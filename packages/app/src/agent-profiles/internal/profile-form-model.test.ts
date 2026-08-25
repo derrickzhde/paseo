@@ -410,18 +410,22 @@ describe("openAgentProfileForm", () => {
       expect(model.getState().disclosure.showThinkingField).toBe(false);
     });
 
-    // The request key contains thinkingOptionId, so rewriting it from the response would
-    // invalidate the key that produced the response and re-request forever.
-    it("does not rewrite the selected thinking id when resolved options arrive", () => {
+    // The request key contains thinkingOptionId, so a rewrite must settle: one correction,
+    // then the same list must leave the id alone or it would re-request forever.
+    it("rewrites an unsupported thinking id once and then stays put", () => {
       const model = openWithCatalog({ mode: "create" });
       selectClaude(model);
-      const key = model.getState().featureRequestKey ?? "";
-      const selectedBefore = model.getState().thinkingOptionId;
+      const resolved = [
+        { id: "low", label: "Low" },
+        { id: "high", label: "High", isDefault: true },
+      ];
 
-      model.applyFeatures(key, [], [{ id: "low", label: "Low" }]);
+      model.applyFeatures(model.getState().featureRequestKey ?? "", [], resolved);
+      expect(model.getState().thinkingOptionId).toBe("high");
 
-      expect(model.getState().thinkingOptionId).toBe(selectedBefore);
-      expect(model.getState().featureRequestKey).toBe(key);
+      const rewrittenId = model.getState().thinkingOptionId;
+      model.applyFeatures(model.getState().featureRequestKey ?? "", [], resolved);
+      expect(model.getState().thinkingOptionId).toBe(rewrittenId);
     });
 
     it("falls back to the catalog when the host sends no thinking options", () => {

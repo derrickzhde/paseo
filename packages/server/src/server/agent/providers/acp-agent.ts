@@ -824,6 +824,7 @@ export class ACPAgentClient implements AgentClient {
   private readonly initialCommandsWaitTimeoutMs: number;
   private readonly extensionCommandsParser?: ACPExtensionCommandsParser;
   protected readonly terminateProcess: ProcessTerminator;
+  private listDraftOptionsTail: Promise<void> = Promise.resolve();
 
   constructor(options: ACPAgentClientOptions) {
     this.provider = options.provider;
@@ -1024,6 +1025,15 @@ export class ACPAgentClient implements AgentClient {
   }
 
   async listDraftOptions(config: AgentSessionConfig): Promise<AgentDraftOptions> {
+    const run = this.listDraftOptionsTail.then(() => this.runListDraftOptions(config));
+    this.listDraftOptionsTail = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
+
+  private async runListDraftOptions(config: AgentSessionConfig): Promise<AgentDraftOptions> {
     const autoAcceptFeature = buildACPAutoAcceptFeature(config);
     if (!config.model && this.configFeatureOptions.length === 0) {
       return { features: [autoAcceptFeature] };
@@ -1067,14 +1077,12 @@ export class ACPAgentClient implements AgentClient {
       // Emitted even when empty: an empty list is the answer for models like Cursor's
       // composer-2.5, and the client needs to tell that apart from a host that never resolved.
       const thinkingOptions = deriveSelectorOptions(configOptions, "thought_level");
-      const defaultThinkingOptionId = thinkingOptions.find((option) => option.isDefault)?.id;
       return {
         features: [
           autoAcceptFeature,
           ...deriveFeaturesFromACP(configOptions, this.configFeatureOptions),
         ],
         thinkingOptions,
-        ...(defaultThinkingOptionId ? { defaultThinkingOptionId } : {}),
       };
     } finally {
       if (restore) {
