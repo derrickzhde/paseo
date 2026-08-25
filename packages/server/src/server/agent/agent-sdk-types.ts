@@ -736,7 +736,6 @@ export interface ResolveAgentDefaultModeInput {
 export interface AgentDraftOptions {
   features: AgentFeature[];
   thinkingOptions?: AgentSelectOption[];
-  defaultThinkingOptionId?: string;
 }
 
 export interface AgentClient {
