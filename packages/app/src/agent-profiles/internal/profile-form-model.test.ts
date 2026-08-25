@@ -377,6 +377,62 @@ describe("openAgentProfileForm", () => {
       expect(model.getState().disclosure.showFeaturesField).toBe(true);
     });
 
+    // ACP hosts report thinking levels per selected model, so the catalog's per-provider list
+    // is wrong for every model the probe session did not sit on.
+    it("prefers the host's resolved thinking options over the catalog's", () => {
+      const model = openWithCatalog({ mode: "create" });
+      selectClaude(model);
+      expect(optionValues(model.getState().thinkingOptions)).toEqual(["think", "think-hard"]);
+
+      model.applyFeatures(
+        model.getState().featureRequestKey ?? "",
+        [],
+        [
+          { id: "low", label: "Low" },
+          { id: "high", label: "High" },
+        ],
+      );
+
+      expect(optionValues(model.getState().thinkingOptions)).toEqual(["low", "high"]);
+    });
+
+    // Composer 2.5 is the real case: the catalog claims the provider's levels, the host says
+    // this model has none. The catalog-seeded id has to go or it keeps the field on screen.
+    it("drops the thinking field and its seeded id when the host resolves no levels", () => {
+      const model = openWithCatalog({ mode: "create" });
+      selectClaude(model);
+      expect(model.getState().thinkingOptionId).toBe("think");
+
+      model.applyFeatures(model.getState().featureRequestKey ?? "", [], []);
+
+      expect(model.getState().thinkingOptions).toEqual([]);
+      expect(model.getState().thinkingOptionId).toBe("");
+      expect(model.getState().disclosure.showThinkingField).toBe(false);
+    });
+
+    // The request key contains thinkingOptionId, so rewriting it from the response would
+    // invalidate the key that produced the response and re-request forever.
+    it("does not rewrite the selected thinking id when resolved options arrive", () => {
+      const model = openWithCatalog({ mode: "create" });
+      selectClaude(model);
+      const key = model.getState().featureRequestKey ?? "";
+      const selectedBefore = model.getState().thinkingOptionId;
+
+      model.applyFeatures(key, [], [{ id: "low", label: "Low" }]);
+
+      expect(model.getState().thinkingOptionId).toBe(selectedBefore);
+      expect(model.getState().featureRequestKey).toBe(key);
+    });
+
+    it("falls back to the catalog when the host sends no thinking options", () => {
+      const model = openWithCatalog({ mode: "create" });
+      selectClaude(model);
+
+      model.applyFeatures(model.getState().featureRequestKey ?? "", []);
+
+      expect(optionValues(model.getState().thinkingOptions)).toEqual(["think", "think-hard"]);
+    });
+
     it("reflects a set feature value back into the rendered feature", () => {
       const model = openWithCatalog({ mode: "create" });
       selectClaude(model);
