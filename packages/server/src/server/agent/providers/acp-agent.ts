@@ -64,6 +64,7 @@ import {
   type AgentCapabilityFlags,
   type AgentClient,
   type AgentCreateConfigUnattendedInput,
+  type AgentDraftOptions,
   type AgentFeature,
   type AgentLaunchContext,
   type AgentMetadata,
@@ -1023,13 +1024,18 @@ export class ACPAgentClient implements AgentClient {
   }
 
   async listFeatures(config: AgentSessionConfig): Promise<AgentFeature[]> {
+    return (await this.listDraftOptions(config)).features;
+  }
+
+  async listDraftOptions(config: AgentSessionConfig): Promise<AgentDraftOptions> {
     const autoAcceptFeature = buildACPAutoAcceptFeature(config);
-    if (this.configFeatureOptions.length === 0) {
-      return [autoAcceptFeature];
+    if (!config.model && this.configFeatureOptions.length === 0) {
+      return { features: [autoAcceptFeature] };
     }
 
     this.assertProvider(config);
     const probe = await this.spawnProcess(PROBE_ENV);
+    let restore: { sessionId: string; configId: string; value: string } | null = null;
     try {
       const response = await this.runACPRequest(() =>
         probe.connection.newSession({
@@ -1037,12 +1043,55 @@ export class ACPAgentClient implements AgentClient {
           mcpServers: [],
         }),
       );
-      const transformed = this.transformSessionResponse(response);
-      return [
-        autoAcceptFeature,
-        ...deriveFeaturesFromACP(transformed.configOptions, this.configFeatureOptions),
-      ];
+      let configOptions = this.transformSessionResponse(response).configOptions;
+
+      const modelOption = findSelectConfigOption({ configOptions, category: "model" });
+      if (config.model && modelOption && modelOption.currentValue !== config.model) {
+        // Some agents (cursor-agent) remember the selected model across processes, so a
+        // probe that switches must put it back before it exits.
+        if (modelOption.currentValue) {
+          restore = {
+            sessionId: response.sessionId,
+            configId: modelOption.id,
+            value: modelOption.currentValue,
+          };
+        }
+        const switched = await this.runACPRequest(() =>
+          probe.connection.setSessionConfigOption({
+            sessionId: response.sessionId,
+            configId: modelOption.id,
+            value: config.model,
+          }),
+        );
+        configOptions = this.configOptionsTransformer
+          ? this.configOptionsTransformer(switched.configOptions ?? [])
+          : (switched.configOptions ?? []);
+      }
+
+      // Emitted even when empty: an empty list is the answer for models like Cursor's
+      // composer-2.5, and the client needs to tell that apart from a host that never resolved.
+      const thinkingOptions = deriveSelectorOptions(configOptions, "thought_level");
+      const defaultThinkingOptionId = thinkingOptions.find((option) => option.isDefault)?.id;
+      return {
+        features: [
+          autoAcceptFeature,
+          ...deriveFeaturesFromACP(configOptions, this.configFeatureOptions),
+        ],
+        thinkingOptions,
+        ...(defaultThinkingOptionId ? { defaultThinkingOptionId } : {}),
+      };
     } finally {
+      if (restore) {
+        const pending = restore;
+        try {
+          await this.runACPRequest(() => probe.connection.setSessionConfigOption(pending));
+        } catch (error) {
+          this.logger.warn(
+            { err: error, provider: this.provider },
+            "Draft option probe could not restore the agent's previously selected model",
+          );
+        }
+      }
       await this.closeProbe(probe);
     }
   }
