@@ -430,6 +430,7 @@ describe("ClaudeAgentClient.fetchCatalog", () => {
       });
 
       expect(models.map((m) => m.id)).toEqual([
+        "claude-opus-5[1m]",
         "claude-opus-5",
         "claude-fable-5-1",
         "claude-fable-5",
@@ -454,7 +455,7 @@ describe("ClaudeAgentClient.fetchCatalog", () => {
       }
 
       const defaultModel = models.find((m) => m.isDefault);
-      expect(defaultModel?.id).toBe("claude-opus-5");
+      expect(defaultModel?.id).toBe("claude-opus-5[1m]");
     } finally {
       await fs.rm(emptyConfigDir, { recursive: true, force: true });
     }
