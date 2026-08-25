@@ -992,7 +992,7 @@ export class Session {
         supportsProviderSnapshotReferences: () =>
           this.supports(CLIENT_CAPS.providerSnapshotReferences),
         listProviderAvailability: () => this.agentManager.listProviderAvailability(),
-        listDraftFeatures: (config) => this.agentManager.listDraftFeatures(config),
+        listDraftOptions: (config) => this.agentManager.listDraftOptions(config),
       },
       providerSnapshotManager,
       logger: this.sessionLogger,

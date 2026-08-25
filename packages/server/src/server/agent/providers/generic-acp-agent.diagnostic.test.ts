@@ -305,6 +305,44 @@ describe("GenericACPAgentClient diagnostics", () => {
     });
   });
 
+  test("sends configured client capabilities to the draft options probe", async () => {
+    await withFakeACPAgent("success", async (scriptPath, mode, testDir) => {
+      const initializeTracePath = path.join(testDir, "initialize.jsonl");
+      const logger = createTestLogger();
+      const registry = buildProviderRegistry(logger, {
+        providerOverrides: {
+          "configured-acp": {
+            extends: "acp",
+            label: "Configured ACP",
+            command: [process.execPath, scriptPath, mode, "", initializeTracePath],
+            options: {
+              clientCapabilities: {
+                fs: { readTextFile: true, writeTextFile: true },
+              },
+            },
+          },
+        },
+      });
+      const client = registry["configured-acp"].createClient(logger);
+
+      await client.listDraftOptions?.({
+        provider: "configured-acp",
+        cwd: testDir,
+        model: "fake-model",
+      });
+
+      const initializeRequests = parseInitializeTrace(await readFile(initializeTracePath, "utf8"));
+
+      expect(initializeRequests).toHaveLength(1);
+      expect(initializeRequests[0]?.clientCapabilities).toMatchObject({
+        fs: {
+          readTextFile: true,
+          writeTextFile: true,
+        },
+      });
+    });
+  });
+
   test("reports a missing launcher without dropping the rest of the diagnostic", async () => {
     await withTempDir("paseo-missing-acp-agent-", async (testDir) => {
       const missingCommand = path.join(testDir, "missing-acp-agent");
