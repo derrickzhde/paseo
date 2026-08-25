@@ -29,6 +29,7 @@ import {
   type AgentCreateSessionOptions,
   type AgentResumePurpose,
   type AgentResumeSessionOptions,
+  type AgentDraftOptions,
   type AgentFeature,
   type AgentLaunchContext,
   type AgentSlashCommand,
@@ -1131,10 +1132,14 @@ export class AgentManager {
   }
 
   async listDraftFeatures(config: AgentSessionConfig): Promise<AgentFeature[]> {
+    return (await this.listDraftOptions(config)).features;
+  }
+
+  async listDraftOptions(config: AgentSessionConfig): Promise<AgentDraftOptions> {
     const normalizedConfig = await this.normalizeConfig(config, { resolveDefaultModel: false });
     const client = this.requireClient(normalizedConfig.provider);
-    if (!normalizedConfig.model && !client.listFeatures) {
-      return [];
+    if (!normalizedConfig.model && !client.listFeatures && !client.listDraftOptions) {
+      return { features: [] };
     }
     const available = await client.isAvailable();
     if (!available) {
@@ -1143,13 +1148,17 @@ export class AgentManager {
       );
     }
 
+    if (client.listDraftOptions) {
+      return await client.listDraftOptions(normalizedConfig);
+    }
+
     if (client.listFeatures) {
-      return await client.listFeatures(normalizedConfig);
+      return { features: await client.listFeatures(normalizedConfig) };
     }
 
     const session = await client.createSession(normalizedConfig);
     try {
-      return session.features ?? [];
+      return { features: session.features ?? [] };
     } finally {
       try {
         await session.close();
