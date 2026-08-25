@@ -918,7 +918,7 @@ export class Session {
         supportsCustomModeIcons: () => this.supports(CLIENT_CAPS.customModeIcons),
         supportsCompactProviderSnapshots: () => this.supports(CLIENT_CAPS.compactProviderSnapshots),
         listProviderAvailability: () => this.agentManager.listProviderAvailability(),
-        listDraftFeatures: (config) => this.agentManager.listDraftFeatures(config),
+        listDraftOptions: (config) => this.agentManager.listDraftOptions(config),
       },
       providerSnapshotManager,
       providerUsageService,

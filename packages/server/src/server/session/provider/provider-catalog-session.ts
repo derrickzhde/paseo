@@ -13,7 +13,7 @@ import {
 } from "../../agent/provider-snapshot-manager.js";
 import {
   filterSelectableAgentModels,
-  type AgentFeature,
+  type AgentDraftOptions,
   type AgentProvider,
   type AgentSessionConfig,
   type ProviderSnapshotEntry,
@@ -48,7 +48,7 @@ export interface ProviderCatalogSessionHost {
   supportsCustomModeIcons(): boolean;
   supportsCompactProviderSnapshots(): boolean;
   listProviderAvailability(): Promise<ProviderAvailability[]>;
-  listDraftFeatures(config: AgentSessionConfig): Promise<AgentFeature[]>;
+  listDraftOptions(config: AgentSessionConfig): Promise<AgentDraftOptions>;
 }
 
 export interface ProviderCatalogSessionOptions {
@@ -329,12 +329,18 @@ export class ProviderCatalogSession {
     const fetchedAt = new Date().toISOString();
     try {
       const sessionConfig = this.buildDraftAgentSessionConfig(msg.draftConfig);
-      const features = await this.host.listDraftFeatures(sessionConfig);
+      const draftOptions = await this.host.listDraftOptions(sessionConfig);
       this.host.emit({
         type: "list_provider_features_response",
         payload: {
           provider: msg.draftConfig.provider,
-          features,
+          features: draftOptions.features,
+          ...(draftOptions.thinkingOptions
+            ? { thinkingOptions: draftOptions.thinkingOptions }
+            : {}),
+          ...(draftOptions.defaultThinkingOptionId
+            ? { defaultThinkingOptionId: draftOptions.defaultThinkingOptionId }
+            : {}),
           error: null,
           fetchedAt,
           requestId: msg.requestId,

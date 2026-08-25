@@ -728,6 +728,12 @@ export interface ResolveAgentDefaultModeInput {
   signal?: AbortSignal;
 }
 
+export interface AgentDraftOptions {
+  features: AgentFeature[];
+  thinkingOptions?: AgentSelectOption[];
+  defaultThinkingOptionId?: string;
+}
+
 export interface AgentClient {
   readonly provider: AgentProvider;
   readonly capabilities: AgentCapabilityFlags;
@@ -761,6 +767,15 @@ export interface AgentClient {
   isCreateConfigUnattended?(input: AgentCreateConfigUnattendedInput): boolean;
   listCommands?(config: AgentSessionConfig): Promise<AgentSlashCommand[]>;
   listFeatures?(config: AgentSessionConfig): Promise<AgentFeature[]>;
+  /**
+   * Resolve the features *and* thinking levels a drafted config would actually get.
+   *
+   * ACP reports both per selected model with no bulk query, so a draft probe that skips
+   * `config.model` describes whichever model the agent happened to sit on. Providers that
+   * know their options are per-model implement this instead of `listFeatures` so one probe
+   * answers both — splitting them would spawn the agent process twice.
+   */
+  listDraftOptions?(config: AgentSessionConfig): Promise<AgentDraftOptions>;
   listImportableSessions?(
     options?: ListImportableSessionsOptions,
   ): Promise<ImportableProviderSession[]>;

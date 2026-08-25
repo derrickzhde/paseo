@@ -55,7 +55,10 @@ export function useAgentProfileFormFeatures(input: {
       if (payload.error) {
         throw new Error(payload.error);
       }
-      return payload.features ?? [];
+      return {
+        features: payload.features ?? [],
+        thinkingOptions: payload.thinkingOptions,
+      };
     },
   });
 
@@ -66,7 +69,7 @@ export function useAgentProfileFormFeatures(input: {
     if (!requestKey || !data) {
       return;
     }
-    model.applyFeatures(requestKey, data);
+    model.applyFeatures(requestKey, data.features, data.thinkingOptions);
   }, [data, model, requestKey]);
 
   useEffect(() => {
