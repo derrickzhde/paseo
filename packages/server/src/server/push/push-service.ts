@@ -23,6 +23,39 @@ interface ExpoPushTicket {
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
 const MAX_BATCH_SIZE = 100;
+const CROSS_PROJECT_ERROR_CODE = "PUSH_TOO_MANY_EXPERIENCE_IDS";
+
+interface ExpoPushApiError {
+  code?: string;
+  message?: string;
+}
+
+function parseExpoPushApiErrors(body: string): ExpoPushApiError[] | null {
+  try {
+    const parsed: unknown = JSON.parse(body);
+    if (typeof parsed !== "object" || parsed === null || !("errors" in parsed)) {
+      return null;
+    }
+    if (!Array.isArray(parsed.errors)) {
+      return null;
+    }
+    return parsed.errors.map((item) => {
+      const error: ExpoPushApiError = {};
+      if (typeof item !== "object" || item === null) {
+        return error;
+      }
+      if ("code" in item && typeof item.code === "string") {
+        error.code = item.code;
+      }
+      if ("message" in item && typeof item.message === "string") {
+        error.message = item.message;
+      }
+      return error;
+    });
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Service for sending Expo push notifications.
@@ -71,10 +104,25 @@ export class PushService {
       });
 
       if (!response.ok) {
+        const body = await response.text().catch(() => "");
+        const errors = parseExpoPushApiErrors(body);
         this.logger.error(
-          { status: response.status, statusText: response.statusText },
+          {
+            status: response.status,
+            statusText: response.statusText,
+            ...(errors ? { errors } : {}),
+          },
           "Expo push API error",
         );
+        // Expo rejects an entire request whose messages span more than one Expo project,
+        // which happens once a device has both an upstream and a fork build installed.
+        // Tokens carry no project id, so retrying one per request is the only recovery.
+        if (
+          messages.length > 1 &&
+          errors?.some((error) => error.code === CROSS_PROJECT_ERROR_CODE)
+        ) {
+          await Promise.all(messages.map((message) => this.sendBatch([message])));
+        }
         return;
       }
 
@@ -92,7 +140,10 @@ export class PushService {
 
       if (ticket.status === "error") {
         this.logger.error(
-          { token: message.to, message: ticket.message, details: ticket.details },
+          {
+            tokenSuffix: message.to.slice(-6),
+            ...(ticket.details?.error ? { errorCode: ticket.details.error } : {}),
+          },
           "Push failed for token",
         );
 
