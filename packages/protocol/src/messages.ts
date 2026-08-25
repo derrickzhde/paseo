@@ -5746,7 +5746,6 @@ export const ListProviderFeaturesResponseMessageSchema = z.object({
     // model send the real levels here. Absent and empty differ: absent means the host did not
     // resolve them (old host, or a provider that cannot), empty means this model has none.
     thinkingOptions: z.array(AgentSelectOptionSchema).optional(),
-    defaultThinkingOptionId: z.string().optional(),
     error: z.string().nullable().optional(),
     fetchedAt: z.string(),
     requestId: z.string(),
