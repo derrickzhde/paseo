@@ -338,9 +338,6 @@ export class ProviderCatalogSession {
           ...(draftOptions.thinkingOptions
             ? { thinkingOptions: draftOptions.thinkingOptions }
             : {}),
-          ...(draftOptions.defaultThinkingOptionId
-            ? { defaultThinkingOptionId: draftOptions.defaultThinkingOptionId }
-            : {}),
           error: null,
           fetchedAt,
           requestId: msg.requestId,
