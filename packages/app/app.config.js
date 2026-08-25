@@ -67,7 +67,7 @@ function resolveSecretFile(params) {
 const variants = {
   production: {
     name: "Paseo",
-    packageId: "sh.paseo",
+    packageId: "com.halocloudnet.paseo",
     googleServicesFile: resolveSecretFile({
       envKey: "GOOGLE_SERVICES_FILE_PROD",
       fallbackRelativePath: "./.secrets/google-services.prod.json",
@@ -79,7 +79,7 @@ const variants = {
   },
   development: {
     name: "Paseo Debug",
-    packageId: "sh.paseo.debug",
+    packageId: "com.halocloudnet.paseo.debug",
     googleServicesFile: resolveSecretFile({
       envKey: "GOOGLE_SERVICES_FILE_DEBUG",
       fallbackRelativePath: "./.secrets/google-services.debug.json",
@@ -188,9 +188,9 @@ export default {
       profileBuild: isProfileBuild,
       router: {},
       eas: {
-        projectId: "0e7f65ce-0367-46c8-a238-2b65963d235a",
+        projectId: "da350ba0-4719-4262-8674-a01eb9449336",
       },
     },
-    owner: "getpaseo",
+    owner: "changsha-huanhui-yingchen-network-technology-coltd",
   },
 };
