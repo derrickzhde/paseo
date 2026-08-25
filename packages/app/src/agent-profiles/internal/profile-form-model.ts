@@ -118,7 +118,11 @@ export interface AgentProfileFormModel {
   /** Late input: the host-scoped provider catalog. Never touches selections. */
   applyProviderCatalog: (entries: readonly ProviderSnapshotEntry[]) => void;
   /** Late input: the feature list for one request. Stale keys are ignored. */
-  applyFeatures: (requestKey: string, features: readonly AgentFeature[]) => void;
+  applyFeatures: (
+    requestKey: string,
+    features: readonly AgentFeature[],
+    thinkingOptions?: readonly AgentSelectOption[],
+  ) => void;
   /** Resolve a request that produced no usable features (provider error). */
   applyFeaturesUnavailable: (requestKey: string) => void;
   setName: (value: string) => void;
@@ -276,12 +280,21 @@ function seedSelections(
     entry: ProviderSnapshotEntry | null;
     models: readonly AgentModelDefinition[];
     modes: readonly AgentMode[];
+    resolvedThinking: ResolvedThinking | null;
   },
 ): AgentProfileFormState {
   const modelId = next.modelId || defaultModelId(input.models);
   const modeId = next.modeId || defaultModeId(input.entry, input.modes);
-  const thinkingOptionId =
-    next.thinkingOptionId || defaultThinkingOptionId(resolveEffectiveModel(input.models, modelId));
+  // A host that resolved *this* model to zero levels overrules the catalog, which only
+  // knows one list per provider. Without this the catalog's default keeps seeding a value
+  // and the field stays on screen to host it.
+  const resolvedEmpty =
+    input.resolvedThinking?.scope === thinkingScopeKey(next.provider, modelId, modeId) &&
+    input.resolvedThinking.options.length === 0;
+  const thinkingOptionId = resolvedEmpty
+    ? ""
+    : next.thinkingOptionId ||
+      defaultThinkingOptionId(resolveEffectiveModel(input.models, modelId));
   if (
     modelId === next.modelId &&
     modeId === next.modeId &&
@@ -290,6 +303,20 @@ function seedSelections(
     return next;
   }
   return { ...next, modelId, modeId, thinkingOptionId };
+}
+
+interface ResolvedThinking {
+  scope: string;
+  options: AgentSelectOption[];
+}
+
+/**
+ * Thinking levels depend on provider/model/mode but not on the selected level itself, so
+ * this key deliberately omits `thinkingOptionId` — keying on it would make every level
+ * change discard an answer that is still valid.
+ */
+function thinkingScopeKey(provider: string, modelId: string, modeId: string): string {
+  return [provider, modelId, modeId].join("|");
 }
 
 /**
@@ -424,6 +451,7 @@ export function openAgentProfileForm(snapshot: AgentProfileFormSnapshot): AgentP
   let catalogResolution: AgentProfileResolutionStatus = "idle";
   let resolvedFeatureKey: string | null = null;
   let resolvedFeatures: AgentFeature[] = [];
+  let resolvedThinking: ResolvedThinking | null = null;
   let listeners = new Set<() => void>();
   let closed = false;
 
@@ -434,8 +462,8 @@ export function openAgentProfileForm(snapshot: AgentProfileFormSnapshot): AgentP
       entry: findEntry(entries, incoming.provider),
       models,
       modes,
+      resolvedThinking,
     });
-    const thinking = resolveThinkingOptions(entries, next.provider, next.modelId);
     const featureRequest = buildFeatureRequest(next);
     const featureRequestKey = buildFeatureRequestKey(featureRequest);
     const featuresAreCurrent =
@@ -443,6 +471,12 @@ export function openAgentProfileForm(snapshot: AgentProfileFormSnapshot): AgentP
     const features = featuresAreCurrent
       ? applyFeatureValues(resolvedFeatures, next.featureValues)
       : [];
+    // The catalog lists one thinking set per provider, but ACP reports levels per model, so
+    // the host's answer for this exact model wins when it has one.
+    const thinking =
+      resolvedThinking?.scope === thinkingScopeKey(next.provider, next.modelId, next.modeId)
+        ? resolvedThinking.options
+        : resolveThinkingOptions(entries, next.provider, next.modelId);
     const featureResolution = resolveFeatureStatus(featureRequestKey, featuresAreCurrent);
 
     const withOptions: AgentProfileFormState = {
@@ -531,12 +565,18 @@ export function openAgentProfileForm(snapshot: AgentProfileFormSnapshot): AgentP
       catalogResolution = "complete";
       publish((current) => current);
     },
-    applyFeatures: (requestKey, features) => {
+    applyFeatures: (requestKey, features, thinkingOptions) => {
       if (requestKey !== state.featureRequestKey) {
         return;
       }
       resolvedFeatureKey = requestKey;
       resolvedFeatures = [...features];
+      resolvedThinking = thinkingOptions
+        ? {
+            scope: thinkingScopeKey(state.provider, state.modelId, state.modeId),
+            options: [...thinkingOptions],
+          }
+        : null;
       publish((current) => ({
         ...current,
         featureValues: pruneFeatureValues(current.featureValues, resolvedFeatures),
@@ -548,6 +588,7 @@ export function openAgentProfileForm(snapshot: AgentProfileFormSnapshot): AgentP
       }
       resolvedFeatureKey = requestKey;
       resolvedFeatures = [];
+      resolvedThinking = null;
       publish((current) => current);
     },
     setName: (value) => publish((current) => ({ ...current, name: value })),

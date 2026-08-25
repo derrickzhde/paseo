@@ -488,6 +488,7 @@ function wrapClientProvider(
   const listImportableSessions = inner.listImportableSessions?.bind(inner);
   const importSession = inner.importSession?.bind(inner);
   const listFeatures = inner.listFeatures?.bind(inner);
+  const listDraftOptions = inner.listDraftOptions?.bind(inner);
   const archiveNativeSession = inner.archiveNativeSession?.bind(inner);
   const unarchiveNativeSession = inner.unarchiveNativeSession?.bind(inner);
 
@@ -546,6 +547,9 @@ function wrapClientProvider(
     isCreateConfigUnattended: inner.isCreateConfigUnattended?.bind(inner),
     listFeatures: listFeatures
       ? async (config) => await listFeatures({ ...config, provider: inner.provider })
+      : undefined,
+    listDraftOptions: listDraftOptions
+      ? async (config) => await listDraftOptions({ ...config, provider: inner.provider })
       : undefined,
     listImportableSessions: listImportableSessions
       ? async (options) => await listImportableSessions(options)
