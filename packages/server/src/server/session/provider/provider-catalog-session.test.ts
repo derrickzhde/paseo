@@ -60,7 +60,7 @@ function makeSubsystem(options: MakeOptions = {}) {
     },
     supportsCompactProviderSnapshots: () => options.supportsCompactProviderSnapshots ?? false,
     listProviderAvailability: async () => [],
-    listDraftFeatures: async () => [],
+    listDraftOptions: async () => ({ features: [] }),
     ...options.host,
   };
   const providerSnapshotManager = createStub<ProviderSnapshotManager>({
@@ -321,7 +321,7 @@ describe("ProviderCatalogSession", () => {
   it("surfaces a feature-list failure inline, not as an rpc_error", async () => {
     const { subsystem, emitted } = makeSubsystem({
       host: {
-        listDraftFeatures: async () => {
+        listDraftOptions: async () => {
           throw new Error("feature probe failed");
         },
       },
@@ -337,6 +337,33 @@ describe("ProviderCatalogSession", () => {
     const res = findByType(emitted, "list_provider_features_response");
     expect(res?.payload.error).toBe("feature probe failed");
     expect(res?.payload.requestId).toBe("f1");
+  });
+
+  it("forwards resolved features and thinking options on list_provider_features_response", async () => {
+    const features = [
+      { type: "toggle" as const, id: "webSearch", label: "Web search", value: false },
+    ];
+    const thinkingOptions = [
+      { id: "low", label: "Low" },
+      { id: "high", label: "High", isDefault: true },
+    ];
+    const { subsystem, emitted } = makeSubsystem({
+      host: {
+        listDraftOptions: async () => ({ features, thinkingOptions }),
+      },
+    });
+
+    await subsystem.handleListProviderFeaturesRequest({
+      type: "list_provider_features_request",
+      requestId: "f-ok",
+      draftConfig: { provider: "codex", cwd: "/tmp/project" },
+    });
+
+    const res = findByType(emitted, "list_provider_features_response");
+    expect(res?.payload.requestId).toBe("f-ok");
+    expect(res?.payload.error).toBeNull();
+    expect(res?.payload.features).toEqual(features);
+    expect(res?.payload.thinkingOptions).toEqual(thinkingOptions);
   });
 });
 
