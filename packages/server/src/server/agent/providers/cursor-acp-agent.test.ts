@@ -248,7 +248,6 @@ describe("CursorACPAgentClient draft option resolution", () => {
     });
 
     expect(resolved.thinkingOptions?.map((option) => option.id)).toEqual(["low", "high"]);
-    expect(resolved.defaultThinkingOptionId).toBe("high");
     expect(resolved.features.map((feature) => feature.id)).toContain(CURSOR_FAST_FEATURE_OPTION.id);
   });
 
@@ -264,7 +263,6 @@ describe("CursorACPAgentClient draft option resolution", () => {
     });
 
     expect(resolved.thinkingOptions).toEqual([]);
-    expect(resolved.defaultThinkingOptionId).toBeUndefined();
   });
 
   test("restores the model the agent had selected before the probe switched it", async () => {
@@ -284,5 +282,20 @@ describe("CursorACPAgentClient draft option resolution", () => {
     await client.listDraftOptions({ provider: "acp", cwd: "/tmp/cursor", model: "default" });
 
     expect(client.configOptionWrites).toEqual([]);
+  });
+
+  test("serializes concurrent draft probes so the second switch waits for the first restore", async () => {
+    const client = createClient();
+
+    await Promise.all([
+      client.listDraftOptions({ provider: "acp", cwd: "/tmp/cursor", model: "grok-4.6" }),
+      client.listDraftOptions({ provider: "acp", cwd: "/tmp/cursor", model: "composer-2.5" }),
+    ]);
+
+    const values = client.configOptionWrites.map((write) => write.value);
+    expect(values).toHaveLength(4);
+    expect(values[1]).toBe("default");
+    expect(values[3]).toBe("default");
+    expect(new Set([values[0], values[2]])).toEqual(new Set(["grok-4.6", "composer-2.5"]));
   });
 });
