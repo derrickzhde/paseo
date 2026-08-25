@@ -50,6 +50,7 @@ describe("getClaudeModels", () => {
   it("returns all claude models", () => {
     const models = getClaudeModels();
     expect(models.map((m) => m.id)).toEqual([
+      "claude-opus-5[1m]",
       "claude-opus-5",
       "claude-fable-5-1",
       "claude-fable-5",
@@ -72,7 +73,7 @@ describe("getClaudeModels", () => {
     const models = getClaudeModels();
     const defaults = models.filter((m) => m.isDefault);
     expect(defaults).toHaveLength(1);
-    expect(defaults[0].id).toBe("claude-opus-5");
+    expect(defaults[0].id).toBe("claude-opus-5[1m]");
   });
 
   it("defines context window sizes in the catalog", () => {
@@ -82,7 +83,8 @@ describe("getClaudeModels", () => {
 
     expect(contextWindows).toEqual(
       new Map([
-        ["claude-opus-5", 1_000_000],
+        ["claude-opus-5[1m]", 1_000_000],
+        ["claude-opus-5", 200_000],
         ["claude-fable-5-1", 1_000_000],
         ["claude-fable-5", 1_000_000],
         ["claude-fable-5[1m]", 1_000_000],
@@ -103,8 +105,10 @@ describe("getClaudeModels", () => {
 
   it("filters models by their minimum Claude Code version", () => {
     const oldVersionModels = getClaudeModels("2.1.218");
+    expect(oldVersionModels.map((model) => model.id)).not.toContain("claude-opus-5[1m]");
     expect(oldVersionModels.map((model) => model.id)).not.toContain("claude-opus-5");
     expect(oldVersionModels.find((model) => model.isDefault)?.id).toBe("claude-opus-4-8");
+    expect(getClaudeModels("2.1.219").map((model) => model.id)).toContain("claude-opus-5[1m]");
     expect(getClaudeModels("2.1.219").map((model) => model.id)).toContain("claude-opus-5");
 
     expect(getClaudeModels("2.1.168").map((model) => model.id)).not.toContain("claude-fable-5");
@@ -364,6 +368,7 @@ describe("ClaudeAgentClient.fetchCatalog", () => {
 
 describe("normalizeClaudeRuntimeModelId", () => {
   it("returns exact match for known model IDs", () => {
+    expect(normalizeClaudeRuntimeModelId("claude-opus-5[1m]")).toBe("claude-opus-5[1m]");
     expect(normalizeClaudeRuntimeModelId("claude-opus-5")).toBe("claude-opus-5");
     expect(normalizeClaudeRuntimeModelId("claude-fable-5")).toBe("claude-fable-5");
     expect(normalizeClaudeRuntimeModelId("claude-fable-5[1m]")).toBe("claude-fable-5");
@@ -382,6 +387,7 @@ describe("normalizeClaudeRuntimeModelId", () => {
     expect(normalizeClaudeRuntimeModelId("claude-opus-4-6-20260101")).toBe("claude-opus-4-6");
     expect(normalizeClaudeRuntimeModelId("claude-sonnet-4-6-20260101")).toBe("claude-sonnet-4-6");
     expect(normalizeClaudeRuntimeModelId("claude-haiku-4-5-20251001")).toBe("claude-haiku-4-5");
+    expect(normalizeClaudeRuntimeModelId("claude-opus-5-20260724[1m]")).toBe("claude-opus-5[1m]");
     expect(normalizeClaudeRuntimeModelId("claude-fable-5-20260301[1m]")).toBe("claude-fable-5");
     expect(normalizeClaudeRuntimeModelId("claude-sonnet-5-20260101[1m]")).toBe(
       "claude-sonnet-5[1m]",
@@ -436,20 +442,21 @@ describe("findClaudeModel", () => {
 });
 
 describe("Claude Opus 5 catalog", () => {
-  it("offers a single Opus 5 entry with a 1M context window", () => {
+  it("offers a standard entry and a 1M entry, like Opus 4.8 and 4.7", () => {
     const opus5Models = getClaudeModels()
       .filter((model) => model.id.startsWith("claude-opus-5"))
       .map(({ id, label, contextWindowMaxTokens }) => ({ id, label, contextWindowMaxTokens }));
 
     expect(opus5Models).toEqual([
-      { id: "claude-opus-5", label: "Opus 5", contextWindowMaxTokens: 1_000_000 },
+      { id: "claude-opus-5[1m]", label: "Opus 5 1M", contextWindowMaxTokens: 1_000_000 },
+      { id: "claude-opus-5", label: "Opus 5", contextWindowMaxTokens: 200_000 },
     ]);
   });
 
-  it("resolves retired and dated Opus 5 IDs to the single catalog entry", () => {
-    expect(findClaudeModel("claude-opus-5[1m]")?.id).toBe("claude-opus-5");
+  it("resolves dated Opus 5 IDs to the matching context-window entry", () => {
+    expect(findClaudeModel("claude-opus-5[1m]")?.id).toBe("claude-opus-5[1m]");
     expect(findClaudeModel("claude-opus-5-20260724")?.id).toBe("claude-opus-5");
-    expect(findClaudeModel("claude-opus-5-20260724[1m]")?.id).toBe("claude-opus-5");
+    expect(findClaudeModel("claude-opus-5-20260724[1m]")?.id).toBe("claude-opus-5[1m]");
     expect(findClaudeModel("claude-opus-5[1m]")?.contextWindowMaxTokens).toBe(1_000_000);
   });
 

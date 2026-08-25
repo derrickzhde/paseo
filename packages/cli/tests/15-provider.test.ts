@@ -121,6 +121,11 @@ const EXPECTED_CLAUDE_MODELS = [
 
 const EXPECTED_CLAUDE_CONTEXT_MODELS = [
   {
+    id: "claude-opus-5[1m]",
+    model: "Opus 5 1M",
+    descriptionFragment: "1M context window",
+  },
+  {
     id: "claude-sonnet-5[1m]",
     model: "Sonnet 5 1M",
     descriptionFragment: "1M context window",
