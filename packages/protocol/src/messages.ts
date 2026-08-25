@@ -5739,6 +5739,13 @@ export const ListProviderFeaturesResponseMessageSchema = z.object({
   payload: z.object({
     provider: AgentProviderSchema,
     features: z.array(AgentFeatureSchema).optional(),
+    // COMPAT(draftThinkingOptions): added in v0.5.4, remove optional parsing after 2027-08-25.
+    // ACP reports thinking levels per selected model, so the catalog's per-provider list is
+    // wrong for every model the probe session did not sit on. Hosts that resolve the drafted
+    // model send the real levels here. Absent and empty differ: absent means the host did not
+    // resolve them (old host, or a provider that cannot), empty means this model has none.
+    thinkingOptions: z.array(AgentSelectOptionSchema).optional(),
+    defaultThinkingOptionId: z.string().optional(),
     error: z.string().nullable().optional(),
     fetchedAt: z.string(),
     requestId: z.string(),
