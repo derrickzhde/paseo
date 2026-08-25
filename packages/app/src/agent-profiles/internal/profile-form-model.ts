@@ -285,16 +285,28 @@ function seedSelections(
 ): AgentProfileFormState {
   const modelId = next.modelId || defaultModelId(input.models);
   const modeId = next.modeId || defaultModeId(input.entry, input.modes);
-  // A host that resolved *this* model to zero levels overrules the catalog, which only
-  // knows one list per provider. Without this the catalog's default keeps seeding a value
-  // and the field stays on screen to host it.
-  const resolvedEmpty =
-    input.resolvedThinking?.scope === thinkingScopeKey(next.provider, modelId, modeId) &&
-    input.resolvedThinking.options.length === 0;
-  const thinkingOptionId = resolvedEmpty
-    ? ""
-    : next.thinkingOptionId ||
+  // A host that resolved *this* model overrules the catalog, which only knows one list
+  // per provider. An empty list clears the seeded id so the field can leave the screen;
+  // a non-empty list that does not contain the current id must land on a real option or
+  // the next feature request would keep asking for a level this model does not have.
+  let thinkingOptionId: string;
+  if (
+    input.resolvedThinking &&
+    input.resolvedThinking.scope === thinkingScopeKey(next.provider, modelId, modeId)
+  ) {
+    const options = input.resolvedThinking.options;
+    if (options.length === 0) {
+      thinkingOptionId = "";
+    } else if (options.some((option) => option.id === next.thinkingOptionId)) {
+      thinkingOptionId = next.thinkingOptionId;
+    } else {
+      thinkingOptionId = options.find((option) => option.isDefault)?.id ?? options[0]?.id ?? "";
+    }
+  } else {
+    thinkingOptionId =
+      next.thinkingOptionId ||
       defaultThinkingOptionId(resolveEffectiveModel(input.models, modelId));
+  }
   if (
     modelId === next.modelId &&
     modeId === next.modeId &&
