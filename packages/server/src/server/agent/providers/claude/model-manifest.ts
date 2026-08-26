@@ -56,13 +56,19 @@ export const CLAUDE_MODEL_MANIFEST = [
     supportsFastMode: true,
   },
   {
+    id: "claude-fable-5[1m]",
+    label: "Fable 5 1M",
+    description: "Fable 5 with 1M context window",
+    minimumClaudeCodeVersion: "2.1.169",
+    contextWindowMaxTokens: 1_000_000,
+    effortLevels: CLAUDE_EFFORT_LEVELS.xhigh,
+  },
+  {
     id: "claude-fable-5",
-    // COMPAT(claudeFable5OneMillionId): added in v0.3.0, remove after 2027-02-06 once pre-v0.3.0 app preferences are outside support.
-    aliases: ["claude-fable-5[1m]"],
     label: "Fable 5",
     description: "Fable 5 · Most powerful model",
     minimumClaudeCodeVersion: "2.1.169",
-    contextWindowMaxTokens: 1_000_000,
+    contextWindowMaxTokens: 200_000,
     effortLevels: CLAUDE_EFFORT_LEVELS.xhigh,
   },
   {
