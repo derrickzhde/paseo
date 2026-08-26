@@ -52,8 +52,8 @@ describe("getClaudeModels", () => {
     expect(models.map((m) => m.id)).toEqual([
       "claude-opus-5[1m]",
       "claude-opus-5",
-      "claude-fable-5",
       "claude-fable-5[1m]",
+      "claude-fable-5",
       "claude-opus-4-8[1m]",
       "claude-opus-4-8",
       "claude-sonnet-5",
@@ -84,8 +84,8 @@ describe("getClaudeModels", () => {
       new Map([
         ["claude-opus-5[1m]", 1_000_000],
         ["claude-opus-5", 200_000],
-        ["claude-fable-5", 1_000_000],
         ["claude-fable-5[1m]", 1_000_000],
+        ["claude-fable-5", 200_000],
         ["claude-opus-4-8[1m]", 1_000_000],
         ["claude-opus-4-8", 200_000],
         ["claude-sonnet-5", 200_000],
@@ -111,6 +111,8 @@ describe("getClaudeModels", () => {
 
     expect(getClaudeModels("2.1.168").map((model) => model.id)).not.toContain("claude-fable-5");
     expect(getClaudeModels("2.1.169").map((model) => model.id)).toContain("claude-fable-5");
+    expect(getClaudeModels("2.1.168").map((model) => model.id)).not.toContain("claude-fable-5[1m]");
+    expect(getClaudeModels("2.1.169").map((model) => model.id)).toContain("claude-fable-5[1m]");
   });
 
   it("derives thinking options from model effort capabilities", () => {
@@ -326,7 +328,7 @@ describe("ClaudeAgentClient.fetchCatalog", () => {
     ]);
   });
 
-  it("lets an exact settings model override the hidden Fable compatibility entry", async () => {
+  it("surfaces a settings-configured Fable 5 1M id once, as a selectable entry", async () => {
     const configDir = await createClaudeConfigDir({ model: "claude-fable-5[1m]" });
     vi.stubEnv("CLAUDE_CONFIG_DIR", configDir);
     const client = createCatalogClient();
@@ -341,9 +343,10 @@ describe("ClaudeAgentClient.fetchCatalog", () => {
     expect(configured).toHaveLength(1);
     expect(configured[0]).toMatchObject({
       id: "claude-fable-5[1m]",
-      isSelectable: true,
+      contextWindowMaxTokens: 1_000_000,
       defaultThinkingOptionId: "high",
     });
+    expect(configured[0]?.isSelectable).not.toBe(false);
   });
 
   it("omits models that require a newer Claude Code version", async () => {
@@ -365,7 +368,7 @@ describe("normalizeClaudeRuntimeModelId", () => {
     expect(normalizeClaudeRuntimeModelId("claude-opus-5[1m]")).toBe("claude-opus-5[1m]");
     expect(normalizeClaudeRuntimeModelId("claude-opus-5")).toBe("claude-opus-5");
     expect(normalizeClaudeRuntimeModelId("claude-fable-5")).toBe("claude-fable-5");
-    expect(normalizeClaudeRuntimeModelId("claude-fable-5[1m]")).toBe("claude-fable-5");
+    expect(normalizeClaudeRuntimeModelId("claude-fable-5[1m]")).toBe("claude-fable-5[1m]");
     expect(normalizeClaudeRuntimeModelId("claude-sonnet-5")).toBe("claude-sonnet-5");
     expect(normalizeClaudeRuntimeModelId("claude-sonnet-5[1m]")).toBe("claude-sonnet-5[1m]");
     expect(normalizeClaudeRuntimeModelId("claude-opus-4-6")).toBe("claude-opus-4-6");
@@ -382,16 +385,19 @@ describe("normalizeClaudeRuntimeModelId", () => {
     expect(normalizeClaudeRuntimeModelId("claude-sonnet-4-6-20260101")).toBe("claude-sonnet-4-6");
     expect(normalizeClaudeRuntimeModelId("claude-haiku-4-5-20251001")).toBe("claude-haiku-4-5");
     expect(normalizeClaudeRuntimeModelId("claude-opus-5-20260724[1m]")).toBe("claude-opus-5[1m]");
-    expect(normalizeClaudeRuntimeModelId("claude-fable-5-20260301[1m]")).toBe("claude-fable-5");
+    expect(normalizeClaudeRuntimeModelId("claude-fable-5-20260301[1m]")).toBe("claude-fable-5[1m]");
     expect(normalizeClaudeRuntimeModelId("claude-sonnet-5-20260101[1m]")).toBe(
       "claude-sonnet-5[1m]",
     );
   });
 
-  it("preserves [1m] only when it identifies a distinct catalog entry", () => {
-    expect(normalizeClaudeRuntimeModelId("claude-fable-5[1m]")).toBe("claude-fable-5");
+  // Every 1M variant names its own catalog entry, so the suffix always survives. Dropping it
+  // silently downgrades the request to the 200K model the bare id points at.
+  it("preserves [1m] because it always identifies a distinct catalog entry", () => {
+    expect(normalizeClaudeRuntimeModelId("claude-fable-5[1m]")).toBe("claude-fable-5[1m]");
     expect(normalizeClaudeRuntimeModelId("claude-sonnet-5[1m]")).toBe("claude-sonnet-5[1m]");
     expect(normalizeClaudeRuntimeModelId("claude-opus-4-6[1m]")).toBe("claude-opus-4-6[1m]");
+    expect(normalizeClaudeRuntimeModelId("claude-opus-5[1m]")).toBe("claude-opus-5[1m]");
   });
 
   it("returns null for empty/null/undefined", () => {
@@ -463,7 +469,10 @@ describe("Claude Opus 5 catalog", () => {
 });
 
 describe("Claude Fable 5 catalog", () => {
-  it("offers one selectable Fable 5 entry and a compatibility entry for old apps", () => {
+  // Fable 5 follows the same shape as every other 1M model: the bare id is the 200K model and
+  // the suffixed id is its own selectable 1M entry. Collapsing them hid the 1M variant and
+  // labelled the 200K one as 1M, so picking Fable could never reach a million tokens.
+  it("offers the 1M variant and the 200K base as separate selectable entries", () => {
     const fable5Models = getClaudeModels()
       .filter((model) => model.id.startsWith("claude-fable-5"))
       .map(({ id, aliases, isSelectable, label, contextWindowMaxTokens }) => ({
@@ -476,25 +485,27 @@ describe("Claude Fable 5 catalog", () => {
 
     expect(fable5Models).toEqual([
       {
-        id: "claude-fable-5",
-        aliases: ["claude-fable-5[1m]"],
+        id: "claude-fable-5[1m]",
+        aliases: undefined,
         isSelectable: undefined,
-        label: "Fable 5",
+        label: "Fable 5 1M",
         contextWindowMaxTokens: 1_000_000,
       },
       {
-        id: "claude-fable-5[1m]",
+        id: "claude-fable-5",
         aliases: undefined,
-        isSelectable: false,
+        isSelectable: undefined,
         label: "Fable 5",
-        contextWindowMaxTokens: 1_000_000,
+        contextWindowMaxTokens: 200_000,
       },
     ]);
   });
 
-  it("resolves retired Fable 5 IDs to the canonical catalog entry", () => {
-    expect(findClaudeModel("claude-fable-5[1m]")?.id).toBe("claude-fable-5");
-    expect(findClaudeModel("claude-fable-5-20260301[1m]")?.id).toBe("claude-fable-5");
+  it("resolves Fable 5 IDs to the entry whose context window they name", () => {
+    expect(findClaudeModel("claude-fable-5[1m]")?.id).toBe("claude-fable-5[1m]");
+    expect(findClaudeModel("claude-fable-5-20260301[1m]")?.id).toBe("claude-fable-5[1m]");
+    expect(findClaudeModel("claude-fable-5")?.id).toBe("claude-fable-5");
+    expect(findClaudeModel("claude-fable-5-20260301")?.id).toBe("claude-fable-5");
   });
 });
 
