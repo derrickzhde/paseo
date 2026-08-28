@@ -24,13 +24,39 @@ interface ExpoPushTicket {
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
 const MAX_BATCH_SIZE = 100;
 const CROSS_PROJECT_ERROR_CODE = "PUSH_TOO_MANY_EXPERIENCE_IDS";
+const MAX_INDIVIDUAL_RETRY_CONCURRENCY = 5;
+const REQUEST_TIMEOUT_MS = 30_000;
 
-interface ExpoPushApiError {
-  code?: string;
-  message?: string;
+// Expo rejects a whole request that mixes projects, so recovery means one request per token.
+// The daemon fires pushes concurrently and without awaiting, so the limit has to live on the
+// service rather than on a single send, or overlapping sends each open their own window.
+export function createConcurrencyGate(limit: number): <T>(task: () => Promise<T>) => Promise<T> {
+  let active = 0;
+  const waiting: Array<() => void> = [];
+  return async <T>(task: () => Promise<T>): Promise<T> => {
+    if (active >= limit) {
+      // The waiter inherits the permit of whoever woke it, so it must not take one itself.
+      await new Promise<void>((resolve) => waiting.push(resolve));
+    } else {
+      active++;
+    }
+    try {
+      return await task();
+    } finally {
+      // Hand the permit straight to the next waiter. Releasing it first would expose a free
+      // slot that a caller arriving before the waiter resumes could take, putting both over
+      // the limit.
+      const next = waiting.shift();
+      if (next) {
+        next();
+      } else {
+        active--;
+      }
+    }
+  };
 }
 
-function parseExpoPushApiErrors(body: string): ExpoPushApiError[] | null {
+function parseExpoPushApiErrorCodes(body: string): string[] | null {
   try {
     const parsed: unknown = JSON.parse(body);
     if (typeof parsed !== "object" || parsed === null || !("errors" in parsed)) {
@@ -39,19 +65,18 @@ function parseExpoPushApiErrors(body: string): ExpoPushApiError[] | null {
     if (!Array.isArray(parsed.errors)) {
       return null;
     }
-    return parsed.errors.map((item) => {
-      const error: ExpoPushApiError = {};
-      if (typeof item !== "object" || item === null) {
-        return error;
+    const codes: string[] = [];
+    for (const item of parsed.errors) {
+      if (
+        typeof item === "object" &&
+        item !== null &&
+        "code" in item &&
+        typeof item.code === "string"
+      ) {
+        codes.push(item.code);
       }
-      if ("code" in item && typeof item.code === "string") {
-        error.code = item.code;
-      }
-      if ("message" in item && typeof item.message === "string") {
-        error.message = item.message;
-      }
-      return error;
-    });
+    }
+    return codes.length > 0 ? codes : null;
   } catch {
     return null;
   }
@@ -64,6 +89,7 @@ function parseExpoPushApiErrors(body: string): ExpoPushApiError[] | null {
 export class PushService {
   private readonly logger: pino.Logger;
   private readonly revokeToken: (token: string) => void;
+  private readonly retryGate = createConcurrencyGate(MAX_INDIVIDUAL_RETRY_CONCURRENCY);
 
   constructor(logger: pino.Logger, revokeToken: (token: string) => void) {
     this.logger = logger.child({ component: "push-service" });
@@ -101,27 +127,27 @@ export class PushService {
           Accept: "application/json",
         },
         body: JSON.stringify(messages),
+        // Without this a stalled request holds its retry permit until undici's own timeouts
+        // fire, and five of them starve every later retry.
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
 
       if (!response.ok) {
         const body = await response.text().catch(() => "");
-        const errors = parseExpoPushApiErrors(body);
+        const errorCodes = parseExpoPushApiErrorCodes(body);
         this.logger.error(
           {
             status: response.status,
             statusText: response.statusText,
-            ...(errors ? { errors } : {}),
+            ...(errorCodes ? { errorCodes } : {}),
           },
           "Expo push API error",
         );
         // Expo rejects an entire request whose messages span more than one Expo project,
         // which happens once a device has both an upstream and a fork build installed.
         // Tokens carry no project id, so retrying one per request is the only recovery.
-        if (
-          messages.length > 1 &&
-          errors?.some((error) => error.code === CROSS_PROJECT_ERROR_CODE)
-        ) {
-          await Promise.all(messages.map((message) => this.sendBatch([message])));
+        if (messages.length > 1 && errorCodes?.includes(CROSS_PROJECT_ERROR_CODE)) {
+          await this.sendIndividualRetries(messages);
         }
         return;
       }
@@ -131,6 +157,10 @@ export class PushService {
     } catch (error) {
       this.logger.error({ err: error }, "Failed to send push notifications");
     }
+  }
+
+  private async sendIndividualRetries(messages: ExpoPushMessage[]): Promise<void> {
+    await Promise.all(messages.map((message) => this.retryGate(() => this.sendBatch([message]))));
   }
 
   private handleTickets(messages: ExpoPushMessage[], tickets: ExpoPushTicket[]): void {
