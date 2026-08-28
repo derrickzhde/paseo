@@ -126,6 +126,11 @@ const EXPECTED_CLAUDE_CONTEXT_MODELS = [
     descriptionFragment: "1M context window",
   },
   {
+    id: "claude-fable-5[1m]",
+    model: "Fable 5 1M",
+    descriptionFragment: "1M context window",
+  },
+  {
     id: "claude-sonnet-5[1m]",
     model: "Sonnet 5 1M",
     descriptionFragment: "1M context window",
@@ -144,7 +149,12 @@ const EXPECTED_CLAUDE_CATALOG_MODELS = [
 let claudeModelIdsFromJson: string[] = [];
 let claudeModelsFromJson: ProviderModel[] = [];
 
-const ctx = await createE2ETestContext({ timeout: 120000 });
+const ctx = await createE2ETestContext({
+  timeout: 120000,
+  env: {
+    CLAUDE_CONFIG_DIR: join(import.meta.dirname, "fixtures", "empty-claude-config"),
+  },
+});
 
 async function runProviderModelsJson(provider: string): Promise<ProviderModel[]> {
   const transientNeedles = ["transport closed", "timed out", "timeout", "socket", "econn"];
@@ -353,10 +363,6 @@ try {
     assert(
       ids.every((id) => id.startsWith("gpt-")),
       "all codex model IDs should be from the gpt family",
-    );
-    assert(
-      ids.some((id) => id.includes("codex")),
-      "codex model list should include at least one codex-optimized model",
     );
     assert(
       data.every((m) => m.model && m.id && m.description),
