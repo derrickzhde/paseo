@@ -107,7 +107,7 @@ describe("GenericACPAgentClient diagnostics", () => {
     });
   });
 
-  test("sends configured client capabilities in catalog and live session initialization", async () => {
+  test("forces terminal=false for catalog probe initialize but keeps live session terminal=true", async () => {
     await withFakeACPAgent("success", async (scriptPath, mode, testDir) => {
       const initializeTracePath = path.join(testDir, "initialize.jsonl");
       const client = new GenericACPAgentClient({
@@ -131,26 +131,20 @@ describe("GenericACPAgentClient diagnostics", () => {
       const initializeRequests = parseInitializeTrace(await readFile(initializeTracePath, "utf8"));
 
       expect(initializeRequests).toHaveLength(2);
-      expect(initializeRequests).toEqual([
-        {
-          clientCapabilities: {
-            fs: {
-              readTextFile: true,
-              writeTextFile: true,
-            },
-            terminal: true,
-          },
+      expect(initializeRequests[0]?.clientCapabilities).toEqual({
+        fs: {
+          readTextFile: true,
+          writeTextFile: true,
         },
-        {
-          clientCapabilities: {
-            fs: {
-              readTextFile: true,
-              writeTextFile: true,
-            },
-            terminal: true,
-          },
+        terminal: false,
+      });
+      expect(initializeRequests[1]?.clientCapabilities).toEqual({
+        fs: {
+          readTextFile: true,
+          writeTextFile: true,
         },
-      ]);
+        terminal: true,
+      });
     });
   });
 
