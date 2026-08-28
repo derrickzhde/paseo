@@ -350,6 +350,8 @@ describe("ClaudeAgentClient.fetchCatalog", () => {
   });
 
   it("omits models that require a newer Claude Code version", async () => {
+    const configDir = await createClaudeConfigDir({});
+    vi.stubEnv("CLAUDE_CONFIG_DIR", configDir);
     const client = createCatalogClient("2.1.218");
 
     const { models } = await client.fetchCatalog({
