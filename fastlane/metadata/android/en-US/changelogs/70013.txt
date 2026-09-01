@@ -1,0 +1,6 @@
+Fixed
+- Fixed Opus 5 and Fable 5 offering no selectable 1M context entry while the plain entries were labelled 1M but ran at 200K.
+- Fixed ACP agents reporting the catalog's per-provider thinking levels and features instead of the ones the selected model actually supports.
+- Fixed concurrent ACP draft probes racing each other, and probe connections claiming terminal support their client cannot provide.
+
+Full notes: https://paseo.sh/changelog

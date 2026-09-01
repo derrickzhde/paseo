@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.7.1 - 2026-09-01
+
+### Fixed
+
+- Fixed Opus 5 and Fable 5 offering no selectable 1M context entry while the plain entries were labelled 1M but ran at 200K.
+- Fixed ACP agents reporting the catalog's per-provider thinking levels and features instead of the ones the selected model actually supports.
+- Fixed concurrent ACP draft probes racing each other, and probe connections claiming terminal support their client cannot provide.
+- Fixed push notifications failing outright when a device has builds from two Expo projects installed, and bounded the per-token retry fanout that recovery needs.
+- Fixed Expo push error bodies echoing device tokens and app identities into the daemon log.
+
+### Changed
+
+- Changed the GLM agent to install glm-acp-agent 1.8.0, which carries the current Coding Plan model set.
+- Changed desktop updates and mobile app identity to point at this fork.
+
 ## 0.7.0 - 2026-08-31
 
 ### Changed
