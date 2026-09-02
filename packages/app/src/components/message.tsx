@@ -1489,6 +1489,494 @@ function MarkdownListView({
   );
 }
 
+export function createAssistantMessageMarkdownRules({
+  phase,
+  markdownParser,
+  fileLinkActions,
+  client,
+  occurrenceKey,
+  serverId,
+  workspaceRoot,
+}: {
+  phase: MarkdownPhase;
+  markdownParser: ReturnType<typeof createAssistantMarkdownParser>;
+  fileLinkActions: ReturnType<typeof useAssistantFileLinkActions>;
+  client: DaemonClient | null | undefined;
+  occurrenceKey: string;
+  serverId: string | undefined;
+  workspaceRoot: string | undefined;
+}): RenderRules {
+  return {
+    heading1: (
+      node: ASTNode,
+      children: ReactNode[],
+      _parent: ASTNode[],
+      styles: MarkdownStyles,
+    ) => (
+      <View key={node.key} style={styles._VIEW_SAFE_heading1} dataSet={markdownCopyDataSet.h1}>
+        {children}
+      </View>
+    ),
+    heading2: (
+      node: ASTNode,
+      children: ReactNode[],
+      _parent: ASTNode[],
+      styles: MarkdownStyles,
+    ) => (
+      <View key={node.key} style={styles._VIEW_SAFE_heading2} dataSet={markdownCopyDataSet.h2}>
+        {children}
+      </View>
+    ),
+    heading3: (
+      node: ASTNode,
+      children: ReactNode[],
+      _parent: ASTNode[],
+      styles: MarkdownStyles,
+    ) => (
+      <View key={node.key} style={styles._VIEW_SAFE_heading3} dataSet={markdownCopyDataSet.h3}>
+        {children}
+      </View>
+    ),
+    heading4: (
+      node: ASTNode,
+      children: ReactNode[],
+      _parent: ASTNode[],
+      styles: MarkdownStyles,
+    ) => (
+      <View key={node.key} style={styles._VIEW_SAFE_heading4} dataSet={markdownCopyDataSet.h4}>
+        {children}
+      </View>
+    ),
+    heading5: (
+      node: ASTNode,
+      children: ReactNode[],
+      _parent: ASTNode[],
+      styles: MarkdownStyles,
+    ) => (
+      <View key={node.key} style={styles._VIEW_SAFE_heading5} dataSet={markdownCopyDataSet.h5}>
+        {children}
+      </View>
+    ),
+    heading6: (
+      node: ASTNode,
+      children: ReactNode[],
+      _parent: ASTNode[],
+      styles: MarkdownStyles,
+    ) => (
+      <View key={node.key} style={styles._VIEW_SAFE_heading6} dataSet={markdownCopyDataSet.h6}>
+        {children}
+      </View>
+    ),
+    blockquote: (
+      node: ASTNode,
+      children: ReactNode[],
+      _parent: ASTNode[],
+      styles: MarkdownStyles,
+    ) => (
+      <View
+        key={node.key}
+        style={styles._VIEW_SAFE_blockquote}
+        dataSet={markdownCopyDataSet.blockquote}
+      >
+        {children}
+      </View>
+    ),
+    hr: (node: ASTNode, _children: ReactNode[], _parent: ASTNode[], styles: MarkdownStyles) => (
+      <View key={node.key} style={styles._VIEW_SAFE_hr} dataSet={markdownCopyDataSet.hr} />
+    ),
+    table: (node: ASTNode, children: ReactNode[], _parent: ASTNode[], styles: MarkdownStyles) => (
+      <View key={node.key} style={styles._VIEW_SAFE_table} dataSet={markdownCopyDataSet.table}>
+        {children}
+      </View>
+    ),
+    thead: (node: ASTNode, children: ReactNode[], _parent: ASTNode[], styles: MarkdownStyles) => (
+      <View key={node.key} style={styles._VIEW_SAFE_thead} dataSet={markdownCopyDataSet.thead}>
+        {children}
+      </View>
+    ),
+    tbody: (node: ASTNode, children: ReactNode[], _parent: ASTNode[], styles: MarkdownStyles) => (
+      <View key={node.key} style={styles._VIEW_SAFE_tbody} dataSet={markdownCopyDataSet.tbody}>
+        {children}
+      </View>
+    ),
+    tr: (node: ASTNode, children: ReactNode[], _parent: ASTNode[], styles: MarkdownStyles) => (
+      <View key={node.key} style={styles._VIEW_SAFE_tr} dataSet={markdownCopyDataSet.tr}>
+        {children}
+      </View>
+    ),
+    text: (
+      node: ASTNode,
+      _children: ReactNode[],
+      _parent: ASTNode[],
+      styles: MarkdownStyles,
+      inheritedStyles: TextStyle = {},
+    ) => (
+      <MarkdownInheritedText
+        key={node.key}
+        inheritedStyles={inheritedStyles}
+        textStyle={styles.text}
+      >
+        {node.content}
+      </MarkdownInheritedText>
+    ),
+    textgroup: (
+      node: ASTNode,
+      children: ReactNode[],
+      _parent: ASTNode[],
+      styles: MarkdownStyles,
+      inheritedStyles: TextStyle = {},
+    ) => (
+      <MarkdownInheritedText
+        key={node.key}
+        inheritedStyles={inheritedStyles}
+        textStyle={styles.textgroup}
+      >
+        {children}
+      </MarkdownInheritedText>
+    ),
+    // strong/em/s have no custom rule in react-native-markdown-display's
+    // defaults beyond wrapping children in a plain RN <Text>. On iOS the
+    // paragraph/textgroup are native UITextViews (see markdown-text.ios.tsx),
+    // and a plain <Text> nested inside one is not hoisted into a
+    // UITextViewChild, so its content renders invisibly. Route these inline
+    // marks through MarkdownTextSpan (same path as text/textgroup) so the
+    // styled content composes and stays visible + selectable on iOS.
+    strong: (
+      node: ASTNode,
+      children: ReactNode[],
+      _parent: ASTNode[],
+      styles: MarkdownStyles,
+      inheritedStyles: TextStyle = {},
+    ) => (
+      <MarkdownInheritedText
+        key={node.key}
+        copyTag="strong"
+        inheritedStyles={inheritedStyles}
+        textStyle={styles.strong}
+      >
+        {children}
+      </MarkdownInheritedText>
+    ),
+    em: (
+      node: ASTNode,
+      children: ReactNode[],
+      _parent: ASTNode[],
+      styles: MarkdownStyles,
+      inheritedStyles: TextStyle = {},
+    ) => (
+      <MarkdownInheritedText
+        key={node.key}
+        copyTag="em"
+        inheritedStyles={inheritedStyles}
+        textStyle={styles.em}
+      >
+        {children}
+      </MarkdownInheritedText>
+    ),
+    s: (
+      node: ASTNode,
+      children: ReactNode[],
+      _parent: ASTNode[],
+      styles: MarkdownStyles,
+      inheritedStyles: TextStyle = {},
+    ) => (
+      <MarkdownInheritedText
+        key={node.key}
+        copyTag="s"
+        inheritedStyles={inheritedStyles}
+        textStyle={styles.s}
+      >
+        {children}
+      </MarkdownInheritedText>
+    ),
+    // hardbreak/softbreak fall back to react-native-markdown-display's
+    // default, a plain RN <Text>{"\n"}. Inside the paragraph UITextView that
+    // plain <Text> is not hoisted into a UITextViewChild and is dropped (same
+    // root cause as strong/em/s) — so on iOS a hard line break vanished, and
+    // a softbreak between words jammed them together ("one\ntwo" -> "onetwo").
+    // Emit the break through MarkdownTextSpan so it composes on iOS. Keep
+    // the resolved break styles: hardbreak is a full-width flex-row child on
+    // Android, and dropping that width joins the surrounding text spans.
+    hardbreak: (
+      node: ASTNode,
+      _children: ReactNode[],
+      _parent: ASTNode[],
+      styles: MarkdownStyles,
+    ) => (
+      <MarkdownTextSpan key={node.key} style={styles.hardbreak} copyTag="br">
+        {"\n"}
+      </MarkdownTextSpan>
+    ),
+    softbreak: (
+      node: ASTNode,
+      _children: ReactNode[],
+      _parent: ASTNode[],
+      styles: MarkdownStyles,
+    ) => (
+      <MarkdownTextSpan key={node.key} style={styles.softbreak}>
+        {"\n"}
+      </MarkdownTextSpan>
+    ),
+    code_block: (
+      node: ASTNode,
+      _children: ReactNode[],
+      _parent: ASTNode[],
+      styles: MarkdownStyles,
+      inheritedStyles: TextStyle = {},
+    ) => (
+      <HighlightedCodeBlock
+        key={node.key}
+        code={node.content}
+        language={null}
+        inheritedStyles={inheritedStyles}
+        textStyle={styles.code_block}
+      />
+    ),
+    fence: (
+      node: ASTNode,
+      _children: ReactNode[],
+      _parent: ASTNode[],
+      styles: MarkdownStyles,
+      inheritedStyles: TextStyle = {},
+    ) => (
+      <MarkdownFenceBlock
+        key={node.key}
+        code={node.content}
+        info={node.sourceInfo}
+        phase={phase}
+        inheritedStyles={inheritedStyles}
+        textStyle={styles.fence}
+      />
+    ),
+    code_inline: (
+      node: ASTNode,
+      _children: ReactNode[],
+      parent: ASTNode[],
+      styles: MarkdownStyles,
+      inheritedStyles: TextStyle = {},
+    ) => {
+      const content = node.content ?? "";
+      const isLinkedInlineCode = nodeHasParentType(parent, "link");
+      const inlineCodeSource: AssistantFileLinkSource = {
+        href: content,
+        text: content,
+        sourceType: "inline-code",
+      };
+      const shouldResolveInlinePath =
+        !isLinkedInlineCode && fileLinkActions.canResolveFile(inlineCodeSource);
+
+      if (shouldResolveInlinePath) {
+        return (
+          <AssistantInlineCodePathLink
+            key={node.key}
+            content={content}
+            inheritedStyles={inheritedStyles}
+            codeInlineStyle={styles.code_inline}
+            linkStyle={styles.link}
+          />
+        );
+      }
+
+      const inlineCodeLinkUrl = getInlineCodeAutoLinkUrl(markdownParser, content);
+      if (inlineCodeLinkUrl) {
+        const source = getInlineCodeAutoLinkSource({
+          href: inlineCodeLinkUrl,
+          content,
+        });
+        return (
+          <AssistantMarkdownCodeLink
+            key={node.key}
+            source={source}
+            inheritedStyles={inheritedStyles}
+            codeInlineStyle={styles.code_inline}
+            linkStyle={styles.link}
+          >
+            {content}
+          </AssistantMarkdownCodeLink>
+        );
+      }
+
+      return (
+        <MarkdownInheritedText
+          key={node.key}
+          copyTag="code"
+          inheritedStyles={inheritedStyles}
+          textStyle={styles.code_inline}
+          monoSurface
+        >
+          {content}
+        </MarkdownInheritedText>
+      );
+    },
+    math_inline: (
+      node: ASTNode,
+      _children: ReactNode[],
+      _parent: ASTNode[],
+      styles: MarkdownStyles,
+      inheritedStyles: TextStyle = {},
+    ) => (
+      <MarkdownInheritedText
+        key={node.key}
+        inheritedStyles={inheritedStyles}
+        textStyle={styles.text}
+      >
+        {node.markup ?? node.content}
+      </MarkdownInheritedText>
+    ),
+    math_block: (
+      node: ASTNode,
+      _children: ReactNode[],
+      _parent: ASTNode[],
+      styles: MarkdownStyles,
+      inheritedStyles: TextStyle = {},
+    ) => {
+      const text = (
+        <MarkdownInheritedText inheritedStyles={inheritedStyles} textStyle={styles.text}>
+          {node.markup ?? node.content}
+        </MarkdownInheritedText>
+      );
+
+      if ((node as ASTNode & { block?: boolean }).block === true) {
+        return (
+          <MarkdownParagraphView
+            key={node.key}
+            paragraphStyle={styles.paragraph}
+            containsImage={false}
+          >
+            {text}
+          </MarkdownParagraphView>
+        );
+      }
+
+      return (
+        <MarkdownInheritedText
+          key={node.key}
+          inheritedStyles={inheritedStyles}
+          textStyle={styles.text}
+        >
+          {node.markup ?? node.content}
+        </MarkdownInheritedText>
+      );
+    },
+    bullet_list: (
+      node: ASTNode,
+      children: ReactNode[],
+      parent: ASTNode[],
+      styles: MarkdownStyles,
+    ) => (
+      <MarkdownListView
+        key={node.key}
+        baseStyle={styles.bullet_list}
+        copyTag="ul"
+        spacing={getMarkdownListSpacing(node, parent)}
+      >
+        {children}
+      </MarkdownListView>
+    ),
+    ordered_list: (
+      node: ASTNode,
+      children: ReactNode[],
+      parent: ASTNode[],
+      styles: MarkdownStyles,
+    ) => (
+      <MarkdownListView
+        key={node.key}
+        baseStyle={styles.ordered_list}
+        copyTag="ol"
+        orderedStart={node.attributes?.start}
+        spacing={getMarkdownListSpacing(node, parent)}
+      >
+        {children}
+      </MarkdownListView>
+    ),
+    list_item: (
+      node: ASTNode,
+      children: ReactNode[],
+      parent: ASTNode[],
+      styles: MarkdownStyles,
+    ) => {
+      const { isOrdered, marker } = getMarkdownListMarker(node, parent);
+      const iconStyle = isOrdered ? styles.ordered_list_icon : styles.bullet_list_icon;
+      const contentStyle = isOrdered ? styles.ordered_list_content : styles.bullet_list_content;
+
+      return (
+        <View key={node.key} style={styles.list_item} dataSet={markdownCopyDataSet.li}>
+          <Text style={iconStyle} dataSet={markdownCopyDataSet.listMarker}>
+            {marker}
+          </Text>
+          <MarkdownListItemContent contentStyle={contentStyle}>{children}</MarkdownListItemContent>
+        </View>
+      );
+    },
+    th: (node: ASTNode, children: ReactNode[], _parent: ASTNode[], styles: MarkdownStyles) => (
+      <MarkdownTableCellText key={node.key}>
+        <View
+          style={styles._VIEW_SAFE_th}
+          dataSet={markdownCopyTableCellDataSet("th", node.attributes?.style)}
+        >
+          {children}
+        </View>
+      </MarkdownTableCellText>
+    ),
+    td: (node: ASTNode, children: ReactNode[], _parent: ASTNode[], styles: MarkdownStyles) => (
+      <MarkdownTableCellText key={node.key}>
+        <View
+          style={styles._VIEW_SAFE_td}
+          dataSet={markdownCopyTableCellDataSet("td", node.attributes?.style)}
+        >
+          {children}
+        </View>
+      </MarkdownTableCellText>
+    ),
+    paragraph: (
+      node: ASTNode,
+      children: ReactNode[],
+      _parent: ASTNode[],
+      styles: MarkdownStyles,
+    ) => (
+      <MarkdownParagraphView
+        key={node.key}
+        paragraphStyle={styles.paragraph}
+        containsImage={markdownNodeContainsType(node, "image")}
+      >
+        {children}
+      </MarkdownParagraphView>
+    ),
+    link: (node: ASTNode, children: ReactNode[], _parent: ASTNode[], styles: MarkdownStyles) => (
+      <AssistantMarkdownLink
+        key={node.key}
+        source={getMarkdownLinkSource(node)}
+        style={styles.link}
+      >
+        {colorMarkdownLinkChildren(children, styles.link.color)}
+      </AssistantMarkdownLink>
+    ),
+    image: (node: ASTNode, _children: ReactNode[], parent: ASTNode[], _styles: MarkdownStyles) => {
+      const paragraphNode = Array.isArray(parent)
+        ? parent.find((ancestor) => ancestor?.type === "paragraph")
+        : null;
+      const paragraphChildren = Array.isArray(paragraphNode?.children)
+        ? paragraphNode.children
+        : [];
+      const imageIndex = paragraphChildren.findIndex((child: ASTNode) => child?.key === node.key);
+      const hasLeadingContent = imageIndex > 0;
+
+      return (
+        <AssistantMarkdownImage
+          key={node.key}
+          source={String(node.attributes?.src ?? "")}
+          occurrenceKey={`${occurrenceKey}:${node.key}`}
+          alt={typeof node.attributes?.alt === "string" ? node.attributes.alt : undefined}
+          hasLeadingContent={hasLeadingContent}
+          client={client}
+          workspaceRoot={workspaceRoot}
+          serverId={serverId}
+        />
+      );
+    },
+  };
+}
+
 export const AssistantMessage = memo(function AssistantMessage({
   occurrenceKey,
   message,
@@ -1518,434 +2006,19 @@ export const AssistantMessage = memo(function AssistantMessage({
     return false;
   });
 
-  const markdownRules = useMemo<RenderRules>(() => {
-    return {
-      heading1: (
-        node: ASTNode,
-        children: ReactNode[],
-        _parent: ASTNode[],
-        styles: MarkdownStyles,
-      ) => (
-        <View key={node.key} style={styles._VIEW_SAFE_heading1} dataSet={markdownCopyDataSet.h1}>
-          {children}
-        </View>
-      ),
-      heading2: (
-        node: ASTNode,
-        children: ReactNode[],
-        _parent: ASTNode[],
-        styles: MarkdownStyles,
-      ) => (
-        <View key={node.key} style={styles._VIEW_SAFE_heading2} dataSet={markdownCopyDataSet.h2}>
-          {children}
-        </View>
-      ),
-      heading3: (
-        node: ASTNode,
-        children: ReactNode[],
-        _parent: ASTNode[],
-        styles: MarkdownStyles,
-      ) => (
-        <View key={node.key} style={styles._VIEW_SAFE_heading3} dataSet={markdownCopyDataSet.h3}>
-          {children}
-        </View>
-      ),
-      heading4: (
-        node: ASTNode,
-        children: ReactNode[],
-        _parent: ASTNode[],
-        styles: MarkdownStyles,
-      ) => (
-        <View key={node.key} style={styles._VIEW_SAFE_heading4} dataSet={markdownCopyDataSet.h4}>
-          {children}
-        </View>
-      ),
-      heading5: (
-        node: ASTNode,
-        children: ReactNode[],
-        _parent: ASTNode[],
-        styles: MarkdownStyles,
-      ) => (
-        <View key={node.key} style={styles._VIEW_SAFE_heading5} dataSet={markdownCopyDataSet.h5}>
-          {children}
-        </View>
-      ),
-      heading6: (
-        node: ASTNode,
-        children: ReactNode[],
-        _parent: ASTNode[],
-        styles: MarkdownStyles,
-      ) => (
-        <View key={node.key} style={styles._VIEW_SAFE_heading6} dataSet={markdownCopyDataSet.h6}>
-          {children}
-        </View>
-      ),
-      blockquote: (
-        node: ASTNode,
-        children: ReactNode[],
-        _parent: ASTNode[],
-        styles: MarkdownStyles,
-      ) => (
-        <View
-          key={node.key}
-          style={styles._VIEW_SAFE_blockquote}
-          dataSet={markdownCopyDataSet.blockquote}
-        >
-          {children}
-        </View>
-      ),
-      hr: (node: ASTNode, _children: ReactNode[], _parent: ASTNode[], styles: MarkdownStyles) => (
-        <View key={node.key} style={styles._VIEW_SAFE_hr} dataSet={markdownCopyDataSet.hr} />
-      ),
-      table: (node: ASTNode, children: ReactNode[], _parent: ASTNode[], styles: MarkdownStyles) => (
-        <View key={node.key} style={styles._VIEW_SAFE_table} dataSet={markdownCopyDataSet.table}>
-          {children}
-        </View>
-      ),
-      thead: (node: ASTNode, children: ReactNode[], _parent: ASTNode[], styles: MarkdownStyles) => (
-        <View key={node.key} style={styles._VIEW_SAFE_thead} dataSet={markdownCopyDataSet.thead}>
-          {children}
-        </View>
-      ),
-      tbody: (node: ASTNode, children: ReactNode[], _parent: ASTNode[], styles: MarkdownStyles) => (
-        <View key={node.key} style={styles._VIEW_SAFE_tbody} dataSet={markdownCopyDataSet.tbody}>
-          {children}
-        </View>
-      ),
-      tr: (node: ASTNode, children: ReactNode[], _parent: ASTNode[], styles: MarkdownStyles) => (
-        <View key={node.key} style={styles._VIEW_SAFE_tr} dataSet={markdownCopyDataSet.tr}>
-          {children}
-        </View>
-      ),
-      text: (
-        node: ASTNode,
-        _children: ReactNode[],
-        _parent: ASTNode[],
-        styles: MarkdownStyles,
-        inheritedStyles: TextStyle = {},
-      ) => (
-        <MarkdownInheritedText
-          key={node.key}
-          inheritedStyles={inheritedStyles}
-          textStyle={styles.text}
-        >
-          {node.content}
-        </MarkdownInheritedText>
-      ),
-      textgroup: (
-        node: ASTNode,
-        children: ReactNode[],
-        _parent: ASTNode[],
-        styles: MarkdownStyles,
-        inheritedStyles: TextStyle = {},
-      ) => (
-        <MarkdownInheritedText
-          key={node.key}
-          inheritedStyles={inheritedStyles}
-          textStyle={styles.textgroup}
-        >
-          {children}
-        </MarkdownInheritedText>
-      ),
-      // strong/em/s have no custom rule in react-native-markdown-display's
-      // defaults beyond wrapping children in a plain RN <Text>. On iOS the
-      // paragraph/textgroup are native UITextViews (see markdown-text.ios.tsx),
-      // and a plain <Text> nested inside one is not hoisted into a
-      // UITextViewChild, so its content renders invisibly. Route these inline
-      // marks through MarkdownTextSpan (same path as text/textgroup) so the
-      // styled content composes and stays visible + selectable on iOS.
-      strong: (
-        node: ASTNode,
-        children: ReactNode[],
-        _parent: ASTNode[],
-        styles: MarkdownStyles,
-        inheritedStyles: TextStyle = {},
-      ) => (
-        <MarkdownInheritedText
-          key={node.key}
-          copyTag="strong"
-          inheritedStyles={inheritedStyles}
-          textStyle={styles.strong}
-        >
-          {children}
-        </MarkdownInheritedText>
-      ),
-      em: (
-        node: ASTNode,
-        children: ReactNode[],
-        _parent: ASTNode[],
-        styles: MarkdownStyles,
-        inheritedStyles: TextStyle = {},
-      ) => (
-        <MarkdownInheritedText
-          key={node.key}
-          copyTag="em"
-          inheritedStyles={inheritedStyles}
-          textStyle={styles.em}
-        >
-          {children}
-        </MarkdownInheritedText>
-      ),
-      s: (
-        node: ASTNode,
-        children: ReactNode[],
-        _parent: ASTNode[],
-        styles: MarkdownStyles,
-        inheritedStyles: TextStyle = {},
-      ) => (
-        <MarkdownInheritedText
-          key={node.key}
-          copyTag="s"
-          inheritedStyles={inheritedStyles}
-          textStyle={styles.s}
-        >
-          {children}
-        </MarkdownInheritedText>
-      ),
-      // hardbreak/softbreak fall back to react-native-markdown-display's
-      // default, a plain RN <Text>{"\n"}. Inside the paragraph UITextView that
-      // plain <Text> is not hoisted into a UITextViewChild and is dropped (same
-      // root cause as strong/em/s) — so on iOS a hard line break vanished, and
-      // a softbreak between words jammed them together ("one\ntwo" -> "onetwo").
-      // Emit the break through MarkdownTextSpan so it composes on iOS. Keep
-      // the resolved break styles: hardbreak is a full-width flex-row child on
-      // Android, and dropping that width joins the surrounding text spans.
-      hardbreak: (
-        node: ASTNode,
-        _children: ReactNode[],
-        _parent: ASTNode[],
-        styles: MarkdownStyles,
-      ) => (
-        <MarkdownTextSpan key={node.key} style={styles.hardbreak} copyTag="br">
-          {"\n"}
-        </MarkdownTextSpan>
-      ),
-      softbreak: (
-        node: ASTNode,
-        _children: ReactNode[],
-        _parent: ASTNode[],
-        styles: MarkdownStyles,
-      ) => (
-        <MarkdownTextSpan key={node.key} style={styles.softbreak}>
-          {"\n"}
-        </MarkdownTextSpan>
-      ),
-      code_block: (
-        node: ASTNode,
-        _children: ReactNode[],
-        _parent: ASTNode[],
-        styles: MarkdownStyles,
-        inheritedStyles: TextStyle = {},
-      ) => (
-        <HighlightedCodeBlock
-          key={node.key}
-          code={node.content}
-          language={null}
-          inheritedStyles={inheritedStyles}
-          textStyle={styles.code_block}
-        />
-      ),
-      fence: (
-        node: ASTNode,
-        _children: ReactNode[],
-        _parent: ASTNode[],
-        styles: MarkdownStyles,
-        inheritedStyles: TextStyle = {},
-      ) => (
-        <MarkdownFenceBlock
-          key={node.key}
-          code={node.content}
-          info={node.sourceInfo}
-          phase={phase}
-          inheritedStyles={inheritedStyles}
-          textStyle={styles.fence}
-        />
-      ),
-      code_inline: (
-        node: ASTNode,
-        _children: ReactNode[],
-        parent: ASTNode[],
-        styles: MarkdownStyles,
-        inheritedStyles: TextStyle = {},
-      ) => {
-        const content = node.content ?? "";
-        const isLinkedInlineCode = nodeHasParentType(parent, "link");
-        const inlineCodeSource: AssistantFileLinkSource = {
-          href: content,
-          text: content,
-          sourceType: "inline-code",
-        };
-        const shouldResolveInlinePath =
-          !isLinkedInlineCode && fileLinkActions.canResolveFile(inlineCodeSource);
-
-        if (shouldResolveInlinePath) {
-          return (
-            <AssistantInlineCodePathLink
-              key={node.key}
-              content={content}
-              inheritedStyles={inheritedStyles}
-              codeInlineStyle={styles.code_inline}
-              linkStyle={styles.link}
-            />
-          );
-        }
-
-        const inlineCodeLinkUrl = getInlineCodeAutoLinkUrl(markdownParser, content);
-        if (inlineCodeLinkUrl) {
-          const source = getInlineCodeAutoLinkSource({
-            href: inlineCodeLinkUrl,
-            content,
-          });
-          return (
-            <AssistantMarkdownCodeLink
-              key={node.key}
-              source={source}
-              inheritedStyles={inheritedStyles}
-              codeInlineStyle={styles.code_inline}
-              linkStyle={styles.link}
-            >
-              {content}
-            </AssistantMarkdownCodeLink>
-          );
-        }
-
-        return (
-          <MarkdownInheritedText
-            key={node.key}
-            copyTag="code"
-            inheritedStyles={inheritedStyles}
-            textStyle={styles.code_inline}
-            monoSurface
-          >
-            {content}
-          </MarkdownInheritedText>
-        );
-      },
-      bullet_list: (
-        node: ASTNode,
-        children: ReactNode[],
-        parent: ASTNode[],
-        styles: MarkdownStyles,
-      ) => (
-        <MarkdownListView
-          key={node.key}
-          baseStyle={styles.bullet_list}
-          copyTag="ul"
-          spacing={getMarkdownListSpacing(node, parent)}
-        >
-          {children}
-        </MarkdownListView>
-      ),
-      ordered_list: (
-        node: ASTNode,
-        children: ReactNode[],
-        parent: ASTNode[],
-        styles: MarkdownStyles,
-      ) => (
-        <MarkdownListView
-          key={node.key}
-          baseStyle={styles.ordered_list}
-          copyTag="ol"
-          orderedStart={node.attributes?.start}
-          spacing={getMarkdownListSpacing(node, parent)}
-        >
-          {children}
-        </MarkdownListView>
-      ),
-      list_item: (
-        node: ASTNode,
-        children: ReactNode[],
-        parent: ASTNode[],
-        styles: MarkdownStyles,
-      ) => {
-        const { isOrdered, marker } = getMarkdownListMarker(node, parent);
-        const iconStyle = isOrdered ? styles.ordered_list_icon : styles.bullet_list_icon;
-        const contentStyle = isOrdered ? styles.ordered_list_content : styles.bullet_list_content;
-
-        return (
-          <View key={node.key} style={styles.list_item} dataSet={markdownCopyDataSet.li}>
-            <Text style={iconStyle} dataSet={markdownCopyDataSet.listMarker}>
-              {marker}
-            </Text>
-            <MarkdownListItemContent contentStyle={contentStyle}>
-              {children}
-            </MarkdownListItemContent>
-          </View>
-        );
-      },
-      th: (node: ASTNode, children: ReactNode[], _parent: ASTNode[], styles: MarkdownStyles) => (
-        <MarkdownTableCellText key={node.key}>
-          <View
-            style={styles._VIEW_SAFE_th}
-            dataSet={markdownCopyTableCellDataSet("th", node.attributes?.style)}
-          >
-            {children}
-          </View>
-        </MarkdownTableCellText>
-      ),
-      td: (node: ASTNode, children: ReactNode[], _parent: ASTNode[], styles: MarkdownStyles) => (
-        <MarkdownTableCellText key={node.key}>
-          <View
-            style={styles._VIEW_SAFE_td}
-            dataSet={markdownCopyTableCellDataSet("td", node.attributes?.style)}
-          >
-            {children}
-          </View>
-        </MarkdownTableCellText>
-      ),
-      paragraph: (
-        node: ASTNode,
-        children: ReactNode[],
-        _parent: ASTNode[],
-        styles: MarkdownStyles,
-      ) => (
-        <MarkdownParagraphView
-          key={node.key}
-          paragraphStyle={styles.paragraph}
-          containsImage={markdownNodeContainsType(node, "image")}
-        >
-          {children}
-        </MarkdownParagraphView>
-      ),
-      link: (node: ASTNode, children: ReactNode[], _parent: ASTNode[], styles: MarkdownStyles) => (
-        <AssistantMarkdownLink
-          key={node.key}
-          source={getMarkdownLinkSource(node)}
-          style={styles.link}
-        >
-          {colorMarkdownLinkChildren(children, styles.link.color)}
-        </AssistantMarkdownLink>
-      ),
-      image: (
-        node: ASTNode,
-        _children: ReactNode[],
-        parent: ASTNode[],
-        _styles: MarkdownStyles,
-      ) => {
-        const paragraphNode = Array.isArray(parent)
-          ? parent.find((ancestor) => ancestor?.type === "paragraph")
-          : null;
-        const paragraphChildren = Array.isArray(paragraphNode?.children)
-          ? paragraphNode.children
-          : [];
-        const imageIndex = paragraphChildren.findIndex((child: ASTNode) => child?.key === node.key);
-        const hasLeadingContent = imageIndex > 0;
-
-        return (
-          <AssistantMarkdownImage
-            key={node.key}
-            source={String(node.attributes?.src ?? "")}
-            occurrenceKey={`${occurrenceKey}:${node.key}`}
-            alt={typeof node.attributes?.alt === "string" ? node.attributes.alt : undefined}
-            hasLeadingContent={hasLeadingContent}
-            client={client}
-            workspaceRoot={workspaceRoot}
-            serverId={serverId}
-          />
-        );
-      },
-    };
-  }, [client, fileLinkActions, markdownParser, occurrenceKey, phase, serverId, workspaceRoot]);
+  const markdownRules = useMemo(
+    () =>
+      createAssistantMessageMarkdownRules({
+        phase,
+        markdownParser,
+        fileLinkActions,
+        client,
+        occurrenceKey,
+        serverId,
+        workspaceRoot,
+      }),
+    [client, fileLinkActions, markdownParser, occurrenceKey, phase, serverId, workspaceRoot],
+  );
 
   const blocks = useMemo(() => splitMarkdownBlocks(revealedMessage), [revealedMessage]);
   const keyedBlocks = useMemo(

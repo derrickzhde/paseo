@@ -1,4 +1,5 @@
 import MarkdownIt from "markdown-it";
+import { markdownMathPlugin } from "./markdown-math";
 
 /**
  * The one place that decides how the app parses markdown.
@@ -15,5 +16,7 @@ import MarkdownIt from "markdown-it";
  * never have. Unifying that is a product decision on its own.
  */
 export function createMarkdownParser({ linkify }: { linkify: boolean }): MarkdownIt {
-  return new MarkdownIt({ html: false, linkify });
+  // Math delimiters are parsed here so every surface shares the same token model
+  // before react-native-markdown-display or clipboard HTML rendering sees them.
+  return new MarkdownIt({ html: false, linkify }).use(markdownMathPlugin);
 }

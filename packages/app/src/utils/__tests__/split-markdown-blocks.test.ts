@@ -81,4 +81,18 @@ describe("splitMarkdownBlocks", () => {
       "Second paragraph",
     ]);
   });
+
+  it("splits blockquote, list, and table into separate blocks", () => {
+    expect(splitMarkdownBlocks("> quoted line\n\n- list item\n\n| a | b |\n| - | - |")).toEqual([
+      "> quoted line",
+      "- list item",
+      "| a | b |\n| - | - |",
+    ]);
+  });
+
+  it("keeps multiline math blocks with internal blank lines intact", () => {
+    const source = "$$\n\\begin{aligned}\na &= 1\n\nb &= 2\n\\end{aligned}\n$$";
+
+    expect(splitMarkdownBlocks(source)).toEqual([source]);
+  });
 });
