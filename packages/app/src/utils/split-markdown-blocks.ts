@@ -1,7 +1,7 @@
-import MarkdownIt from "markdown-it";
+import { createMarkdownParser } from "./markdown-parser";
 
 // Only block maps are needed here; inline parsing belongs to each rendered block.
-const markdownBlockParser = new MarkdownIt();
+const markdownBlockParser = createMarkdownParser({ linkify: false });
 markdownBlockParser.core.ruler.disable("inline");
 
 // The renderer decides what counts as a definition, so ask the same parser: a block
