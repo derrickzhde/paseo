@@ -52,6 +52,7 @@ describe("getClaudeModels", () => {
     expect(models.map((m) => m.id)).toEqual([
       "claude-opus-5[1m]",
       "claude-opus-5",
+      "claude-fable-5-1[1m]",
       "claude-fable-5-1",
       "claude-fable-5[1m]",
       "claude-fable-5",
@@ -85,7 +86,8 @@ describe("getClaudeModels", () => {
       new Map([
         ["claude-opus-5[1m]", 1_000_000],
         ["claude-opus-5", 200_000],
-        ["claude-fable-5-1", 1_000_000],
+        ["claude-fable-5-1[1m]", 1_000_000],
+        ["claude-fable-5-1", 200_000],
         ["claude-fable-5[1m]", 1_000_000],
         ["claude-fable-5", 200_000],
         ["claude-opus-4-8[1m]", 1_000_000],
@@ -165,12 +167,11 @@ describe("getClaudeModels", () => {
       "high",
       "max",
     ]);
-    expect(models.get("claude-fable-5")?.thinkingOptions?.map((option) => option.id)).not.toContain(
-      CLAUDE_DISABLED_THINKING_OPTION_ID,
-    );
-    expect(
-      models.get("claude-fable-5-1")?.thinkingOptions?.map((option) => option.id),
-    ).not.toContain(CLAUDE_DISABLED_THINKING_OPTION_ID);
+    for (const modelId of ["claude-fable-5", "claude-fable-5-1[1m]", "claude-fable-5-1"]) {
+      expect(models.get(modelId)?.thinkingOptions?.map((option) => option.id)).not.toContain(
+        CLAUDE_DISABLED_THINKING_OPTION_ID,
+      );
+    }
     expect(models.get("claude-haiku-4-5")?.thinkingOptions).toBeUndefined();
   });
 
@@ -181,6 +182,7 @@ describe("getClaudeModels", () => {
     ["claude-sonnet-5[1m]", true, "high"],
     ["claude-sonnet-5-20260101", true, "high"],
     ["claude-fable-5", false, "high"],
+    ["claude-fable-5-1[1m]", false, "high"],
     ["claude-fable-5-1", false, "high"],
     ["claude-haiku-4-5", false, undefined],
     ["openrouter/anthropic/claude-opus-4-8", false, undefined],
@@ -377,6 +379,8 @@ describe("normalizeClaudeRuntimeModelId", () => {
     expect(normalizeClaudeRuntimeModelId("claude-opus-5")).toBe("claude-opus-5");
     expect(normalizeClaudeRuntimeModelId("claude-fable-5")).toBe("claude-fable-5");
     expect(normalizeClaudeRuntimeModelId("claude-fable-5[1m]")).toBe("claude-fable-5[1m]");
+    expect(normalizeClaudeRuntimeModelId("claude-fable-5-1")).toBe("claude-fable-5-1");
+    expect(normalizeClaudeRuntimeModelId("claude-fable-5-1[1m]")).toBe("claude-fable-5-1[1m]");
     expect(normalizeClaudeRuntimeModelId("claude-sonnet-5")).toBe("claude-sonnet-5");
     expect(normalizeClaudeRuntimeModelId("claude-sonnet-5[1m]")).toBe("claude-sonnet-5[1m]");
     expect(normalizeClaudeRuntimeModelId("claude-opus-4-6")).toBe("claude-opus-4-6");
@@ -388,12 +392,16 @@ describe("normalizeClaudeRuntimeModelId", () => {
   it("normalizes dated model IDs to base model", () => {
     expect(normalizeClaudeRuntimeModelId("claude-opus-5-20260724")).toBe("claude-opus-5");
     expect(normalizeClaudeRuntimeModelId("claude-fable-5-20260301")).toBe("claude-fable-5");
+    expect(normalizeClaudeRuntimeModelId("claude-fable-5-1-20260901")).toBe("claude-fable-5-1");
     expect(normalizeClaudeRuntimeModelId("claude-sonnet-5-20260101")).toBe("claude-sonnet-5");
     expect(normalizeClaudeRuntimeModelId("claude-opus-4-6-20260101")).toBe("claude-opus-4-6");
     expect(normalizeClaudeRuntimeModelId("claude-sonnet-4-6-20260101")).toBe("claude-sonnet-4-6");
     expect(normalizeClaudeRuntimeModelId("claude-haiku-4-5-20251001")).toBe("claude-haiku-4-5");
     expect(normalizeClaudeRuntimeModelId("claude-opus-5-20260724[1m]")).toBe("claude-opus-5[1m]");
     expect(normalizeClaudeRuntimeModelId("claude-fable-5-20260301[1m]")).toBe("claude-fable-5[1m]");
+    expect(normalizeClaudeRuntimeModelId("claude-fable-5-1-20260901[1m]")).toBe(
+      "claude-fable-5-1[1m]",
+    );
     expect(normalizeClaudeRuntimeModelId("claude-sonnet-5-20260101[1m]")).toBe(
       "claude-sonnet-5[1m]",
     );
@@ -403,6 +411,7 @@ describe("normalizeClaudeRuntimeModelId", () => {
   // silently downgrades the request to the 200K model the bare id points at.
   it("preserves [1m] because it always identifies a distinct catalog entry", () => {
     expect(normalizeClaudeRuntimeModelId("claude-fable-5[1m]")).toBe("claude-fable-5[1m]");
+    expect(normalizeClaudeRuntimeModelId("claude-fable-5-1[1m]")).toBe("claude-fable-5-1[1m]");
     expect(normalizeClaudeRuntimeModelId("claude-sonnet-5[1m]")).toBe("claude-sonnet-5[1m]");
     expect(normalizeClaudeRuntimeModelId("claude-opus-4-6[1m]")).toBe("claude-opus-4-6[1m]");
     expect(normalizeClaudeRuntimeModelId("claude-opus-5[1m]")).toBe("claude-opus-5[1m]");
@@ -518,20 +527,40 @@ describe("Claude Fable 5 catalog", () => {
 });
 
 describe("Claude Fable 5.1 catalog", () => {
-  it("offers one Fable 5.1 entry with a 1M context window", () => {
+  it("offers the 1M variant and the 200K base as separate selectable entries", () => {
     const fable51Models = getClaudeModels()
-      .filter((model) => model.id.startsWith("claude-fable-5-1"))
-      .map(({ id, label, contextWindowMaxTokens }) => ({ id, label, contextWindowMaxTokens }));
+      .filter((model) => model.id === "claude-fable-5-1" || model.id === "claude-fable-5-1[1m]")
+      .map(({ id, aliases, isSelectable, label, contextWindowMaxTokens }) => ({
+        id,
+        aliases,
+        isSelectable,
+        label,
+        contextWindowMaxTokens,
+      }));
 
     expect(fable51Models).toEqual([
-      { id: "claude-fable-5-1", label: "Fable 5.1", contextWindowMaxTokens: 1_000_000 },
+      {
+        id: "claude-fable-5-1[1m]",
+        aliases: undefined,
+        isSelectable: undefined,
+        label: "Fable 5.1 1M",
+        contextWindowMaxTokens: 1_000_000,
+      },
+      {
+        id: "claude-fable-5-1",
+        aliases: undefined,
+        isSelectable: undefined,
+        label: "Fable 5.1",
+        contextWindowMaxTokens: 200_000,
+      },
     ]);
   });
 
-  it("resolves suffixed and dated Fable 5.1 IDs to the catalog entry", () => {
-    expect(findClaudeModel("claude-fable-5-1[1m]")?.id).toBe("claude-fable-5-1");
+  it("resolves Fable 5.1 IDs to the entry whose context window they name", () => {
+    expect(findClaudeModel("claude-fable-5-1[1m]")?.id).toBe("claude-fable-5-1[1m]");
+    expect(findClaudeModel("claude-fable-5-1-20260901[1m]")?.id).toBe("claude-fable-5-1[1m]");
+    expect(findClaudeModel("claude-fable-5-1")?.id).toBe("claude-fable-5-1");
     expect(findClaudeModel("claude-fable-5-1-20260901")?.id).toBe("claude-fable-5-1");
-    expect(findClaudeModel("claude-fable-5-1-20260901[1m]")?.id).toBe("claude-fable-5-1");
   });
 });
 

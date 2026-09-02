@@ -56,10 +56,17 @@ export const CLAUDE_MODEL_MANIFEST = [
     supportsFastMode: true,
   },
   {
+    id: "claude-fable-5-1[1m]",
+    label: "Fable 5.1 1M",
+    description: "Fable 5.1 with 1M context window",
+    contextWindowMaxTokens: 1_000_000,
+    effortLevels: CLAUDE_EFFORT_LEVELS.xhigh,
+  },
+  {
     id: "claude-fable-5-1",
     label: "Fable 5.1",
     description: "Fable 5.1 · Most powerful model",
-    contextWindowMaxTokens: 1_000_000,
+    contextWindowMaxTokens: 200_000,
     effortLevels: CLAUDE_EFFORT_LEVELS.xhigh,
   },
   {

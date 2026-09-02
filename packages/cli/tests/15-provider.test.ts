@@ -126,6 +126,11 @@ const EXPECTED_CLAUDE_CONTEXT_MODELS = [
     descriptionFragment: "1M context window",
   },
   {
+    id: "claude-fable-5-1[1m]",
+    model: "Fable 5.1 1M",
+    descriptionFragment: "1M context window",
+  },
+  {
     id: "claude-fable-5[1m]",
     model: "Fable 5 1M",
     descriptionFragment: "1M context window",
@@ -199,17 +204,31 @@ function assertClaudeModels(data: ProviderModel[]): void {
     );
   }
 
+  const fable51OneMillionIndex = data.findIndex((model) => model.id === "claude-fable-5-1[1m]");
   const fable51Index = data.findIndex((model) => model.id === "claude-fable-5-1");
+  const fable5OneMillionIndex = data.findIndex((model) => model.id === "claude-fable-5[1m]");
   const fable5Index = data.findIndex((model) => model.id === "claude-fable-5");
   assert.strictEqual(
-    fable5Index,
+    fable51Index,
+    fable51OneMillionIndex + 1,
+    "Fable 5.1 1M and Fable 5.1 should be adjacent with 1M first",
+  );
+  assert.strictEqual(
+    fable5OneMillionIndex,
     fable51Index + 1,
-    "Fable models should stay adjacent and newest-first",
+    "Fable 5.1 and Fable 5 1M should be adjacent",
   );
-  assert(
-    !byId.has("claude-fable-5[1m]"),
-    "compatibility-only Fable aliases should not appear in CLI output",
+  assert.strictEqual(
+    fable5Index,
+    fable5OneMillionIndex + 1,
+    "Fable 5 1M and Fable 5 should be adjacent",
   );
+  for (const id of ["claude-opus-5[1m]", "claude-fable-5-1[1m]", "claude-fable-5[1m]"]) {
+    assert(
+      byId.has(id),
+      `${id} must appear in CLI output — [1m] entries must be selectable or 1M context is unreachable`,
+    );
+  }
 }
 
 try {
