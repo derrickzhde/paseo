@@ -6,6 +6,8 @@ import { useTranslation } from "react-i18next";
 import { createMarkdownStyles } from "@/styles/markdown-styles";
 import { getMarkdownListMarker } from "@/utils/markdown-list";
 import { createMarkdownParser } from "@/utils/markdown-parser";
+import { MathFormula } from "@/components/markdown/math/formula";
+import { resolveMathTextStyle } from "@/components/markdown/math/text-style";
 
 // Without this prop react-native-markdown-display builds its own parser with
 // `typographer: true`, which would render a plan's literal `(c)` as ©. Its
@@ -129,11 +131,19 @@ export function createPlanMarkdownRules() {
       _parent: ASTNode[],
       styles: MarkdownRuleStyles,
       inheritedStyles: TextStyle = {},
-    ) => (
-      <MarkdownInlineText key={node.key} inheritedStyle={inheritedStyles} ruleStyle={styles.text}>
-        {node.markup ?? node.content}
-      </MarkdownInlineText>
-    ),
+    ) => {
+      const { fontSize, color } = resolveMathTextStyle([inheritedStyles, styles.text]);
+      return (
+        <MathFormula
+          key={node.key}
+          tex={node.content ?? ""}
+          source={node.markup ?? node.content ?? ""}
+          display={false}
+          fontSize={fontSize}
+          color={color}
+        />
+      );
+    },
     math_block: (
       node: ASTNode,
       _children: ReactNode[],
@@ -141,13 +151,23 @@ export function createPlanMarkdownRules() {
       styles: MarkdownRuleStyles,
       inheritedStyles: TextStyle = {},
     ) => {
-      const text = (
-        <MarkdownInlineText inheritedStyle={inheritedStyles} ruleStyle={styles.text}>
-          {node.markup ?? node.content}
-        </MarkdownInlineText>
+      const isBlock = (node as ASTNode & { block?: boolean }).block === true;
+      // `\[...\]` mid-sentence is math_block with block: false. Block-level
+      // ScrollView cannot live inside Text, so render inline (display: false).
+      // Display limits/subscripts differ slightly from true display math.
+      const { fontSize, color } = resolveMathTextStyle([inheritedStyles, styles.text]);
+      const formula = (
+        <MathFormula
+          key={node.key}
+          tex={node.content ?? ""}
+          source={node.markup ?? node.content ?? ""}
+          display={isBlock}
+          fontSize={fontSize}
+          color={color}
+        />
       );
 
-      if ((node as ASTNode & { block?: boolean }).block === true) {
+      if (isBlock) {
         const isLastChild = parent[0]?.children?.at(-1)?.key === node.key;
         return (
           <MarkdownParagraph
@@ -155,16 +175,12 @@ export function createPlanMarkdownRules() {
             paragraphStyle={styles.paragraph}
             isLastChild={isLastChild}
           >
-            {text}
+            {formula}
           </MarkdownParagraph>
         );
       }
 
-      return (
-        <MarkdownInlineText key={node.key} inheritedStyle={inheritedStyles} ruleStyle={styles.text}>
-          {node.markup ?? node.content}
-        </MarkdownInlineText>
-      );
+      return formula;
     },
     bullet_list: (
       node: ASTNode,

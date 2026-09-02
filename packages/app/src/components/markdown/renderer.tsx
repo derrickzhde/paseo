@@ -24,6 +24,8 @@ import Markdown, {
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { HighlightedCodeBlock } from "@/components/highlighted-code-block";
 import { MarkdownFenceBlock } from "@/components/markdown/fence";
+import { MathFormula } from "@/components/markdown/math/formula";
+import { resolveMathTextStyle } from "@/components/markdown/math/text-style";
 import { MarkdownParagraphView, MarkdownTextSpan } from "@/components/markdown-text";
 import { MarkdownTableCellText } from "@/components/markdown-text-selection";
 import { getMarkdownListMarker, getMarkdownListSpacing } from "@/utils/markdown-list";
@@ -511,6 +513,17 @@ function getMarkdownLinkHref(node: ASTNode): string {
   return typeof href === "string" ? href : "";
 }
 
+// iOS MarkdownParagraphView defaults to UITextView, which ignores embedded views.
+// The upstream `containsImage` prop forces a View host instead. Keep that prop name
+// — this fork rebases upstream markdown-text; renaming it is needless churn.
+function paragraphNeedsViewHost(node: ASTNode): boolean {
+  return (
+    markdownNodeContainsType(node, "image") ||
+    markdownNodeContainsType(node, "math_inline") ||
+    markdownNodeContainsType(node, "math_block")
+  );
+}
+
 export function createSharedMarkdownRules(): RenderRules {
   return {
     text: (
@@ -653,15 +666,19 @@ export function createSharedMarkdownRules(): RenderRules {
       _parent: ASTNode[],
       styles: MarkdownStyles,
       inheritedStyles: TextStyle = {},
-    ) => (
-      <MarkdownInheritedText
-        key={node.key}
-        inheritedStyles={inheritedStyles}
-        textStyle={styles.text}
-      >
-        {node.markup ?? node.content}
-      </MarkdownInheritedText>
-    ),
+    ) => {
+      const { fontSize, color } = resolveMathTextStyle([inheritedStyles, styles.text]);
+      return (
+        <MathFormula
+          key={node.key}
+          tex={node.content ?? ""}
+          source={node.markup ?? node.content ?? ""}
+          display={false}
+          fontSize={fontSize}
+          color={color}
+        />
+      );
+    },
     math_block: (
       node: ASTNode,
       _children: ReactNode[],
@@ -669,33 +686,35 @@ export function createSharedMarkdownRules(): RenderRules {
       styles: MarkdownStyles,
       inheritedStyles: TextStyle = {},
     ) => {
-      const text = (
-        <MarkdownInheritedText inheritedStyles={inheritedStyles} textStyle={styles.text}>
-          {node.markup ?? node.content}
-        </MarkdownInheritedText>
+      const isBlock = (node as ASTNode & { block?: boolean }).block === true;
+      // `\[...\]` mid-sentence is math_block with block: false. Block-level
+      // ScrollView cannot live inside Text, so render inline (display: false).
+      // Display limits/subscripts differ slightly from true display math.
+      const { fontSize, color } = resolveMathTextStyle([inheritedStyles, styles.text]);
+      const formula = (
+        <MathFormula
+          key={node.key}
+          tex={node.content ?? ""}
+          source={node.markup ?? node.content ?? ""}
+          display={isBlock}
+          fontSize={fontSize}
+          color={color}
+        />
       );
 
-      if ((node as ASTNode & { block?: boolean }).block === true) {
+      if (isBlock) {
         return (
           <MarkdownParagraphView
             key={node.key}
             paragraphStyle={styles.paragraph}
             containsImage={false}
           >
-            {text}
+            {formula}
           </MarkdownParagraphView>
         );
       }
 
-      return (
-        <MarkdownInheritedText
-          key={node.key}
-          inheritedStyles={inheritedStyles}
-          textStyle={styles.text}
-        >
-          {node.markup ?? node.content}
-        </MarkdownInheritedText>
-      );
+      return formula;
     },
     bullet_list: (
       node: ASTNode,
@@ -761,7 +780,7 @@ export function createSharedMarkdownRules(): RenderRules {
       <MarkdownParagraphView
         key={node.key}
         paragraphStyle={styles.paragraph}
-        containsImage={markdownNodeContainsType(node, "image")}
+        containsImage={paragraphNeedsViewHost(node)}
       >
         {children}
       </MarkdownParagraphView>
