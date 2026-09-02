@@ -513,17 +513,6 @@ function getMarkdownLinkHref(node: ASTNode): string {
   return typeof href === "string" ? href : "";
 }
 
-// iOS MarkdownParagraphView defaults to UITextView, which ignores embedded views.
-// The upstream `containsImage` prop forces a View host instead. Keep that prop name
-// — this fork rebases upstream markdown-text; renaming it is needless churn.
-function paragraphNeedsViewHost(node: ASTNode): boolean {
-  return (
-    markdownNodeContainsType(node, "image") ||
-    markdownNodeContainsType(node, "math_inline") ||
-    markdownNodeContainsType(node, "math_block")
-  );
-}
-
 export function createSharedMarkdownRules(): RenderRules {
   return {
     text: (
@@ -704,11 +693,8 @@ export function createSharedMarkdownRules(): RenderRules {
 
       if (isBlock) {
         return (
-          <MarkdownParagraphView
-            key={node.key}
-            paragraphStyle={styles.paragraph}
-            containsImage={false}
-          >
+          // The formula is a scroll view, so this paragraph needs the View host.
+          <MarkdownParagraphView key={node.key} paragraphStyle={styles.paragraph} containsImage>
             {formula}
           </MarkdownParagraphView>
         );
@@ -780,7 +766,7 @@ export function createSharedMarkdownRules(): RenderRules {
       <MarkdownParagraphView
         key={node.key}
         paragraphStyle={styles.paragraph}
-        containsImage={paragraphNeedsViewHost(node)}
+        containsImage={markdownNodeContainsType(node, "image")}
       >
         {children}
       </MarkdownParagraphView>
