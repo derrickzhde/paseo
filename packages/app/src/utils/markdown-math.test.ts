@@ -101,17 +101,24 @@ function findMarkdownRulesFactories(): MarkdownRulesFactory[] {
 
   for (const filePath of walkSourceFiles(appSrcRoot)) {
     const source = readFileSync(filePath, "utf8");
-    for (const match of source.matchAll(/export function (create\w*MarkdownRules)/g)) {
+    const starts = [...source.matchAll(/export function (create\w*MarkdownRules)/g)];
+    for (const [index, match] of starts.entries()) {
       const factoryStart = match.index ?? 0;
       factories.push({
         file: relative(appSrcRoot, filePath),
         name: match[1],
-        body: source.slice(factoryStart, factoryStart + 12_000),
+        body: source.slice(factoryStart, starts[index + 1]?.index),
       });
     }
   }
 
   return factories;
+}
+
+function sliceRule(factory: MarkdownRulesFactory, ruleName: string): string {
+  const start = factory.body.indexOf(`${ruleName}: (`);
+  expect(start, `${factory.file}::${factory.name} 缺少 ${ruleName} 规则`).toBeGreaterThan(-1);
+  return factory.body.slice(start);
 }
 
 function buildVariableParagraphMathSource(
@@ -290,6 +297,39 @@ describe("markdownMathPlugin", () => {
       expect(factory.body, `${factory.file}::${factory.name}`).toContain("math_inline:");
       expect(factory.body, `${factory.file}::${factory.name}`).toContain("math_block:");
     }
+  });
+
+  // A display formula is a horizontally scrolling view, which a UITextView cannot
+  // host — it needs the View paragraph. The assertion is positive because
+  // containsImage defaults to false, so dropping the prop has to fail too.
+  it("gives display formulas the View paragraph host", () => {
+    const factories = findMarkdownRulesFactories().filter((factory) =>
+      factory.body.includes("MarkdownParagraphView"),
+    );
+    expect(factories.length, "使用 iOS 文本容器的规则表数量变了，请复查公式路径").toBe(2);
+
+    for (const factory of factories) {
+      expect(
+        sliceRule(factory, "math_block"),
+        `${factory.file}::${factory.name} 块级公式需要 View 容器`,
+      ).toMatch(/<MarkdownParagraphView[^>]*\scontainsImage[\s>]/);
+    }
+  });
+
+  // Inline formulas survive on iOS only because react-native-uitextview turns a
+  // non-text child into a text attachment, which landed in 2.6.0. On 2.2.0 — what
+  // 0.7.4 shipped — the SVG is dropped and every formula renders blank.
+  it("requires a react-native-uitextview that lays out inline views", () => {
+    const manifest = JSON.parse(
+      readFileSync(resolve(import.meta.dirname, "../../package.json"), "utf8"),
+    ) as { dependencies: Record<string, string> };
+    const range = manifest.dependencies["react-native-uitextview"];
+    const [major, minor] = range.replace(/^\D*/, "").split(".").map(Number);
+
+    expect(
+      major > 2 || (major === 2 && minor >= 6),
+      `react-native-uitextview ${range} 没有行内视图支持，iOS 公式会变空白`,
+    ).toBe(true);
   });
 
   it("does not break markdown links when parentheses appear inside link labels", () => {
