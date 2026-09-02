@@ -12,6 +12,7 @@ import {
   MARKDOWN_COPY_LANGUAGE_ATTRIBUTE,
   MARKDOWN_COPY_LIST_MARKER_ATTRIBUTE,
   MARKDOWN_COPY_LIST_START_ATTRIBUTE,
+  MARKDOWN_COPY_MATH_SOURCE_ATTRIBUTE,
   MARKDOWN_COPY_SRC_ATTRIBUTE,
   MARKDOWN_COPY_TAG_ATTRIBUTE,
   MARKDOWN_COPY_UNWRAP_ATTRIBUTE,
@@ -25,6 +26,7 @@ const messageRowSelector = (messageId: string) => `[data-message-id="${CSS.escap
 const CODE_BLOCK_SELECTOR = `[${MARKDOWN_COPY_TAG_ATTRIBUTE}="pre"]`;
 const CODE_REGION_SELECTOR = `${CODE_BLOCK_SELECTOR}, [${MARKDOWN_COPY_TAG_ATTRIBUTE}="code"]`;
 const IMAGE_FRAME_SELECTOR = `[${MARKDOWN_COPY_TAG_ATTRIBUTE}="img"]`;
+const MATH_FORMULA_SELECTOR = `[${MARKDOWN_COPY_MATH_SOURCE_ATTRIBUTE}]`;
 
 const turndown = new TurndownService({
   bulletListMarker: "-",
@@ -58,6 +60,10 @@ turndown.addRule("compactListItem", {
     }
     return `${node.getAttribute("value")}. ${item}\n`;
   },
+});
+turndown.addRule("mathFormulaCopy", {
+  filter: (node) => node.getAttribute(MARKDOWN_COPY_MATH_SOURCE_ATTRIBUTE) !== null,
+  replacement: (_content, node) => node.getAttribute(MARKDOWN_COPY_MATH_SOURCE_ATTRIBUTE) ?? "",
 });
 
 export function createAssistantSelectionClipboardContent(
@@ -428,7 +434,17 @@ function hasSelectedAllContents(range: Range, element: Element, includeIgnored =
 }
 
 function selectsContent(range: Range): boolean {
-  return hasMarkdownContent(range.cloneContents(), true);
+  return hasMarkdownContent(range.cloneContents(), true) || isInsideMathFormula(range);
+}
+
+/**
+ * A formula draws its glyphs as SVG paths and carries its source on the wrapper, so a
+ * selection inside the drawing clones neither text nor the wrapper.
+ */
+function isInsideMathFormula(range: Range): boolean {
+  const ancestor = range.commonAncestorContainer;
+  const element = ancestor instanceof Element ? ancestor : ancestor.parentElement;
+  return !range.collapsed && element?.closest(MATH_FORMULA_SELECTOR) != null;
 }
 
 function selectsNothingOutside(range: Range, element: Element): boolean {
@@ -463,7 +479,7 @@ function hasMarkdownContent(fragment: DocumentFragment, includeIgnored: boolean)
   }
   const visibleVoidSelector = ["br", "hr", "img"]
     .map((tag) => `[${MARKDOWN_COPY_TAG_ATTRIBUTE}="${tag}"]`)
-    .concat("img")
+    .concat("img", MATH_FORMULA_SELECTOR)
     .join(",");
   return Boolean(fragment.querySelector(visibleVoidSelector));
 }
@@ -546,6 +562,8 @@ function selectedMessageParts(range: Range): SelectedMessagePart[] | null {
 }
 
 function restoreMarkdownElements(container: HTMLElement): void {
+  restoreMathFormulaSources(container);
+
   for (const ignored of container.querySelectorAll(`[${MARKDOWN_COPY_IGNORE_ATTRIBUTE}]`)) {
     ignored.remove();
   }
@@ -596,9 +614,24 @@ function restoreMarkdownElements(container: HTMLElement): void {
     element.replaceWith(...element.childNodes);
   }
 
-  const presentational = Array.from(container.querySelectorAll("div, span"));
+  const presentational = Array.from(
+    container.querySelectorAll(
+      `div:not(${MATH_FORMULA_SELECTOR}), span:not(${MATH_FORMULA_SELECTOR})`,
+    ),
+  );
   for (const element of presentational.toReversed()) {
     element.replaceWith(...element.childNodes);
+  }
+}
+
+function restoreMathFormulaSources(container: HTMLElement): void {
+  for (const element of Array.from(
+    container.querySelectorAll(MATH_FORMULA_SELECTOR),
+  ).toReversed()) {
+    const source = element.getAttribute(MARKDOWN_COPY_MATH_SOURCE_ATTRIBUTE);
+    if (source) {
+      element.textContent = source;
+    }
   }
 }
 

@@ -7,6 +7,7 @@ export const MARKDOWN_COPY_LANGUAGE_ATTRIBUTE = "data-paseo-markdown-language";
 export const MARKDOWN_COPY_ALIGN_ATTRIBUTE = "data-paseo-markdown-align";
 export const MARKDOWN_COPY_SRC_ATTRIBUTE = "data-paseo-markdown-src";
 export const MARKDOWN_COPY_ALT_ATTRIBUTE = "data-paseo-markdown-alt";
+export const MARKDOWN_COPY_MATH_SOURCE_ATTRIBUTE = "data-paseo-markdown-math-source";
 
 /**
  * Trailing line breaks, with any indentation that followed the last one.
@@ -75,6 +76,10 @@ export function markdownCopyImageDataSet(source: string, alt: string | undefined
     paseoMarkdownSrc: source,
     ...(alt ? { paseoMarkdownAlt: alt } : {}),
   } as const;
+}
+
+export function markdownCopyMathFormulaDataSet(source: string) {
+  return { paseoMarkdownMathSource: source } as const;
 }
 
 export function markdownCopyTableCellDataSet(tag: "td" | "th", style: unknown) {
