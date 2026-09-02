@@ -1,0 +1,5 @@
+Fixed
+- Fixed Opus 5, Fable 5, and Fable 5.1 offering no selectable 1M context entry while the plain entries were labelled 1M but ran at 200K. Paseo sends the selected id to Claude Code unchanged, and only the [1m] spelling serves 1M.
+- Fixed gateway-prefixed model ids resolving to the wrong catalog entry, which labelled a Fable 5.1 session as Fable 5.
+
+Full notes: https://paseo.sh/changelog

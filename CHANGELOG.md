@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.7.3 - 2026-09-02
+
+### Fixed
+
+- Fixed Opus 5, Fable 5, and Fable 5.1 offering no selectable 1M context entry while the plain entries were labelled 1M but ran at 200K. Paseo sends the selected id to Claude Code unchanged, and only the `[1m]` spelling serves 1M.
+- Fixed gateway-prefixed model ids resolving to the wrong catalog entry, which labelled a Fable 5.1 session as Fable 5.
+- Fixed ACP agents reporting the catalog's per-provider thinking levels and features instead of the ones the selected model actually supports.
+- Fixed concurrent ACP draft probes racing each other, and probe connections claiming terminal support their client cannot provide.
+- Fixed push notifications failing outright when a device has builds from two Expo projects installed, and bounded the per-token retry fanout that recovery needs.
+- Fixed Expo push error bodies echoing device tokens and app identities into the daemon log.
+
+### Changed
+
+- Changed the GLM agent to install glm-acp-agent 1.8.0, which carries the current Coding Plan model set.
+- Changed desktop updates and mobile app identity to point at this fork.
+
 ## 0.7.2 - 2026-09-02
 
 ### Added
