@@ -440,6 +440,24 @@ describe("normalizeClaudeRuntimeModelId", () => {
       "claude-opus-4-8",
     );
   });
+
+  describe("resolves prefixed ids to the most specific catalog entry", () => {
+    it.each([
+      ["openrouter/anthropic/claude-fable-5-1[1m]", "claude-fable-5-1[1m]"],
+      ["openrouter/anthropic/claude-fable-5-1", "claude-fable-5-1"],
+      ["bedrock/claude-fable-5-1-20260901[1m]", "claude-fable-5-1[1m]"],
+      ["openrouter/anthropic/claude-fable-5[1m]", "claude-fable-5[1m]"],
+      ["openrouter/anthropic/claude-fable-5", "claude-fable-5"],
+      ["openrouter/anthropic/claude-opus-5[1m]", "claude-opus-5[1m]"],
+      ["openrouter/anthropic/claude-opus-5", "claude-opus-5"],
+      ["openrouter/anthropic/claude-opus-4-8[1m]", "claude-opus-4-8[1m]"],
+      ["openrouter/anthropic/claude-sonnet-5-20260101[1m]", "claude-sonnet-5[1m]"],
+      ["openrouter/anthropic/claude-haiku-4-5", "claude-haiku-4-5"],
+      ["openrouter/anthropic/claude-fable-5-20260301", "claude-fable-5"],
+    ])("normalizes %s to %s", (input, expected) => {
+      expect(normalizeClaudeRuntimeModelId(input)).toBe(expected);
+    });
+  });
 });
 
 describe("parseClaudeCodeVersion", () => {

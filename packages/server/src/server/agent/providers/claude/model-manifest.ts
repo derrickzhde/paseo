@@ -386,13 +386,18 @@ export function normalizeClaudeRuntimeModelId(value: string | null | undefined):
     return null;
   }
 
-  const singleSegmentMatch = trimmed.match(
-    /claude[-_ ](fable|opus|sonnet|haiku)[-_ ]+(\d+)(\[1m\])?/i,
+  // Major.minor is the more specific spelling and must be tried first: unanchored, the
+  // single-segment pattern also matches `claude-fable-5-1` as `claude-fable-5`, which resolves
+  // a prefixed Fable 5.1 id to Fable 5. Dated ids fall through here because their second number
+  // names no catalog entry.
+  const majorMinorMatch = trimmed.match(
+    /claude[-_ ](fable|opus|sonnet|haiku)[-_ ]+(\d+)[-.](\d+)(\[1m\])?/i,
   );
-  if (singleSegmentMatch) {
-    const normalizedModelId = normalizeSingleSegmentClaudeModelId(
-      singleSegmentMatch[1],
-      singleSegmentMatch[2],
+  if (majorMinorMatch) {
+    const normalizedModelId = normalizeMajorMinorClaudeModelId(
+      majorMinorMatch[1],
+      majorMinorMatch[2],
+      majorMinorMatch[3],
       trimmed.toLowerCase().includes("[1m]"),
     );
     if (normalizedModelId) {
@@ -400,17 +405,16 @@ export function normalizeClaudeRuntimeModelId(value: string | null | undefined):
     }
   }
 
-  const runtimeMatch = trimmed.match(
-    /claude[-_ ](fable|opus|sonnet|haiku)[-_ ]+(\d+)[-.](\d+)(\[1m\])?/i,
+  const singleSegmentMatch = trimmed.match(
+    /claude[-_ ](fable|opus|sonnet|haiku)[-_ ]+(\d+)(\[1m\])?/i,
   );
-  if (!runtimeMatch) {
+  if (!singleSegmentMatch) {
     return null;
   }
 
-  return normalizeMajorMinorClaudeModelId(
-    runtimeMatch[1],
-    runtimeMatch[2],
-    runtimeMatch[3],
+  return normalizeSingleSegmentClaudeModelId(
+    singleSegmentMatch[1],
+    singleSegmentMatch[2],
     trimmed.toLowerCase().includes("[1m]"),
   );
 }
