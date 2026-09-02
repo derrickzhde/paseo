@@ -54,7 +54,7 @@ function MarkdownParagraph({
   return <View style={style}>{children}</View>;
 }
 
-function createPlanMarkdownRules() {
+export function createPlanMarkdownRules() {
   return {
     text: (
       node: ASTNode,
@@ -123,6 +123,49 @@ function createPlanMarkdownRules() {
         {node.content}
       </MarkdownInlineText>
     ),
+    math_inline: (
+      node: ASTNode,
+      _children: ReactNode[],
+      _parent: ASTNode[],
+      styles: MarkdownRuleStyles,
+      inheritedStyles: TextStyle = {},
+    ) => (
+      <MarkdownInlineText key={node.key} inheritedStyle={inheritedStyles} ruleStyle={styles.text}>
+        {node.markup ?? node.content}
+      </MarkdownInlineText>
+    ),
+    math_block: (
+      node: ASTNode,
+      _children: ReactNode[],
+      parent: ASTNode[],
+      styles: MarkdownRuleStyles,
+      inheritedStyles: TextStyle = {},
+    ) => {
+      const text = (
+        <MarkdownInlineText inheritedStyle={inheritedStyles} ruleStyle={styles.text}>
+          {node.markup ?? node.content}
+        </MarkdownInlineText>
+      );
+
+      if ((node as ASTNode & { block?: boolean }).block === true) {
+        const isLastChild = parent[0]?.children?.at(-1)?.key === node.key;
+        return (
+          <MarkdownParagraph
+            key={node.key}
+            paragraphStyle={styles.paragraph}
+            isLastChild={isLastChild}
+          >
+            {text}
+          </MarkdownParagraph>
+        );
+      }
+
+      return (
+        <MarkdownInlineText key={node.key} inheritedStyle={inheritedStyles} ruleStyle={styles.text}>
+          {node.markup ?? node.content}
+        </MarkdownInlineText>
+      );
+    },
     bullet_list: (
       node: ASTNode,
       children: ReactNode[],

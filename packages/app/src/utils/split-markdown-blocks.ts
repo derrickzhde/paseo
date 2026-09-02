@@ -1,6 +1,6 @@
-import MarkdownIt from "markdown-it";
+import { createMarkdownParser } from "./markdown-parser";
 
-const markdownBlockParser = new MarkdownIt();
+const markdownBlockParser = createMarkdownParser({ linkify: false });
 
 export function splitMarkdownBlocks(text: string): string[] {
   if (text.length === 0) {

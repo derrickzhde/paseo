@@ -647,6 +647,56 @@ export function createSharedMarkdownRules(): RenderRules {
         {node.content ?? ""}
       </MarkdownInheritedText>
     ),
+    math_inline: (
+      node: ASTNode,
+      _children: ReactNode[],
+      _parent: ASTNode[],
+      styles: MarkdownStyles,
+      inheritedStyles: TextStyle = {},
+    ) => (
+      <MarkdownInheritedText
+        key={node.key}
+        inheritedStyles={inheritedStyles}
+        textStyle={styles.text}
+      >
+        {node.markup ?? node.content}
+      </MarkdownInheritedText>
+    ),
+    math_block: (
+      node: ASTNode,
+      _children: ReactNode[],
+      _parent: ASTNode[],
+      styles: MarkdownStyles,
+      inheritedStyles: TextStyle = {},
+    ) => {
+      const text = (
+        <MarkdownInheritedText inheritedStyles={inheritedStyles} textStyle={styles.text}>
+          {node.markup ?? node.content}
+        </MarkdownInheritedText>
+      );
+
+      if ((node as ASTNode & { block?: boolean }).block === true) {
+        return (
+          <MarkdownParagraphView
+            key={node.key}
+            paragraphStyle={styles.paragraph}
+            containsImage={false}
+          >
+            {text}
+          </MarkdownParagraphView>
+        );
+      }
+
+      return (
+        <MarkdownInheritedText
+          key={node.key}
+          inheritedStyles={inheritedStyles}
+          textStyle={styles.text}
+        >
+          {node.markup ?? node.content}
+        </MarkdownInheritedText>
+      );
+    },
     bullet_list: (
       node: ASTNode,
       children: ReactNode[],
