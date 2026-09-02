@@ -6,6 +6,7 @@ import { createElement, type ReactNode } from "react";
 import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { type StyleProp, type TextStyle } from "react-native";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MARKDOWN_COPY_MATH_SOURCE_ATTRIBUTE } from "@/assistant-selection-copy/markup";
 import type { MathEngine, MathSvg } from "@/utils/math-svg";
 import { MathFormula } from "./formula";
 
@@ -50,11 +51,13 @@ vi.mock("react-native", () => ({
   ScrollView: ({
     children,
     contentContainerStyle,
+    dataSet,
     horizontal,
     showsHorizontalScrollIndicator,
   }: {
     children?: ReactNode;
     contentContainerStyle?: StyleProp<TextStyle>;
+    dataSet?: Record<string, string>;
     horizontal?: boolean;
     showsHorizontalScrollIndicator?: boolean;
   }) =>
@@ -65,15 +68,40 @@ vi.mock("react-native", () => ({
         "data-horizontal": String(horizontal),
         "data-shows-horizontal-scroll-indicator": String(showsHorizontalScrollIndicator),
         "data-testid": "math-scroll-view",
+        ...dataSetToAttributes(dataSet),
       },
       children,
     ),
-  Text: ({ children, style }: { children?: ReactNode; style?: StyleProp<TextStyle> }) =>
-    createElement("span", { style: flattenStyle(style) }, children),
+  Text: ({
+    children,
+    dataSet,
+    style,
+  }: {
+    children?: ReactNode;
+    dataSet?: Record<string, string>;
+    style?: StyleProp<TextStyle>;
+  }) =>
+    createElement(
+      "span",
+      { style: flattenStyle(style), ...dataSetToAttributes(dataSet) },
+      children,
+    ),
 }));
 
 function flattenStyle(style: StyleProp<TextStyle> | undefined): TextStyle {
   return Object.assign({}, ...(Array.isArray(style) ? style.filter(Boolean) : [style]));
+}
+
+function dataSetToAttributes(dataSet?: Record<string, string>): Record<string, string> {
+  if (!dataSet) {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(dataSet).map(([key, value]) => [
+      `data-${key.replace(/[A-Z]/g, (match) => `-${match.toLowerCase()}`)}`,
+      value,
+    ]),
+  );
 }
 
 const SAMPLE_SVG = '<svg width="1.842ex" height="2.395ex"></svg>';
@@ -240,5 +268,36 @@ describe("MathFormula", () => {
     await waitFor(() => {
       expect(view.container.querySelector("svg")).not.toBeNull();
     });
+  });
+
+  it("marks the outer inline element for copy restoration when SVG renders", () => {
+    const engine = createMockEngine();
+    mockGetLoadedMathEngine.mockReturnValue(engine);
+    mockRender.mockReturnValue(SAMPLE_RESULT);
+
+    const view = render(createElement(MathFormula, defaultProps));
+    const outer = view.container.querySelector("span");
+
+    expect(outer?.getAttribute(MARKDOWN_COPY_MATH_SOURCE_ATTRIBUTE)).toBe(defaultProps.source);
+  });
+
+  it("marks the outer block container for copy restoration when SVG renders", () => {
+    const engine = createMockEngine();
+    mockGetLoadedMathEngine.mockReturnValue(engine);
+    mockRender.mockReturnValue(SAMPLE_RESULT);
+
+    const view = render(createElement(MathFormula, { ...defaultProps, display: true }));
+    const outer = view.getByTestId("math-scroll-view");
+
+    expect(outer.getAttribute(MARKDOWN_COPY_MATH_SOURCE_ATTRIBUTE)).toBe(defaultProps.source);
+  });
+
+  it("does not mark text fallback output for copy restoration", () => {
+    mockGetLoadedMathEngine.mockReturnValue(null);
+
+    const view = render(createElement(MathFormula, defaultProps));
+    const outer = view.container.querySelector("span");
+
+    expect(outer?.hasAttribute(MARKDOWN_COPY_MATH_SOURCE_ATTRIBUTE)).toBe(false);
   });
 });
