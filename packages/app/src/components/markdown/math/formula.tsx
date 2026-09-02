@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactElement } from "react";
 import { ScrollView, Text } from "react-native";
 import { SvgXml } from "react-native-svg";
+import { markdownCopyMathFormulaDataSet } from "@/assistant-selection-copy/markup";
 import { getLoadedMathEngine, loadMathEngine, type MathEngine } from "@/utils/math-svg";
 import { computeMathLayout } from "./layout";
 
@@ -26,6 +27,7 @@ export function MathFormula({
     [],
   );
   const inlineOuterTextStyle = useMemo(() => ({ fontSize, color }), [fontSize, color]);
+  const mathCopyDataSet = useMemo(() => markdownCopyMathFormulaDataSet(source), [source]);
   const rendered = useMemo(
     () => (engine === null ? null : engine.render(tex, display)),
     [engine, tex, display],
@@ -68,6 +70,7 @@ export function MathFormula({
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={blockContentContainerStyle}
+        dataSet={mathCopyDataSet}
       >
         <SvgXml
           xml={rendered.svg}
@@ -85,7 +88,7 @@ export function MathFormula({
   // bottom edge (depth px). translateY by depth moves the bottom edge from the
   // text baseline to depth px below it, matching MathJax vertical-align: -depthEx ex.
   return (
-    <Text style={inlineOuterTextStyle}>
+    <Text style={inlineOuterTextStyle} dataSet={mathCopyDataSet}>
       <SvgXml
         xml={rendered.svg}
         width={layout.width}

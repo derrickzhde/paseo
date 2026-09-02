@@ -5,6 +5,7 @@ export const MARKDOWN_COPY_UNWRAP_ATTRIBUTE = "data-paseo-markdown-unwrap";
 export const MARKDOWN_COPY_LIST_START_ATTRIBUTE = "data-paseo-markdown-list-start";
 export const MARKDOWN_COPY_LANGUAGE_ATTRIBUTE = "data-paseo-markdown-language";
 export const MARKDOWN_COPY_ALIGN_ATTRIBUTE = "data-paseo-markdown-align";
+export const MARKDOWN_COPY_MATH_SOURCE_ATTRIBUTE = "data-paseo-markdown-math-source";
 
 /**
  * Trailing line breaks, with any indentation that followed the last one.
@@ -61,6 +62,10 @@ export function markdownCopyCodeBlockDataSet(language: string | null | undefined
     ...markdownCopyDataSet.pre,
     ...(fenceLanguage ? { paseoMarkdownLanguage: fenceLanguage } : {}),
   } as const;
+}
+
+export function markdownCopyMathFormulaDataSet(source: string) {
+  return { paseoMarkdownMathSource: source } as const;
 }
 
 export function markdownCopyTableCellDataSet(tag: "td" | "th", style: unknown) {
