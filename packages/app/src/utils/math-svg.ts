@@ -17,12 +17,21 @@ const CACHE_LIMIT = 500;
 const MAX_SVG_BYTES = 512 * 1024;
 
 let enginePromise: Promise<MathEngine> | null = null;
+let loadedEngine: MathEngine | null = null;
 
 export function loadMathEngine(): Promise<MathEngine> {
   if (!enginePromise) {
-    enginePromise = createMathEngine();
+    enginePromise = createMathEngine().then((engine) => {
+      loadedEngine = engine;
+      return engine;
+    });
   }
   return enginePromise;
+}
+
+// 引擎已加载时同步返回，否则返回 null。
+export function getLoadedMathEngine(): MathEngine | null {
+  return loadedEngine;
 }
 
 async function createMathEngine(): Promise<MathEngine> {

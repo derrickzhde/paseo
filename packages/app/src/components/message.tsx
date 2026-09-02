@@ -72,6 +72,8 @@ import { markdownNodeContainsType } from "@/utils/markdown-ast";
 import { useStableEvent } from "@/hooks/use-stable-event";
 import { HighlightedCodeBlock } from "@/components/highlighted-code-block";
 import { MarkdownFenceBlock } from "@/components/markdown/fence";
+import { MathFormula } from "@/components/markdown/math/formula";
+import { resolveMathTextStyle } from "@/components/markdown/math/text-style";
 import type { MarkdownPhase } from "@/components/markdown/fence/types";
 import { splitMarkdownBlocks } from "@/utils/split-markdown-blocks";
 import { useRevealedText } from "@/hooks/use-revealed-text";
@@ -1489,6 +1491,17 @@ function MarkdownListView({
   );
 }
 
+// iOS MarkdownParagraphView defaults to UITextView, which ignores embedded views.
+// The upstream `containsImage` prop forces a View host instead. Keep that prop name
+// — this fork rebases upstream markdown-text; renaming it is needless churn.
+function paragraphNeedsViewHost(node: ASTNode): boolean {
+  return (
+    markdownNodeContainsType(node, "image") ||
+    markdownNodeContainsType(node, "math_inline") ||
+    markdownNodeContainsType(node, "math_block")
+  );
+}
+
 export function createAssistantMessageMarkdownRules({
   phase,
   markdownParser,
@@ -1814,15 +1827,19 @@ export function createAssistantMessageMarkdownRules({
       _parent: ASTNode[],
       styles: MarkdownStyles,
       inheritedStyles: TextStyle = {},
-    ) => (
-      <MarkdownInheritedText
-        key={node.key}
-        inheritedStyles={inheritedStyles}
-        textStyle={styles.text}
-      >
-        {node.markup ?? node.content}
-      </MarkdownInheritedText>
-    ),
+    ) => {
+      const { fontSize, color } = resolveMathTextStyle([inheritedStyles, styles.text]);
+      return (
+        <MathFormula
+          key={node.key}
+          tex={node.content ?? ""}
+          source={node.markup ?? node.content ?? ""}
+          display={false}
+          fontSize={fontSize}
+          color={color}
+        />
+      );
+    },
     math_block: (
       node: ASTNode,
       _children: ReactNode[],
@@ -1830,33 +1847,35 @@ export function createAssistantMessageMarkdownRules({
       styles: MarkdownStyles,
       inheritedStyles: TextStyle = {},
     ) => {
-      const text = (
-        <MarkdownInheritedText inheritedStyles={inheritedStyles} textStyle={styles.text}>
-          {node.markup ?? node.content}
-        </MarkdownInheritedText>
+      const isBlock = (node as ASTNode & { block?: boolean }).block === true;
+      // `\[...\]` mid-sentence is math_block with block: false. Block-level
+      // ScrollView cannot live inside Text, so render inline (display: false).
+      // Display limits/subscripts differ slightly from true display math.
+      const { fontSize, color } = resolveMathTextStyle([inheritedStyles, styles.text]);
+      const formula = (
+        <MathFormula
+          key={node.key}
+          tex={node.content ?? ""}
+          source={node.markup ?? node.content ?? ""}
+          display={isBlock}
+          fontSize={fontSize}
+          color={color}
+        />
       );
 
-      if ((node as ASTNode & { block?: boolean }).block === true) {
+      if (isBlock) {
         return (
           <MarkdownParagraphView
             key={node.key}
             paragraphStyle={styles.paragraph}
             containsImage={false}
           >
-            {text}
+            {formula}
           </MarkdownParagraphView>
         );
       }
 
-      return (
-        <MarkdownInheritedText
-          key={node.key}
-          inheritedStyles={inheritedStyles}
-          textStyle={styles.text}
-        >
-          {node.markup ?? node.content}
-        </MarkdownInheritedText>
-      );
+      return formula;
     },
     bullet_list: (
       node: ASTNode,
@@ -1937,7 +1956,7 @@ export function createAssistantMessageMarkdownRules({
       <MarkdownParagraphView
         key={node.key}
         paragraphStyle={styles.paragraph}
-        containsImage={markdownNodeContainsType(node, "image")}
+        containsImage={paragraphNeedsViewHost(node)}
       >
         {children}
       </MarkdownParagraphView>
