@@ -11,6 +11,7 @@ import {
   MARKDOWN_COPY_LANGUAGE_ATTRIBUTE,
   MARKDOWN_COPY_LIST_MARKER_ATTRIBUTE,
   MARKDOWN_COPY_LIST_START_ATTRIBUTE,
+  MARKDOWN_COPY_MATH_SOURCE_ATTRIBUTE,
   MARKDOWN_COPY_TAG_ATTRIBUTE,
   MARKDOWN_COPY_UNWRAP_ATTRIBUTE,
   TRAILING_CODE_LINE_BREAKS,
@@ -57,6 +58,10 @@ turndown.addRule("compactListItem", {
     const index = Array.from(parent.children).indexOf(node);
     return `${start + index}. ${item}\n`;
   },
+});
+turndown.addRule("mathFormulaCopy", {
+  filter: (node) => node.getAttribute(MARKDOWN_COPY_MATH_SOURCE_ATTRIBUTE) !== null,
+  replacement: (_content, node) => node.getAttribute(MARKDOWN_COPY_MATH_SOURCE_ATTRIBUTE) ?? "",
 });
 
 export function createAssistantSelectionClipboardContent(
@@ -477,6 +482,15 @@ function selectedMessageParts(range: Range): SelectedMessagePart[] | null {
 }
 
 function restoreMarkdownElements(container: HTMLElement): void {
+  for (const element of Array.from(
+    container.querySelectorAll(`[${MARKDOWN_COPY_MATH_SOURCE_ATTRIBUTE}]`),
+  ).toReversed()) {
+    const source = element.getAttribute(MARKDOWN_COPY_MATH_SOURCE_ATTRIBUTE);
+    if (source) {
+      element.textContent = source;
+    }
+  }
+
   for (const ignored of container.querySelectorAll(`[${MARKDOWN_COPY_IGNORE_ATTRIBUTE}]`)) {
     ignored.remove();
   }
@@ -524,6 +538,9 @@ function restoreMarkdownElements(container: HTMLElement): void {
 
   const presentational = Array.from(container.querySelectorAll("div, span"));
   for (const element of presentational.toReversed()) {
+    if (element.hasAttribute(MARKDOWN_COPY_MATH_SOURCE_ATTRIBUTE)) {
+      continue;
+    }
     element.replaceWith(...element.childNodes);
   }
 }
