@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.4 - 2026-09-02
+
+### Added
+
+- Added math rendering. LaTeX written as `\(…\)`, `\[…\]` or `$$…$$` is now typeset instead of shown as source, on iOS, Android, web and desktop alike. A single `$` is deliberately not a delimiter, so currency amounts and shell variables like `$HOME:$PATH` are left alone. Display formulas scroll horizontally rather than being clipped on a phone, copying a formula gives back its LaTeX source, and anything that fails to parse falls back to showing the source.
+
 ## 0.7.3 - 2026-09-02
 
 ### Fixed
