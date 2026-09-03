@@ -22,6 +22,16 @@ interface MarkdownTextSpanProps {
   accessibilityRole?: TextProps["accessibilityRole"];
 }
 
+// Only iOS needs the math text group signal; see markdown-text.ios.tsx.
+export function MarkdownMathTextGroupProvider({
+  children,
+}: {
+  fontSize: number;
+  children: ReactNode;
+}) {
+  return children;
+}
+
 // react-native-web renders Text as <span>/<div> with `user-select: text`
 // already applied via markdownStyleMapping. The web bundle must not import
 // react-native-uitextview: its transitive import of codegenNativeComponent
