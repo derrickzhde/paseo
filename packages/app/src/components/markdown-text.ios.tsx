@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from "react";
+import { createContext, useContext, useMemo, type ReactNode } from "react";
 import {
   Text,
   View,
@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { UITextView } from "react-native-uitextview";
 import { resolvePlainMarkdownTextStyle } from "@/components/markdown-text-style";
+import { inlineMathClipRoom } from "@/components/markdown/math/layout";
 import {
   iosMarkdownTextIsSelectable,
   useMarkdownTextSurface,
@@ -31,6 +32,25 @@ interface MarkdownTextSpanProps {
   accessibilityRole?: TextProps["accessibilityRole"];
 }
 
+// Font size of the text this group renders at, or null outside a math group.
+// The group's own style has none (see markdownAncestorFontSize), and the clip
+// room below has to be sized from the size the formulas were typeset at.
+const MarkdownMathTextGroupContext = createContext<number | null>(null);
+
+export function MarkdownMathTextGroupProvider({
+  fontSize,
+  children,
+}: {
+  fontSize: number;
+  children: ReactNode;
+}) {
+  return (
+    <MarkdownMathTextGroupContext.Provider value={fontSize}>
+      {children}
+    </MarkdownMathTextGroupContext.Provider>
+  );
+}
+
 // Inline span backed by UITextView so iOS gets native word-selection handles.
 // Used inside MarkdownParagraphView (which is also a UITextView on iOS); the
 // library's TextAncestorContext hoists these into UITextViewChild nodes so
@@ -41,7 +61,27 @@ export function MarkdownTextSpan({
   onPress,
   accessibilityRole,
 }: MarkdownTextSpanProps) {
-  const plainStyle = useMemo(() => resolvePlainMarkdownTextStyle(style), [style]);
+  const mathFontSize = useContext(MarkdownMathTextGroupContext);
+  const plainStyle = useMemo(() => {
+    const resolved = resolvePlainMarkdownTextStyle(style);
+    if (mathFontSize === null) {
+      return resolved;
+    }
+
+    // A fixed lineHeight clamps the line box, so a tall formula would overlap the
+    // neighbouring lines instead of pushing them apart.
+    const mathStyle = { ...resolved };
+    delete mathStyle.lineHeight;
+
+    // A formula is drawn below the text baseline, so on the paragraph's last line
+    // its ink leaves this view's bounds — and RNUITextView sets clipsToBounds
+    // unconditionally. Pad the bottom to grow the clip box, then cancel the
+    // padding with a negative margin so the paragraph keeps its height.
+    const room = inlineMathClipRoom(mathFontSize);
+    mathStyle.paddingBottom = room;
+    mathStyle.marginBottom = -room;
+    return mathStyle;
+  }, [mathFontSize, style]);
   const surface = useMarkdownTextSurface();
 
   // Each selectable span creates a UIKit UITextView with a window-level tap recognizer.

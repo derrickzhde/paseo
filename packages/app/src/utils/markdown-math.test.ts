@@ -299,10 +299,9 @@ describe("markdownMathPlugin", () => {
     }
   });
 
-  // A display formula is a horizontally scrolling view, which a UITextView cannot
-  // host — it needs the View paragraph. The assertion is positive because
-  // containsImage defaults to false, so dropping the prop has to fail too.
-  it("gives display formulas the View paragraph host", () => {
+  // Formula paragraphs use a View host on iOS: inline attachment baselines cannot
+  // be expressed by the UITextView wrapper without overlapping adjacent lines.
+  it("gives formula paragraphs the View host", () => {
     const factories = findMarkdownRulesFactories().filter((factory) =>
       factory.body.includes("MarkdownParagraphView"),
     );
@@ -313,6 +312,18 @@ describe("markdownMathPlugin", () => {
         sliceRule(factory, "math_block"),
         `${factory.file}::${factory.name} 块级公式需要 View 容器`,
       ).toMatch(/<MarkdownParagraphView[^>]*\scontainsImage[\s>]/);
+      expect(
+        sliceRule(factory, "paragraph"),
+        `${factory.file}::${factory.name} 含公式段落需要 View 容器`,
+      ).toContain("containsImage={paragraphNeedsViewHost(node)}");
+      expect(
+        sliceRule(factory, "textgroup"),
+        `${factory.file}::${factory.name} 含公式的 textgroup 需要重置行高`,
+      ).toContain("if (textGroupContainsMath(node))");
+      expect(
+        sliceRule(factory, "textgroup"),
+        `${factory.file}::${factory.name} 公式 textgroup 需要平台专用行高处理`,
+      ).toContain("MarkdownMathTextGroupProvider");
     }
   });
 

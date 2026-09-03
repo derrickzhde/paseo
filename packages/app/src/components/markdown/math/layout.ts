@@ -14,6 +14,28 @@ export interface MathLayout {
 // quarter of a pixel. Tune this only against a real screenshot, not by taste.
 const MATHJAX_EX_FACTOR = 0.5;
 
+// An inline formula is shifted down by its own depth (see formula.tsx), so its
+// ink reaches that far below the text baseline — outside the attachment box the
+// text laid out for it. The host text view has to add that much clip room below
+// its last line (see markdown-text.ios.tsx), but it only knows its font size,
+// not which formulas it holds. Capping the shift at the same factor the room is
+// sized from is what ties the two together: ink can never outrun the box.
+//
+// 1.1em clears every ordinary construct — a 2x2 pmatrix, the deepest thing
+// MathJax emits at inline size, sits 1.08em below the baseline; nested
+// fractions reach 0.67em. Deeper input (a 4-row inline pmatrix reaches 2.66em)
+// renders slightly high rather than clipped, and at that depth it already
+// overlaps the neighbouring lines whatever we do.
+const INLINE_MAX_SHIFT_EM = 1.1;
+
+export function inlineMathBaselineShift(depth: number, fontSize: number): number {
+  return Math.min(depth, fontSize * INLINE_MAX_SHIFT_EM);
+}
+
+export function inlineMathClipRoom(fontSize: number): number {
+  return fontSize * INLINE_MAX_SHIFT_EM;
+}
+
 function roundToTwoDecimals(value: number): number {
   return Math.round(value * 100) / 100;
 }
