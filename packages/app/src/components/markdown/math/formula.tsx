@@ -3,7 +3,7 @@ import { ScrollView, Text } from "react-native";
 import { SvgXml } from "react-native-svg";
 import { markdownCopyMathFormulaDataSet } from "@/assistant-selection-copy/markup";
 import { getLoadedMathEngine, loadMathEngine, type MathEngine } from "@/utils/math-svg";
-import { computeMathLayout } from "./layout";
+import { computeMathLayout, inlineMathBaselineShift } from "./layout";
 
 export interface MathFormulaProps {
   tex: string;
@@ -26,7 +26,6 @@ export function MathFormula({
     () => ({ flexGrow: 1, justifyContent: "center" as const }),
     [],
   );
-  const inlineOuterTextStyle = useMemo(() => ({ fontSize, color }), [fontSize, color]);
   const mathCopyDataSet = useMemo(() => markdownCopyMathFormulaDataSet(source), [source]);
   const rendered = useMemo(
     () => (engine === null ? null : engine.render(tex, display)),
@@ -34,8 +33,8 @@ export function MathFormula({
   );
   const layout = rendered === null ? null : computeMathLayout(rendered, fontSize);
   const inlineSvgStyle = useMemo(
-    () => ({ transform: [{ translateY: layout?.depth ?? 0 }] }),
-    [layout?.depth],
+    () => ({ transform: [{ translateY: inlineMathBaselineShift(layout?.depth ?? 0, fontSize) }] }),
+    [layout?.depth, fontSize],
   );
 
   useEffect(() => {
@@ -84,11 +83,18 @@ export function MathFormula({
   }
 
   // RN Text aligns inline replaced elements with their bottom edge on the text
-  // baseline. MathJax depthEx is the distance from the math baseline to the SVG
-  // bottom edge (depth px). translateY by depth moves the bottom edge from the
-  // text baseline to depth px below it, matching MathJax vertical-align: -depthEx ex.
+  // baseline, so an untransformed formula floats above the text by its own depth.
+  // MathJax depthEx is the distance from the math baseline to the SVG bottom
+  // edge, so translateY by depth puts the formula's baseline on the text
+  // baseline — the alignment MathJax asks for with vertical-align: -depthEx ex.
+  // A flat offset cannot do this: it sinks shallow formulas (E = mc^2, \sqrt 2)
+  // by most of an em while deep ones (\sum, \int) still land about right.
+  //
+  // react-native-svg hoists a style transform onto the host view, so this moves
+  // the whole SVG view rather than its contents: nothing is cropped inside the
+  // SVG, but the ink now sits below the attachment box the text laid out for it.
   return (
-    <Text style={inlineOuterTextStyle} dataSet={mathCopyDataSet}>
+    <Text style={sourceTextStyle} dataSet={mathCopyDataSet}>
       <SvgXml
         xml={rendered.svg}
         width={layout.width}
