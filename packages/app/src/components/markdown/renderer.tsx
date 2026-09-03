@@ -26,13 +26,17 @@ import { HighlightedCodeBlock } from "@/components/highlighted-code-block";
 import { MarkdownFenceBlock } from "@/components/markdown/fence";
 import { MathFormula } from "@/components/markdown/math/formula";
 import { resolveMathTextStyle } from "@/components/markdown/math/text-style";
-import { MarkdownParagraphView, MarkdownTextSpan } from "@/components/markdown-text";
+import {
+  MarkdownMathTextGroupProvider,
+  MarkdownParagraphView,
+  MarkdownTextSpan,
+} from "@/components/markdown-text";
 import { MarkdownTableCellText } from "@/components/markdown-text-selection";
 import { getMarkdownListMarker, getMarkdownListSpacing } from "@/utils/markdown-list";
-import { markdownNodeContainsType } from "@/utils/markdown-ast";
+import { markdownAncestorFontSize, markdownNodeContainsType } from "@/utils/markdown-ast";
 import { createMarkdownParser } from "@/utils/markdown-parser";
 import { createCompactMarkdownStyles, createMarkdownStyles } from "@/styles/markdown-styles";
-import type { Theme } from "@/styles/theme";
+import { FONT_SIZE, type Theme } from "@/styles/theme";
 import { openExternalUrl } from "@/utils/open-external-url";
 import { isNative } from "@/constants/platform";
 import {
@@ -513,6 +517,23 @@ function getMarkdownLinkHref(node: ASTNode): string {
   return typeof href === "string" ? href : "";
 }
 
+// iOS MarkdownParagraphView defaults to UITextView, which cannot express the
+// baseline offset of an inline formula attachment. Keep formula paragraphs in
+// a regular View so their SVGs and surrounding text use normal Yoga layout.
+function paragraphNeedsViewHost(node: ASTNode): boolean {
+  return (
+    markdownNodeContainsType(node, "image") ||
+    markdownNodeContainsType(node, "math_inline") ||
+    markdownNodeContainsType(node, "math_block")
+  );
+}
+
+function textGroupContainsMath(node: ASTNode): boolean {
+  return (
+    markdownNodeContainsType(node, "math_inline") || markdownNodeContainsType(node, "math_block")
+  );
+}
+
 export function createSharedMarkdownRules(): RenderRules {
   return {
     text: (
@@ -533,18 +554,33 @@ export function createSharedMarkdownRules(): RenderRules {
     textgroup: (
       node: ASTNode,
       children: ReactNode[],
-      _parent: ASTNode[],
+      parent: ASTNode[],
       styles: MarkdownStyles,
       inheritedStyles: TextStyle = {},
-    ) => (
-      <MarkdownInheritedText
-        key={node.key}
-        inheritedStyles={inheritedStyles}
-        textStyle={styles.textgroup}
-      >
-        {children}
-      </MarkdownInheritedText>
-    ),
+    ) => {
+      const textGroup = (
+        <MarkdownInheritedText
+          key={node.key}
+          inheritedStyles={inheritedStyles}
+          textStyle={styles.textgroup}
+        >
+          {children}
+        </MarkdownInheritedText>
+      );
+
+      if (textGroupContainsMath(node)) {
+        return (
+          <MarkdownMathTextGroupProvider
+            key={node.key}
+            fontSize={markdownAncestorFontSize(parent, styles, FONT_SIZE.content)}
+          >
+            {textGroup}
+          </MarkdownMathTextGroupProvider>
+        );
+      }
+
+      return textGroup;
+    },
     strong: (
       node: ASTNode,
       children: ReactNode[],
@@ -766,7 +802,7 @@ export function createSharedMarkdownRules(): RenderRules {
       <MarkdownParagraphView
         key={node.key}
         paragraphStyle={styles.paragraph}
-        containsImage={markdownNodeContainsType(node, "image")}
+        containsImage={paragraphNeedsViewHost(node)}
       >
         {children}
       </MarkdownParagraphView>

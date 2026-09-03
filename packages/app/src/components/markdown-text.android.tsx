@@ -18,6 +18,16 @@ interface MarkdownTextSpanProps {
   accessibilityRole?: TextProps["accessibilityRole"];
 }
 
+// Only iOS needs the math text group signal; see markdown-text.ios.tsx.
+export function MarkdownMathTextGroupProvider({
+  children,
+}: {
+  fontSize: number;
+  children: ReactNode;
+}) {
+  return children;
+}
+
 // Android's <Text selectable> enables per-text-node selection natively. Each
 // sibling Text is its own selection scope — drag can't span across siblings
 // (that requires a single UITextView ancestor and is iOS-only). onPress works

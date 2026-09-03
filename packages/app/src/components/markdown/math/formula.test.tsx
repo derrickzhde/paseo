@@ -41,6 +41,7 @@ vi.mock("react-native-svg", () => ({
       "data-accessibility-label": accessibilityLabel,
       "data-color": color,
       "data-height": height,
+      "data-style": JSON.stringify(flattenStyle(style)),
       "data-width": width,
       "data-xml": xml,
       style: flattenStyle(style),
@@ -163,6 +164,37 @@ describe("MathFormula", () => {
     expect(mockLoadMathEngine).not.toHaveBeenCalled();
   });
 
+  it("drops inline formulas onto the text baseline by their own depth", () => {
+    const engine = createMockEngine();
+    mockGetLoadedMathEngine.mockReturnValue(engine);
+    mockRender.mockReturnValue(SAMPLE_RESULT);
+
+    // depthEx 0.798 * fontSize 16 * exFactor 0.5
+    const inlineView = render(createElement(MathFormula, defaultProps));
+    const inlineSvg = inlineView.container.querySelector("svg");
+    expect(JSON.parse(inlineSvg?.getAttribute("data-style") ?? "null")).toEqual({
+      transform: [{ translateY: 6.38 }],
+    });
+
+    const blockView = render(createElement(MathFormula, { ...defaultProps, display: true }));
+    const blockSvg = blockView.container.querySelector("svg");
+    expect(JSON.parse(blockSvg?.getAttribute("data-style") ?? "null")).toEqual({});
+  });
+
+  it("caps the drop so the ink cannot outrun the host text view's clip room", () => {
+    const engine = createMockEngine();
+    mockGetLoadedMathEngine.mockReturnValue(engine);
+    // A 4-row inline pmatrix reaches ~2.66em of depth; the cap is 1.1em.
+    mockRender.mockReturnValue({ ...SAMPLE_RESULT, depthEx: 5.32 });
+
+    const view = render(createElement(MathFormula, defaultProps));
+    const svg = view.container.querySelector("svg");
+
+    expect(JSON.parse(svg?.getAttribute("data-style") ?? "null")).toEqual({
+      transform: [{ translateY: defaultProps.fontSize * 1.1 }],
+    });
+  });
+
   it("omits color from source Text when the engine is not ready and color is undefined", () => {
     const view = render(
       createElement(MathFormula, {
@@ -276,7 +308,7 @@ describe("MathFormula", () => {
     mockRender.mockReturnValue(SAMPLE_RESULT);
 
     const view = render(createElement(MathFormula, defaultProps));
-    const outer = view.container.querySelector("span");
+    const outer = view.container.querySelector(`[${MARKDOWN_COPY_MATH_SOURCE_ATTRIBUTE}]`);
 
     expect(outer?.getAttribute(MARKDOWN_COPY_MATH_SOURCE_ATTRIBUTE)).toBe(defaultProps.source);
   });

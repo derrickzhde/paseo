@@ -12,7 +12,11 @@ import {
   type TextStyle,
 } from "react-native";
 import { useTranslation } from "react-i18next";
-import { MarkdownParagraphView, MarkdownTextSpan } from "@/components/markdown-text";
+import {
+  MarkdownMathTextGroupProvider,
+  MarkdownParagraphView,
+  MarkdownTextSpan,
+} from "@/components/markdown-text";
 import { MarkdownTableCellText } from "@/components/markdown-text-selection";
 import * as React from "react";
 import {
@@ -48,7 +52,7 @@ import {
   FileSymlink,
 } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import { ICON_SIZE, type Theme } from "@/styles/theme";
+import { FONT_SIZE, ICON_SIZE, type Theme } from "@/styles/theme";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import Animated, {
   Easing,
@@ -68,7 +72,7 @@ import type { ToolCallDetail } from "@getpaseo/protocol/agent-types";
 import { buildToolCallPresentation } from "@/tool-calls/presentation";
 import { resolveToolCallIcon } from "@/utils/tool-call-icon";
 import { getMarkdownListMarker, getMarkdownListSpacing } from "@/utils/markdown-list";
-import { markdownNodeContainsType } from "@/utils/markdown-ast";
+import { markdownAncestorFontSize, markdownNodeContainsType } from "@/utils/markdown-ast";
 import { useStableEvent } from "@/hooks/use-stable-event";
 import { HighlightedCodeBlock } from "@/components/highlighted-code-block";
 import { MarkdownFenceBlock } from "@/components/markdown/fence";
@@ -1491,6 +1495,23 @@ function MarkdownListView({
   );
 }
 
+// iOS MarkdownParagraphView defaults to UITextView, which cannot express the
+// baseline offset of an inline formula attachment. Keep formula paragraphs in
+// a regular View so their SVGs and surrounding text use normal Yoga layout.
+function paragraphNeedsViewHost(node: ASTNode): boolean {
+  return (
+    markdownNodeContainsType(node, "image") ||
+    markdownNodeContainsType(node, "math_inline") ||
+    markdownNodeContainsType(node, "math_block")
+  );
+}
+
+function textGroupContainsMath(node: ASTNode): boolean {
+  return (
+    markdownNodeContainsType(node, "math_inline") || markdownNodeContainsType(node, "math_block")
+  );
+}
+
 export function createAssistantMessageMarkdownRules({
   phase,
   markdownParser,
@@ -1624,18 +1645,33 @@ export function createAssistantMessageMarkdownRules({
     textgroup: (
       node: ASTNode,
       children: ReactNode[],
-      _parent: ASTNode[],
+      parent: ASTNode[],
       styles: MarkdownStyles,
       inheritedStyles: TextStyle = {},
-    ) => (
-      <MarkdownInheritedText
-        key={node.key}
-        inheritedStyles={inheritedStyles}
-        textStyle={styles.textgroup}
-      >
-        {children}
-      </MarkdownInheritedText>
-    ),
+    ) => {
+      const textGroup = (
+        <MarkdownInheritedText
+          key={node.key}
+          inheritedStyles={inheritedStyles}
+          textStyle={styles.textgroup}
+        >
+          {children}
+        </MarkdownInheritedText>
+      );
+
+      if (textGroupContainsMath(node)) {
+        return (
+          <MarkdownMathTextGroupProvider
+            key={node.key}
+            fontSize={markdownAncestorFontSize(parent, styles, FONT_SIZE.content)}
+          >
+            {textGroup}
+          </MarkdownMathTextGroupProvider>
+        );
+      }
+
+      return textGroup;
+    },
     // strong/em/s have no custom rule in react-native-markdown-display's
     // defaults beyond wrapping children in a plain RN <Text>. On iOS the
     // paragraph/textgroup are native UITextViews (see markdown-text.ios.tsx),
@@ -1942,7 +1978,7 @@ export function createAssistantMessageMarkdownRules({
       <MarkdownParagraphView
         key={node.key}
         paragraphStyle={styles.paragraph}
-        containsImage={markdownNodeContainsType(node, "image")}
+        containsImage={paragraphNeedsViewHost(node)}
       >
         {children}
       </MarkdownParagraphView>
