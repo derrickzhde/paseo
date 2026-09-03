@@ -614,16 +614,35 @@ export const OPACITY = {
 // Platform default font stacks — copied verbatim from constants/theme.ts `Fonts`
 // (sans -> ui, mono -> mono). These seed the dynamic `fontFamily` theme token and
 // are the fallback an empty user-supplied family resolves to at apply time.
+// Neither stack's text fonts cover Combining Diacritical Marks for Symbols
+// (U+20D0-U+20F0), where the vector arrow and overline a model writes as literal
+// Unicode live: on macOS none of system-ui, Helvetica, Arial, Menlo, Monaco or
+// Courier New has U+20D7, and Chrome's own last-resort fallback does not reach a
+// font that does, so it draws a missing-glyph box. CSS falls back per character,
+// so ordinary text never gets here; the fallbacks have to sit before the generic
+// family or the generic family ends the search.
+//
+// A text font has to come first. A math font positions U+20D7 through its MATH
+// table for a math layout engine, not through GPOS mark anchors, so in running
+// text the arrow lands at a fixed height and cuts through anything taller than
+// half an x-height: STIX Two Math overlaps a capital by 7.7% of the font size and
+// an ascender by 12.6%, while STIX Two Text clears both by about 8%. The math
+// fonts stay behind it as a backstop for symbols the text font lacks.
+//
+// CoreText does this fallback itself, which is why native gets the glyph without
+// a stack — but it picks STIX Two Math, so native keeps the overlap.
+const WEB_SYMBOL_FALLBACK = "'STIX Two Text', 'STIX Two Math', 'Cambria Math', 'Noto Sans Math'";
+
 export const DEFAULT_UI_FONT_STACK: string = Platform.select({
   ios: "system-ui",
   default: "normal",
-  web: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+  web: `system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, ${WEB_SYMBOL_FALLBACK}, sans-serif`,
 });
 
 export const DEFAULT_MONO_FONT_STACK: string = Platform.select({
   ios: "ui-monospace",
   default: "monospace",
-  web: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+  web: `SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', ${WEB_SYMBOL_FALLBACK}, monospace`,
 });
 
 // `fontSize`, `fontFamily`, and `lineHeight` are deliberately widened to plain
