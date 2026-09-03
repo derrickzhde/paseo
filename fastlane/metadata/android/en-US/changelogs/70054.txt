@@ -1,0 +1,4 @@
+Fixed
+- Fixed every math formula rendering as a blank box on iOS. react-native-uitextview composes its children into a single native text view and drops any child that is not text, so a formula's SVG never reached the screen; 2.7.1 lays it out as a text attachment instead. Formulas now sit on the text baseline, a tall one pushes the surrounding lines apart instead of overlapping them, and a formula on a paragraph's last line is no longer clipped.
+
+Full notes: https://paseo.sh/changelog
