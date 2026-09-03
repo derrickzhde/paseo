@@ -1,4 +1,5 @@
 import { execFileSync as nodeExecFileSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
 
 function parseJson(output) {
   return JSON.parse(output);
@@ -67,7 +68,9 @@ function parseArgs(argv) {
   return { cleanupDuplicates, repo, tag };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Compare URL to URL: on Windows argv[1] is a backslash path (D:\a\...), so
+// string-prefixing it with file:// never matches and the CLI exits with no output.
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const { cleanupDuplicates, repo, tag } = parseArgs(process.argv.slice(2));
   let release = null;
   for (let attempt = 0; attempt < 5 && !release; attempt += 1) {
