@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.8.1 - 2026-09-11
+
+This fork release syncs upstream Paseo 0.8.0.
+
+**Before upgrading:** desktop now requires macOS 13 or newer. Plugins written for 0.7 need the [0.8 migration guide](https://paseo.sh/docs/plugins/v0.8/migration), including separate client/server entries and the revised composer pill API.
+
+### Synced from upstream 0.8.0
+
+- Added answer forms for Codex questions asked while the agent continues working
+- Added Mark as unread to finished workspaces in the sidebar menu
+- Added Import session to the sidebar footer, History, and Command Center, with search, pagination, and workspace filtering
+- Added sidebar item reordering and visibility controls in Appearance settings
+- Added plugin custom providers, header buttons, composer pills, settings screens, lifecycle hooks, and richer SDK surfaces
+
+### Fork carryovers
+
+This release retains fork-specific behavior already present before 0.8.1: Claude 1M context model entries, per-model ACP thinking and Fast settings, push notification recovery when multiple Expo projects are installed, and LaTeX formula rendering. No new work on those items in this release.
+
 ## 0.8.0 - 2026-09-10
 
 Paseo 0.8 adds plugin header buttons, custom providers, and richer chat components, alongside fixes for desktop updates and mobile keyboards.

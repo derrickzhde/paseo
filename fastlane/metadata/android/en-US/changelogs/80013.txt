@@ -1,0 +1,7 @@
+This fork release syncs upstream Paseo 0.8.0.
+
+Before upgrading: desktop now requires macOS 13 or newer. Plugins written for 0.7 need the 0.8 migration guide, including separate client/server entries and the revised composer pill API.
+
+This release retains fork-specific behavior already present before 0.8.1: Claude 1M context model entries, per-model ACP thinking and Fast settings, push notification recovery when multiple Expo projects are installed, a...
+
+Full notes: https://paseo.sh/changelog
