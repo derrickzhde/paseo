@@ -50,6 +50,7 @@ describe("getClaudeModels", () => {
   it("returns all claude models", () => {
     const models = getClaudeModels();
     expect(models.map((m) => m.id)).toEqual([
+      "claude-opus-5-5[1m]",
       "claude-opus-5-5",
       "claude-opus-5[1m]",
       "claude-opus-5",
@@ -77,7 +78,7 @@ describe("getClaudeModels", () => {
     const models = getClaudeModels();
     const defaults = models.filter((m) => m.isDefault);
     expect(defaults).toHaveLength(1);
-    expect(defaults[0].id).toBe("claude-opus-5-5");
+    expect(defaults[0].id).toBe("claude-opus-5-5[1m]");
   });
 
   it("defines context window sizes in the catalog", () => {
@@ -87,7 +88,8 @@ describe("getClaudeModels", () => {
 
     expect(contextWindows).toEqual(
       new Map([
-        ["claude-opus-5-5", 1_000_000],
+        ["claude-opus-5-5[1m]", 1_000_000],
+        ["claude-opus-5-5", 200_000],
         ["claude-opus-5[1m]", 1_000_000],
         ["claude-opus-5", 200_000],
         ["claude-fable-5-1[1m]", 1_000_000],
@@ -125,9 +127,13 @@ describe("getClaudeModels", () => {
     expect(getClaudeModels("2.1.169").map((model) => model.id)).toContain("claude-fable-5[1m]");
 
     expect(getClaudeModels("2.1.279").map((model) => model.id)).not.toContain("claude-opus-5-5");
-    expect(getClaudeModels("2.1.279").find((model) => model.isDefault)?.id).toBe("claude-opus-5[1m]");
+    expect(getClaudeModels("2.1.279").find((model) => model.isDefault)?.id).toBe(
+      "claude-opus-5[1m]",
+    );
     expect(getClaudeModels("2.1.280").map((model) => model.id)).toContain("claude-opus-5-5");
-    expect(getClaudeModels("2.1.280").find((model) => model.isDefault)?.id).toBe("claude-opus-5-5");
+    expect(getClaudeModels("2.1.280").find((model) => model.isDefault)?.id).toBe(
+      "claude-opus-5-5[1m]",
+    );
 
     expect(getClaudeModels("2.1.283").map((model) => model.id)).not.toContain("claude-sonnet-5-5");
     expect(getClaudeModels("2.1.284").map((model) => model.id)).toContain("claude-sonnet-5-5");
@@ -642,13 +648,32 @@ describe("Claude Fable 5.1 catalog", () => {
 });
 
 describe("Claude Opus 5.5 catalog", () => {
-  it("offers one Opus 5.5 entry with a 1M context window", () => {
+  it("offers the 1M variant and the 200K base as separate selectable entries", () => {
     const opus55Models = getClaudeModels()
       .filter((model) => model.id.startsWith("claude-opus-5-5"))
-      .map(({ id, label, contextWindowMaxTokens }) => ({ id, label, contextWindowMaxTokens }));
+      .map(({ id, aliases, isSelectable, label, contextWindowMaxTokens }) => ({
+        id,
+        aliases,
+        isSelectable,
+        label,
+        contextWindowMaxTokens,
+      }));
 
     expect(opus55Models).toEqual([
-      { id: "claude-opus-5-5", label: "Opus 5.5", contextWindowMaxTokens: 1_000_000 },
+      {
+        id: "claude-opus-5-5[1m]",
+        aliases: undefined,
+        isSelectable: undefined,
+        label: "Opus 5.5 1M",
+        contextWindowMaxTokens: 1_000_000,
+      },
+      {
+        id: "claude-opus-5-5",
+        aliases: undefined,
+        isSelectable: undefined,
+        label: "Opus 5.5",
+        contextWindowMaxTokens: 200_000,
+      },
     ]);
   });
 
@@ -669,10 +694,11 @@ describe("Claude Opus 5.5 catalog", () => {
     ).toEqual(["medium"]);
   });
 
-  it("resolves suffixed and dated Opus 5.5 IDs to the catalog entry", () => {
-    expect(findClaudeModel("claude-opus-5-5[1m]")?.id).toBe("claude-opus-5-5");
+  it("resolves Opus 5.5 IDs to the entry whose context window they name", () => {
+    expect(findClaudeModel("claude-opus-5-5[1m]")?.id).toBe("claude-opus-5-5[1m]");
+    expect(findClaudeModel("claude-opus-5-5-20260401[1m]")?.id).toBe("claude-opus-5-5[1m]");
+    expect(findClaudeModel("claude-opus-5-5")?.id).toBe("claude-opus-5-5");
     expect(findClaudeModel("claude-opus-5-5-20260401")?.id).toBe("claude-opus-5-5");
-    expect(findClaudeModel("claude-opus-5-5-20260401[1m]")?.id).toBe("claude-opus-5-5");
   });
 });
 
