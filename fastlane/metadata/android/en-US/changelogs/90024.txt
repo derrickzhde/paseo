@@ -1,0 +1,4 @@
+Fixed
+- Fixed Opus 5.5 running at 200K while the model picker promised a 1M context window. Claude Code only serves the larger window when the model id carries the 1M suffix, so Opus 5.5 is now two entries the way every other 1M-capable model already is: "Opus 5.5 1M" for the full window, "Opus 5.5" for 200K.
+
+Full notes: https://paseo.sh/changelog

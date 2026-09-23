@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.2 - 2026-09-23
+
+### Fixed
+
+- Fixed Opus 5.5 running at 200K while the model picker promised a 1M context window. Claude Code only serves the larger window when the model id carries the 1M suffix, so Opus 5.5 is now two entries the way every other 1M-capable model already is: "Opus 5.5 1M" for the full window, "Opus 5.5" for 200K.
+
+### Changed
+
+- Merged upstream 0.9.0 and 0.9.1: Find in chat, terminal scrollback and file panes, plugin installation from npm, expandable plan cards, Jump to file in mobile Changes, automatic pull request tabs, match highlighting in History search, and Opus 5.5 in the Claude catalog.
+
 ## 0.9.1 - 2026-09-22
 
 ### Added
