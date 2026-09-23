@@ -93,3 +93,9 @@ app.json
 
 # Heap snapshots dumped by --heapsnapshot-near-heap-limit; keep them for debugging.
 *.heapsnapshot
+
+# CodeGraph index data, local to each machine. This rule has to live here rather
+# than in .codegraph/.gitignore: eas-cli collects nested ignore files with
+# fast-glob and never passes dot: true, so it never sees a rule inside a dot
+# directory, and its build upload chokes on daemon.sock.
+.codegraph/
