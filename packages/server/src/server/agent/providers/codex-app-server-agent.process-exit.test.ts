@@ -6,6 +6,7 @@ import { expect, test } from "vitest";
 
 import { createTestLogger } from "../../../test-utils/test-logger.js";
 import { AgentManager, type AgentManagerEvent } from "../agent-manager.js";
+import { formatSystemNotificationPrompt, startAgentRun } from "../agent-prompt.js";
 import type {
   AgentClient,
   AgentLaunchContext,
@@ -427,6 +428,77 @@ test("unexpected exit fails an autonomous Codex turn", async () => {
       await manager.closeAgent(agentId);
     }
     unsubscribe();
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
+
+test("a finish notification steers an autonomous Codex turn instead of replacing it", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "codex-autonomous-steer-"));
+  const appServer = createFakeCodexAppServer({
+    "turn/steer": () => ({ turn: { id: "goal-turn" } }),
+    "turn/interrupt": () => ({}),
+  });
+  const manager = new AgentManager({
+    clients: { codex: new ProcessExitCodexClient([appServer]) },
+    logger,
+  });
+  let agentId: string | null = null;
+
+  try {
+    const agent = await manager.createAgent(
+      { provider: "codex", cwd: workdir, modeId: "auto", model: "gpt-5.4" },
+      undefined,
+      { workspaceId: undefined },
+    );
+    agentId = agent.id;
+    const firstRun = manager.runAgent(agent.id, "set a goal");
+    const turnStart = await appServer.waitForTurnStart();
+    const threadId = String(turnStart.threadId);
+    appServer.startsTurn({ threadId, turnId: "paseo-turn" });
+    appServer.completeTurn({ threadId });
+    await firstRun;
+
+    // Codex opens each /goal continuation turn itself; Paseo never sent turn/start for it.
+    appServer.startsTurn({ threadId, turnId: "goal-turn" });
+    await expect.poll(() => manager.getAgent(agent.id)?.lifecycle).toBe("running");
+
+    const notification = startAgentRun(
+      manager,
+      agent.id,
+      formatSystemNotificationPrompt("Agent child finished"),
+      logger,
+      { replaceRunning: true, activeTurnBehavior: "steer" },
+    );
+    void notification.catch(() => undefined);
+    await expect
+      .poll(() =>
+        appServer
+          .requests()
+          .some(
+            (message) => message.method === "turn/steer" || message.method === "turn/interrupt",
+          ),
+      )
+      .toBe(true);
+
+    expect(appServer.requests().map((message) => message.method)).not.toContain("turn/interrupt");
+    await expect(notification).resolves.toEqual({ disposition: "steered" });
+    expect(appServer.requests()).toContainEqual(
+      expect.objectContaining({
+        method: "turn/steer",
+        params: expect.objectContaining({ threadId, expectedTurnId: "goal-turn" }),
+      }),
+    );
+    expect(appServer.requests().filter((message) => message.method === "turn/start")).toHaveLength(
+      1,
+    );
+
+    appServer.completeTurn({ threadId });
+    await expect.poll(() => manager.getAgent(agent.id)?.lifecycle).toBe("idle");
+    appServer.assertNoErrors();
+  } finally {
+    if (agentId && manager.getAgent(agentId)) {
+      await manager.closeAgent(agentId);
+    }
     rmSync(workdir, { recursive: true, force: true });
   }
 });
