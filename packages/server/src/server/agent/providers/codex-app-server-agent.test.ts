@@ -15,6 +15,7 @@ import type {
   AgentSlashCommand,
   AgentStreamEvent,
 } from "../agent-sdk-types.js";
+import { getAgentStreamEventTurnId } from "../agent-sdk-types.js";
 import {
   buildCodexAppServerEnv,
   CodexAppServerAgentClient,
@@ -351,6 +352,81 @@ describe("Codex active-turn steering admission", () => {
 
     await expect(steer).resolves.toEqual({ status: "unavailable" });
     expect(startedB.turnId).not.toBe(paseoTurnId);
+    expect(appServer.requests().filter((request) => request.method === "turn/steer")).toEqual([]);
+    await session.close();
+    appServer.assertNoErrors();
+  });
+
+  test("steers a turn Codex started itself, such as a /goal continuation", async () => {
+    const appServer = createFakeCodexAppServer({
+      "turn/steer": (params) => ({ turnId: (params as { expectedTurnId: string }).expectedTurnId }),
+    });
+    const { session } = await startPublicSteeringSession(appServer);
+    const events: AgentStreamEvent[] = [];
+    session.subscribe((event) => events.push(event));
+    async function codexStartsTurn(nativeTurnId: string): Promise<string> {
+      appServer.startsTurn({ threadId: "thread-1", turnId: nativeTurnId });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const started = events.findLast((event) => event.type === "turn_started");
+      expect(started).toMatchObject({ turnId: expect.any(String) });
+      return getAgentStreamEventTurnId(started!)!;
+    }
+    appServer.completeTurn({ threadId: "thread-1" });
+
+    const goalTurnId = await codexStartsTurn("native-goal");
+    await expect(
+      session.steerActiveTurn!("child agent finished", { expectedTurnId: goalTurnId }),
+    ).resolves.toEqual({ status: "accepted" });
+    expect(appServer.requests()).toContainEqual(
+      expect.objectContaining({
+        method: "turn/steer",
+        params: expect.objectContaining({ threadId: "thread-1", expectedTurnId: "native-goal" }),
+      }),
+    );
+
+    appServer.completeTurn({ threadId: "thread-1" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(events.findLast((event) => event.type === "turn_completed")).toMatchObject({
+      turnId: goalTurnId,
+    });
+    const nextGoalTurnId = await codexStartsTurn("native-goal-2");
+    expect(nextGoalTurnId).not.toBe(goalTurnId);
+    await expect(
+      session.steerActiveTurn!("too late", { expectedTurnId: goalTurnId }),
+    ).resolves.toEqual({ status: "unavailable" });
+    expect(appServer.requests().filter((request) => request.method === "turn/steer")).toHaveLength(
+      1,
+    );
+    await session.close();
+    appServer.assertNoErrors();
+  });
+
+  test("does not steer the next Codex-started turn when the targeted one ends during command resolution", async () => {
+    const commandResolution = deferred<{ commandName: string } | null>();
+    const resolverEntered = deferred<void>();
+    const appServer = createFakeCodexAppServer();
+    const { session } = await startPublicSteeringSession(appServer, async (prompt) => {
+      if (prompt !== "/held") return null;
+      resolverEntered.resolve();
+      return commandResolution.promise;
+    });
+    const events: AgentStreamEvent[] = [];
+    session.subscribe((event) => events.push(event));
+    appServer.completeTurn({ threadId: "thread-1" });
+    appServer.startsTurn({ threadId: "thread-1", turnId: "native-goal-A" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const goalTurnA = getAgentStreamEventTurnId(
+      events.findLast((event) => event.type === "turn_started")!,
+    )!;
+
+    const steer = session.steerActiveTurn!("/held", { expectedTurnId: goalTurnA });
+    await resolverEntered.promise;
+    appServer.completeTurn({ threadId: "thread-1" });
+    appServer.startsTurn({ threadId: "thread-1", turnId: "native-goal-B" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    commandResolution.resolve(null);
+
+    await expect(steer).resolves.toEqual({ status: "unavailable" });
     expect(appServer.requests().filter((request) => request.method === "turn/steer")).toEqual([]);
     await session.close();
     appServer.assertNoErrors();
