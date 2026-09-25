@@ -3444,6 +3444,8 @@ export class CodexAppServerAgentSession implements AgentSession {
   private readonly subscribers = new Set<(event: AgentStreamEvent) => void>();
   private nextTurnOrdinal = 0;
   private activeForegroundTurnId: string | null = null;
+  /** Root turn Codex started on its own, such as a /goal continuation. */
+  private autonomousTurnId: string | null = null;
   private activeClientMessageId: string | null = null;
   private cachedRuntimeInfo: AgentRuntimeInfo | null = null;
   private serviceTier: string | null = null;
@@ -3704,6 +3706,7 @@ export class CodexAppServerAgentSession implements AgentSession {
       });
     }
     this.activeForegroundTurnId = null;
+    this.autonomousTurnId = null;
     this.activeClientMessageId = null;
     this.currentTurnId = null;
     this.pendingForegroundTurnIdentification?.resolve(null);
@@ -4374,6 +4377,7 @@ export class CodexAppServerAgentSession implements AgentSession {
       this.activeForegroundTurnId = turnId;
       this.activeClientMessageId = options?.clientMessageId ?? null;
       this.currentTurnId = null;
+      this.autonomousTurnId = null;
       this.pendingForegroundTurnIdentification?.resolve(null);
       let resolveTurnIdentification!: (identifiedTurnId: string | null) => void;
       const turnIdentification = new Promise<string | null>((resolvePromise) => {
@@ -4420,16 +4424,16 @@ export class CodexAppServerAgentSession implements AgentSession {
     const client = this.client;
     const threadId = this.currentThreadId;
     const nativeTurnId = this.currentTurnId;
-    const foregroundTurnId = this.activeForegroundTurnId;
-    if (!client || !threadId || !nativeTurnId || foregroundTurnId !== options.expectedTurnId) {
+    const activeTurnId = this.activeForegroundTurnId ?? this.autonomousTurnId;
+    if (!client || !threadId || !nativeTurnId || activeTurnId !== options.expectedTurnId) {
       return { status: "unavailable" };
     }
     if (await this.resolveSlashCommandInvocation(prompt)) return { status: "unavailable" };
-    if (!this.matchesSteerAdmission({ client, threadId, nativeTurnId, foregroundTurnId })) {
+    if (!this.matchesSteerAdmission({ client, threadId, nativeTurnId, activeTurnId })) {
       return { status: "unavailable" };
     }
     const input = await this.buildUserInput(prompt);
-    if (!this.matchesSteerAdmission({ client, threadId, nativeTurnId, foregroundTurnId })) {
+    if (!this.matchesSteerAdmission({ client, threadId, nativeTurnId, activeTurnId })) {
       return { status: "unavailable" };
     }
     try {
@@ -4463,13 +4467,13 @@ export class CodexAppServerAgentSession implements AgentSession {
     client: CodexAppServerClientLike;
     threadId: string;
     nativeTurnId: string;
-    foregroundTurnId: string;
+    activeTurnId: string;
   }): boolean {
     return (
       this.client === admission.client &&
       this.currentThreadId === admission.threadId &&
       this.currentTurnId === admission.nativeTurnId &&
-      this.activeForegroundTurnId === admission.foregroundTurnId
+      (this.activeForegroundTurnId ?? this.autonomousTurnId) === admission.activeTurnId
     );
   }
 
@@ -5003,6 +5007,7 @@ export class CodexAppServerAgentSession implements AgentSession {
         throw error;
       }
       this.activeForegroundTurnId = null;
+      this.autonomousTurnId = null;
       this.activeClientMessageId = null;
       this.currentTurnId = null;
       this.pendingForegroundTurnIdentification?.resolve(null);
@@ -5016,6 +5021,7 @@ export class CodexAppServerAgentSession implements AgentSession {
     this.pendingSubAgentNotificationsByThreadId.clear();
     this.subscribers.clear();
     this.activeForegroundTurnId = null;
+    this.autonomousTurnId = null;
     this.activeClientMessageId = null;
     this.pendingForegroundTurnIdentification?.resolve(null);
     this.pendingForegroundTurnIdentification = null;
@@ -5043,6 +5049,7 @@ export class CodexAppServerAgentSession implements AgentSession {
     const client = this.client;
     this.connectionState = "disconnected";
     this.currentTurnId = null;
+    this.autonomousTurnId = null;
     if (client) {
       await client.dispose();
     }
@@ -5360,7 +5367,8 @@ export class CodexAppServerAgentSession implements AgentSession {
   }
 
   private notifySubscribers(event: AgentStreamEvent): void {
-    const turnId = getAgentStreamEventTurnId(event) ?? this.activeForegroundTurnId;
+    const turnId =
+      getAgentStreamEventTurnId(event) ?? this.activeForegroundTurnId ?? this.autonomousTurnId;
     const tagged = turnId ? { ...event, turnId } : event;
     this.logger.trace(
       {
@@ -6110,6 +6118,9 @@ export class CodexAppServerAgentSession implements AgentSession {
       pendingIdentification.resolve(parsed.turnId);
       this.pendingForegroundTurnIdentification = null;
     }
+    // Give the turn an identity Paseo can steer into instead of interrupting it.
+    this.autonomousTurnId =
+      this.activeForegroundTurnId || this.pendingForegroundStart ? null : this.createTurnId();
     this.resetTurnTrackingState();
     this.emitEvent({ type: "turn_started", provider: CODEX_PROVIDER });
   }
@@ -6149,6 +6160,7 @@ export class CodexAppServerAgentSession implements AgentSession {
       });
     }
     this.activeForegroundTurnId = null;
+    this.autonomousTurnId = null;
     this.activeClientMessageId = null;
     this.currentTurnId = null;
     this.pendingForegroundTurnIdentification?.resolve(null);
