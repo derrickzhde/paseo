@@ -1,0 +1,4 @@
+Fixed
+- Fixed a Codex agent working toward a /goal being interrupted each time one of its child agents finished. Codex starts goal continuation turns itself, and Paseo only recognised turns it had started, so it stopped the running turn to deliver the notification and Codex logged that as the user interrupting on purpose. The notification now joins the running turn.
+
+Full notes: https://paseo.sh/changelog
