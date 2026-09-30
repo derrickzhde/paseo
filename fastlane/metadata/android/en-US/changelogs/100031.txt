@@ -1,0 +1,5 @@
+Changed
+- Synced with upstream main through 5599f9e56, including the 0.10.0, 0.10.1, and 0.10.2 changes documented below and the subsequent main-branch updates.
+- Kept this fork's fixes for Codex goal continuation notifications, Claude 1M model selection, model-specific ACP options, cross-project push delivery, and math rendering and copying, including the iOS layout fixes. GLM Agent remains pinned to 1.8.0.
+
+Full notes: https://paseo.sh/changelog
