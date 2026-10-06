@@ -1,0 +1,4 @@
+Changed
+- Synced with upstream main through a7f7405c0, including the upstream 0.11.0-beta.5 and 0.10.3 changes listed below and the main-branch fixes after them. This fork's own 0.10.3 (2026-09-30) was a separate build of upstream main at 5599f9e56.
+
+Full notes: https://paseo.sh/changelog

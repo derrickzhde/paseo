@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.1 - 2026-10-06
+
+### Changed
+
+- Synced with upstream main through `a7f7405c0`, including the upstream 0.11.0-beta.5 and 0.10.3 changes listed below and the main-branch fixes after them. This fork's own 0.10.3 (2026-09-30) was a separate build of upstream main at `5599f9e56`.
+- Kept this fork's fixes for Codex goal continuation notifications, Claude 1M model selection, model-specific ACP options, cross-project push delivery, and math rendering and copying, including the iOS layout fixes. GLM Agent remains pinned to 1.8.0.
+
 ## 0.11.0-beta.5 - 2026-10-06
 
 ### Added
@@ -202,6 +209,16 @@
 - Fixed the Theme menu not scrolling when plugin themes overflow the window ([#5374](https://github.com/getpaseo/paseo/pull/5374))
 - Fixed a message from today's weekday last week showing only the weekday instead of its date ([#5341](https://github.com/getpaseo/paseo/pull/5341))
 - Fixed `paseo daemon set-password` exiting silently when stdin is not a terminal ([#5358](https://github.com/getpaseo/paseo/pull/5358))
+
+## 0.9.3 - 2026-09-26
+
+### Fixed
+
+- Fixed a Codex agent working toward a `/goal` being interrupted each time one of its child agents finished. Codex starts goal continuation turns itself, and Paseo only recognised turns it had started, so it stopped the running turn to deliver the notification and Codex logged that as the user interrupting on purpose. The notification now joins the running turn.
+
+### Changed
+
+- Merged upstream 0.9.2 and the fixes that followed it: structured Claude Code launch arguments, Fast for GPT-6 Sol and Luna, fixes for daemon memory growth, for workspaces vanishing when their disk is unavailable and for Cursor agents on models without Fast, running agents on another daemon from inside an agent session, and OpenCode agents reconnecting after their server exits.
 
 ## 0.9.2 - 2026-09-24
 
