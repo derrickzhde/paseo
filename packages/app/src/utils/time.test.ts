@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it, expect, vi } from "vitest";
+import { getDeviceUses24HourClock } from "./device-clock";
 import {
   describeCompactTimeAgo,
   describeTimeAgo,
@@ -8,6 +9,8 @@ import {
   formatMessageTimestamp,
   formatTimeAgo,
 } from "./time";
+
+vi.mock("./device-clock", () => ({ getDeviceUses24HourClock: vi.fn(() => null) }));
 
 describe("formatTimeAgo", () => {
   const now = new Date("2026-07-16T12:00:00.000Z");
@@ -117,6 +120,10 @@ describe("formatDuration", () => {
 });
 
 describe("formatMessageTimestamp", () => {
+  beforeEach(() => {
+    vi.mocked(getDeviceUses24HourClock).mockReturnValue(null);
+  });
+
   it("shows only time for same-day timestamps", () => {
     const now = new Date(2026, 4, 14, 17, 30);
     const date = new Date(2026, 4, 14, 12, 23);
@@ -151,5 +158,22 @@ describe("formatMessageTimestamp", () => {
     const formatted = formatMessageTimestamp(date, now);
     expect(formatted).toMatch(/Apr|April/);
     expect(formatted).toMatch(/2026/);
+  });
+
+  // Each case contradicts some locale's default cycle, so one of the two fails wherever the
+  // device setting is ignored.
+  it("uses a 24-hour clock when the phone is set to one", () => {
+    vi.mocked(getDeviceUses24HourClock).mockReturnValue(true);
+    const now = new Date(2026, 4, 14, 23, 30);
+    const formatted = formatMessageTimestamp(new Date(2026, 4, 14, 22, 12), now);
+    expect(formatted).toMatch(/22:12/);
+  });
+
+  it("uses a 12-hour clock when the phone is set to one", () => {
+    vi.mocked(getDeviceUses24HourClock).mockReturnValue(false);
+    const now = new Date(2026, 4, 14, 23, 30);
+    const formatted = formatMessageTimestamp(new Date(2026, 4, 14, 22, 12), now);
+    expect(formatted).toMatch(/10:12/);
+    expect(formatted).not.toMatch(/22:12/);
   });
 });

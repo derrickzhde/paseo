@@ -1,3 +1,5 @@
+import { getDeviceUses24HourClock } from "./device-clock";
+
 /**
  * How often a relative label can change, which is all a caller needs to know to keep it honest.
  * `static` means it never will again.
@@ -107,22 +109,34 @@ function localCalendarDaysBetween(earlier: Date, later: Date): number {
   return Math.round((startOfDay(later).getTime() - startOfDay(earlier).getTime()) / DAY_MS);
 }
 
-// Cached Intl formatter. Explicitly carrying `hourCycle` from the resolved
-// options is what makes the runtime respect the user's OS-level 12h/24h
-// preference rather than the locale's default cycle.
-let cachedTimeFormatter: Intl.DateTimeFormat | null = null;
+const TIME_OPTIONS: Intl.DateTimeFormatOptions = { hour: "numeric", minute: "2-digit" };
+
+interface CachedTimeFormatter {
+  uses24HourClock: boolean | null;
+  formatter: Intl.DateTimeFormat;
+}
+
+// Cached Intl formatter, rebuilt when the device's 12h/24h setting changes. A setting the device
+// reports wins. Without one, explicitly carrying `hourCycle` from the resolved options is what
+// makes the runtime respect the user's OS-level 12h/24h preference rather than the locale's
+// default cycle.
+let cachedTimeFormatter: CachedTimeFormatter | null = null;
 function getTimeFormatter(): Intl.DateTimeFormat {
-  if (cachedTimeFormatter) return cachedTimeFormatter;
-  const resolved = new Intl.DateTimeFormat(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-  }).resolvedOptions();
-  cachedTimeFormatter = new Intl.DateTimeFormat(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-    hourCycle: resolved.hourCycle,
-  });
-  return cachedTimeFormatter;
+  const uses24HourClock = getDeviceUses24HourClock();
+  if (cachedTimeFormatter && cachedTimeFormatter.uses24HourClock === uses24HourClock) {
+    return cachedTimeFormatter.formatter;
+  }
+  const formatter = createTimeFormatter(uses24HourClock);
+  cachedTimeFormatter = { uses24HourClock, formatter };
+  return formatter;
+}
+
+function createTimeFormatter(uses24HourClock: boolean | null): Intl.DateTimeFormat {
+  if (uses24HourClock !== null) {
+    return new Intl.DateTimeFormat(undefined, { ...TIME_OPTIONS, hour12: !uses24HourClock });
+  }
+  const { hourCycle } = new Intl.DateTimeFormat(undefined, TIME_OPTIONS).resolvedOptions();
+  return new Intl.DateTimeFormat(undefined, { ...TIME_OPTIONS, hourCycle });
 }
 
 /**
