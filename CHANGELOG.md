@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.11.2 - 2026-10-09
+
+### Added
+
+- Added support for the phone's system 12/24-hour clock setting in message timestamps on iOS and Android.
+
+### Changed
+
+- Synced with upstream main through `29db2b798`, including the upstream 0.11.0 and 0.11.1 changes listed below and the main-branch fixes after them. This fork's previous 0.11.1 was built from upstream main at `a7f7405c0`.
+- Kept this fork's fixes for Codex goal continuation notifications, Claude 1M model selection, model-specific ACP options, cross-project push delivery, and math rendering and copying, including the iOS layout fixes. GLM Agent remains pinned to 1.8.0.
+- Agent messages and completion notifications now show their sender, with expandable message details ([#6373](https://github.com/getpaseo/paseo/pull/6373)).
+- Limited copied fork history to 100,000 characters, retaining the newest entries and marking omitted context ([#6379](https://github.com/getpaseo/paseo/pull/6379)).
+
+### Fixed
+
+- Kept newly created agents and their visible error when the first prompt is rejected, avoiding duplicate-creation conflicts ([#6379](https://github.com/getpaseo/paseo/pull/6379)).
+- Fixed schedules stopping after a run could not be recorded ([#6334](https://github.com/getpaseo/paseo/pull/6334)).
+- Fixed browser screenshots not reaching OpenCode v2 agents ([#6330](https://github.com/getpaseo/paseo/pull/6330)).
+- Kept home-directory searches out of `~/Library` on macOS ([#5789](https://github.com/getpaseo/paseo/pull/5789)).
+
 ## 0.11.1 - 2026-10-07
 
 ### Added
