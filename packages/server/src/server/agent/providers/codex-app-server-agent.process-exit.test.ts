@@ -6,7 +6,8 @@ import { expect, test } from "vitest";
 
 import { createTestLogger } from "../../../test-utils/test-logger.js";
 import { AgentManager, type AgentManagerEvent } from "../agent-manager.js";
-import { formatSystemNotificationPrompt, startAgentRun } from "../agent-prompt.js";
+import { formatAgentMessage } from "../agent-messages/index.js";
+import { startAgentRun } from "../agent-prompt.js";
 import type {
   AgentClient,
   AgentLaunchContext,
@@ -465,7 +466,11 @@ test("a finish notification steers an autonomous Codex turn instead of replacing
     const notification = startAgentRun(
       manager,
       agent.id,
-      formatSystemNotificationPrompt("Agent child finished"),
+      formatAgentMessage({
+        id: "child-finished",
+        source: { kind: "agent-notification", agentId: "child", event: "finished" },
+        text: "Agent child finished",
+      }),
       logger,
       { replaceRunning: true, activeTurnBehavior: "steer" },
     );

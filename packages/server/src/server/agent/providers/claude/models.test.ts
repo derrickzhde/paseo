@@ -142,7 +142,9 @@ describe("getClaudeModels", () => {
   it("gates Haiku 5.5 on Claude Code 2.1.293 without changing the default", () => {
     expect(getClaudeModels("2.1.292").map((model) => model.id)).not.toContain("claude-haiku-5-5");
     expect(getClaudeModels("2.1.293").map((model) => model.id)).toContain("claude-haiku-5-5");
-    expect(getClaudeModels("2.1.293").find((model) => model.isDefault)?.id).toBe("claude-opus-5-5");
+    expect(getClaudeModels("2.1.293").find((model) => model.isDefault)?.id).toBe(
+      "claude-opus-5-5[1m]",
+    );
   });
 
   it("derives thinking options from model effort capabilities", () => {
