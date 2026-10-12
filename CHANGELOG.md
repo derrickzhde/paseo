@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.11.3 - 2026-10-12
+
+### Added
+
+- Added background workspaces for automation and a Show background sidebar option ([#5039](https://github.com/getpaseo/paseo/pull/5039)).
+- Added `paseo usage` to list, inspect, and refresh the host's account usage reports from the terminal ([#6474](https://github.com/getpaseo/paseo/pull/6474)).
+- Added Claude Mythos 5.1 when the configured Claude Code advertises access to it ([#6403](https://github.com/getpaseo/paseo/pull/6403)).
+
+### Changed
+
+- Changed diff review on phones to use comment sheets, with Send feedback targeting an existing workspace agent ([#6455](https://github.com/getpaseo/paseo/pull/6455)).
+- Changed compact headers to group workspace controls and moved New agent and New terminal into the tab switcher; enlarged compact sidebar rows ([#6431](https://github.com/getpaseo/paseo/pull/6431)).
+- Synced with upstream main through `9b92b2e25`, including 44 commits since this fork's previous release.
+- Kept this fork's phone clock settings, formula rendering and copying with iOS layout fixes, explicit Claude 1M model selection, model-specific ACP options, cross-project push delivery, and autonomous Codex goal steering. GLM Agent remains pinned to 1.8.0.
+
+### Fixed
+
+- Fixed intermittent text clipping in iOS chats and Markdown previews ([#6445](https://github.com/getpaseo/paseo/pull/6445)).
+- Fixed Android builds being marked incompatible with devices that have no camera ([#6339](https://github.com/getpaseo/paseo/pull/6339)).
+- Fixed terminal CJK characters gaining spaces after returning to a workspace ([#6452](https://github.com/getpaseo/paseo/pull/6452)).
+- Fixed email addresses opening file autocomplete or being altered when sent with Enter ([#6471](https://github.com/getpaseo/paseo/pull/6471)).
+- Fixed Markdown previews swallowing text such as `1<n<2` or `List<Item>` as HTML ([#6370](https://github.com/getpaseo/paseo/pull/6370)).
+- Fixed assistant file links containing encoded non-ASCII filenames and restored hidden agent plan files in workspace suggestions ([#6520](https://github.com/getpaseo/paseo/pull/6520), [#6641](https://github.com/getpaseo/paseo/pull/6641)).
+- Fixed committed changes missing from worktrees created from existing branches and restored `--cwd` selection for CLI worktree list and archive commands ([#6462](https://github.com/getpaseo/paseo/pull/6462), [#6467](https://github.com/getpaseo/paseo/pull/6467)).
+- Fixed GitLab merge requests and issues not being found by number, and starting-ref results disappearing when only their descriptions match ([#6525](https://github.com/getpaseo/paseo/pull/6525), [#6558](https://github.com/getpaseo/paseo/pull/6558)).
+- Fixed missing diff lines with custom Git colors, prefixes, or external diff commands; preserved edited lines in renames and removed SQL comments ([#6536](https://github.com/getpaseo/paseo/pull/6536), [#6559](https://github.com/getpaseo/paseo/pull/6559), [#6562](https://github.com/getpaseo/paseo/pull/6562), [#6569](https://github.com/getpaseo/paseo/pull/6569)).
+- Fixed schedules dispatching a slot twice and then skipping the next occurrence ([#6532](https://github.com/getpaseo/paseo/pull/6532)).
+- Fixed agent logs ignoring `--since`, splitting streamed words, or moving reasoning out of transcript order ([#6514](https://github.com/getpaseo/paseo/pull/6514), [#6528](https://github.com/getpaseo/paseo/pull/6528), [#6546](https://github.com/getpaseo/paseo/pull/6546)).
+- Fixed OpenCode v2 tool failures losing the daemon's validation error ([#6519](https://github.com/getpaseo/paseo/pull/6519)).
+- Fixed canceled child tasks being reported as finished; replacement tasks now notify their parent after the replacement finishes ([#6660](https://github.com/getpaseo/paseo/pull/6660)).
+- Fixed remote CLI permission approvals reporting success before the daemon confirms them ([#6607](https://github.com/getpaseo/paseo/pull/6607)).
+- Fixed HTTP downloads retaining open files after cancellation, and valid long filenames failing to save ([#6567](https://github.com/getpaseo/paseo/pull/6567), [#6658](https://github.com/getpaseo/paseo/pull/6658)).
+- Fixed untracked bracketed paths renaming the wrong files, and workspace files or directories beginning with two dots being rejected ([#6573](https://github.com/getpaseo/paseo/pull/6573), [#6604](https://github.com/getpaseo/paseo/pull/6604)).
+- Fixed supported daemon settings being rejected by the published configuration schema ([#6621](https://github.com/getpaseo/paseo/pull/6621)).
+- Fixed self-hosted web connections through proxies using standard HTTP or HTTPS ports ([#6638](https://github.com/getpaseo/paseo/pull/6638)).
+- Fixed the Linux window icon and shortcut recording on non-QWERTY keyboard layouts ([#6645](https://github.com/getpaseo/paseo/pull/6645), [#6652](https://github.com/getpaseo/paseo/pull/6652)).
+
 ## 0.11.2 - 2026-10-09
 
 ### Added

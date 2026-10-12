@@ -1,0 +1,9 @@
+Added
+- Added background workspaces for automation and a Show background sidebar option (#5039).
+- Added paseo usage to list, inspect, and refresh the host's account usage reports from the terminal (#6474).
+- Added Claude Mythos 5.1 when the configured Claude Code advertises access to it (#6403).
+
+Changed
+- Changed diff review on phones to use comment sheets, with Send feedback targeting an existing workspace agent (#6455).
+
+Full notes: https://paseo.sh/changelog
