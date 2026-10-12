@@ -21,6 +21,7 @@ env:
 
 jobs:
   ensure-release:
+    if: github.repository == 'getpaseo/paseo'
     permissions:
       contents: write
     runs-on: ubuntu-latest

@@ -83,6 +83,8 @@ buildNpmPackage {
 
   env = {
     EXPO_NO_TELEMETRY = "1";
+    # Metro's generated protocol validators exceed Node's default 2 GiB heap on macOS.
+    NODE_OPTIONS = "--max-old-space-size=4096";
     # Expo's web build pulls in some pre-bundled assets; ensure it doesn't try
     # to phone home during the build.
     CI = "1";
@@ -101,7 +103,7 @@ buildNpmPackage {
     npm run build --workspace=@getpaseo/expo-two-way-audio
 
     # Expo web export for the Electron renderer
-    ( cd packages/app && PASEO_WEB_PLATFORM=electron npx expo export --platform web )
+    ( cd packages/app && PASEO_WEB_PLATFORM=electron npx expo export --platform web --max-workers 2 )
 
     # Desktop main process
     npm run build:main --workspace=@getpaseo/desktop
