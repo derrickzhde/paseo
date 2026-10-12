@@ -38,7 +38,12 @@ jobs:
       - name: Typecheck
         run: npm run typecheck --workspace=@getpaseo/website
 
+      - name: Build website
+        if: github.repository != 'getpaseo/paseo'
+        run: npm run build --workspace=@getpaseo/website
+
       - name: Deploy to Cloudflare Workers
+        if: github.repository == 'getpaseo/paseo'
         run: npm run deploy --workspace=@getpaseo/website
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

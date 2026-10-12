@@ -22,7 +22,28 @@ permissions:
   contents: read
 
 jobs:
+  check-hash:
+    if: github.repository != 'getpaseo/paseo'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - uses: cachix/install-nix-action@v31
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Verify committed lockfile and Nix hash
+        run: |
+          ./scripts/update-nix.sh --check
+          git diff --exit-code -- package-lock.json nix/npm-deps.hash
+
   update-hash:
+    if: github.repository == 'getpaseo/paseo'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/create-github-app-token@v1
