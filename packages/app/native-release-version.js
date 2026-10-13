@@ -36,7 +36,8 @@ function getNativeReleaseVersion(version) {
   }
 
   const iosBuildSlot = betaNumber ?? stableIosBuildSlot;
-  const iosBuildNumber = versionCode * 1_000 + iosBuildSlot;
+  // The fork's 0.11.3 startup-fix rebuild needs a new iOS build number.
+  const iosBuildNumber = version === "0.11.3" ? 11_004_000 : versionCode * 1_000 + iosBuildSlot;
   if (!Number.isSafeInteger(iosBuildNumber)) {
     throw new Error(`Derived iOS buildNumber is out of range: ${iosBuildNumber}`);
   }
