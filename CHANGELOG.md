@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.12.1 - 2026-10-21
+
+Updated this fork to upstream 0.12.0 while retaining its model, notification, and mobile customizations.
+
+### Improved
+
+- Kept math formulas and TeX source copying with the new Markdown renderer.
+- Kept phone message times aligned with the system's 12/24-hour setting.
+- Kept model-specific thinking and feature options, separate Claude 200K/1M model entries, and GLM Agent 1.8.0.
+- Kept follow-up messages on Codex's autonomous goal turns and bounded retries for cross-project push notifications.
+- Adopted upstream's native startup fix and desktop build heap limit; retained the two-worker desktop build limit and this fork's release destinations.
+
 ## 0.12.0 - 2026-10-19
 
 Background workspaces, a new Markdown renderer with selection across paragraphs on phones, a reworked phone layout, and more than 120 fixes.

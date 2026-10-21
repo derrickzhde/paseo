@@ -1,0 +1,8 @@
+Updated this fork to upstream 0.12.0 while retaining its model, notification, and mobile customizations.
+
+Improved
+- Kept math formulas and TeX source copying with the new Markdown renderer.
+- Kept phone message times aligned with the system's 12/24-hour setting.
+- Kept model-specific thinking and feature options, separate Claude 200K/1M model entries, and GLM Agent 1.8.0.
+
+Full notes: https://paseo.sh/changelog
