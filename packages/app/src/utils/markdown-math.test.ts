@@ -1,9 +1,8 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
-import { extname, join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import MarkdownIt from "markdown-it";
 import { createMarkdownParser } from "./markdown-parser";
-import { markdownMathPlugin } from "./markdown-math";
+import { adaptMathSource, markdownMathPlugin } from "./markdown-math";
+import type { ASTNode } from "react-native-enriched-markdown/src/web/types";
 
 interface MathToken {
   type: string;
@@ -68,57 +67,6 @@ function buildUnclosedDollarInput(lineCount: number): string {
 
 function buildImageMathOscillationInput(repeatCount: number): string {
   return Array.from({ length: repeatCount }, () => String.raw`![\(z\)](x) \(a\)`).join(" ");
-}
-
-const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
-
-function walkSourceFiles(directory: string): string[] {
-  const files: string[] = [];
-  for (const entry of readdirSync(directory)) {
-    const fullPath = join(directory, entry);
-    if (statSync(fullPath).isDirectory()) {
-      files.push(...walkSourceFiles(fullPath));
-      continue;
-    }
-    if (SOURCE_EXTENSIONS.has(extname(entry))) {
-      files.push(fullPath);
-    }
-  }
-  return files;
-}
-
-interface MarkdownRulesFactory {
-  file: string;
-  name: string;
-  body: string;
-}
-
-// Source scan only: importing message.tsx for runtime rules checks pulls in the full
-// RN/Expo/Reanimated dependency chain, which is disproportionate for a guard test.
-function findMarkdownRulesFactories(): MarkdownRulesFactory[] {
-  const appSrcRoot = resolve(import.meta.dirname, "..");
-  const factories: MarkdownRulesFactory[] = [];
-
-  for (const filePath of walkSourceFiles(appSrcRoot)) {
-    const source = readFileSync(filePath, "utf8");
-    const starts = [...source.matchAll(/export function (create\w*MarkdownRules)/g)];
-    for (const [index, match] of starts.entries()) {
-      const factoryStart = match.index ?? 0;
-      factories.push({
-        file: relative(appSrcRoot, filePath),
-        name: match[1],
-        body: source.slice(factoryStart, starts[index + 1]?.index),
-      });
-    }
-  }
-
-  return factories;
-}
-
-function sliceRule(factory: MarkdownRulesFactory, ruleName: string): string {
-  const start = factory.body.indexOf(`${ruleName}: (`);
-  expect(start, `${factory.file}::${factory.name} 缺少 ${ruleName} 规则`).toBeGreaterThan(-1);
-  return factory.body.slice(start);
 }
 
 function buildVariableParagraphMathSource(
@@ -289,60 +237,6 @@ describe("markdownMathPlugin", () => {
     expect(tokens.map((token) => token.type)).toEqual(["math_inline", "math_block"]);
   });
 
-  it("registers math rules on every markdown render surface", () => {
-    const factories = findMarkdownRulesFactories();
-    expect(factories.length, "新增或删除 markdown 规则表时必须同步维护公式规则").toBe(3);
-
-    for (const factory of factories) {
-      expect(factory.body, `${factory.file}::${factory.name}`).toContain("math_inline:");
-      expect(factory.body, `${factory.file}::${factory.name}`).toContain("math_block:");
-    }
-  });
-
-  // Formula paragraphs use a View host on iOS: inline attachment baselines cannot
-  // be expressed by the UITextView wrapper without overlapping adjacent lines.
-  it("gives formula paragraphs the View host", () => {
-    const factories = findMarkdownRulesFactories().filter((factory) =>
-      factory.body.includes("MarkdownParagraphView"),
-    );
-    expect(factories.length, "使用 iOS 文本容器的规则表数量变了，请复查公式路径").toBe(2);
-
-    for (const factory of factories) {
-      expect(
-        sliceRule(factory, "math_block"),
-        `${factory.file}::${factory.name} 块级公式需要 View 容器`,
-      ).toMatch(/<MarkdownParagraphView[^>]*\scontainsImage[\s>]/);
-      expect(
-        sliceRule(factory, "paragraph"),
-        `${factory.file}::${factory.name} 含公式段落需要 View 容器`,
-      ).toContain("containsImage={paragraphNeedsViewHost(node)}");
-      expect(
-        sliceRule(factory, "textgroup"),
-        `${factory.file}::${factory.name} 含公式的 textgroup 需要重置行高`,
-      ).toContain("if (textGroupContainsMath(node))");
-      expect(
-        sliceRule(factory, "textgroup"),
-        `${factory.file}::${factory.name} 公式 textgroup 需要平台专用行高处理`,
-      ).toContain("MarkdownMathTextGroupProvider");
-    }
-  });
-
-  // Inline formulas survive on iOS only because react-native-uitextview turns a
-  // non-text child into a text attachment, which landed in 2.6.0. On 2.2.0 — what
-  // 0.7.4 shipped — the SVG is dropped and every formula renders blank.
-  it("requires a react-native-uitextview that lays out inline views", () => {
-    const manifest = JSON.parse(
-      readFileSync(resolve(import.meta.dirname, "../../package.json"), "utf8"),
-    ) as { dependencies: Record<string, string> };
-    const range = manifest.dependencies["react-native-uitextview"];
-    const [major, minor] = range.replace(/^\D*/, "").split(".").map(Number);
-
-    expect(
-      major > 2 || (major === 2 && minor >= 6),
-      `react-native-uitextview ${range} 没有行内视图支持，iOS 公式会变空白`,
-    ).toBe(true);
-  });
-
   it("does not break markdown links when parentheses appear inside link labels", () => {
     const { base, withMath } = createBaselineParsers();
     const cases = [
@@ -483,3 +377,164 @@ describe("markdownMathPlugin", () => {
 function escapeHtml(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
+
+function formulaSources(markdown: string): string[] {
+  return [...adaptMathSource(markdown, "web").formulas.values()].map((formula) => formula.source);
+}
+
+function latexText(node: { content?: string; children?: Array<{ content?: string }> }): string {
+  const nested = (node.children ?? []).map((child) => child.content ?? "").join("");
+  return (nested || node.content || "").trim();
+}
+
+describe("adaptMathSource", () => {
+  it("normalizes fork delimiters and keeps a single dollar as currency", () => {
+    const source = String.raw`Cost $5. Inline \(x\) and \[y\] on one line.`;
+    expect(adaptMathSource(source, "native").markdown).toBe(
+      String.raw`Cost \$5. Inline $x$ and $y$ on one line.`,
+    );
+    expect(adaptMathSource(source, "native").formulas.size).toBe(0);
+  });
+
+  it("distinguishes display blocks from inline formulas, including duplicate TeX", () => {
+    const source = "\\(x\\)\n\n\\[\nx\n\\]\n\n$$\nx\n$$";
+    const web = adaptMathSource(source, "web");
+    const formulas = [...web.formulas.entries()];
+    expect(formulas.map(([, formula]) => [formula.display, formula.source, formula.tex])).toEqual([
+      [false, "\\(x\\)", "x"],
+      [true, "\\[\nx\n\\]", "\nx\n"],
+      [true, "$$\nx\n$$", "\nx\n"],
+    ]);
+    expect(new Set(formulas.map(([id]) => id)).size).toBe(3);
+    expect(web.markdown).toBe(
+      `$${formulas[0]?.[0]}$\n\n$$${formulas[1]?.[0]}$$\n\n$$${formulas[2]?.[0]}$$`,
+    );
+    expect(adaptMathSource(source, "native").markdown).toBe("$x$\n\n$$\nx\n$$\n\n$$\nx\n$$");
+  });
+
+  it("leaves unfinished, escaped, and code-bound delimiters untouched", () => {
+    const source = [
+      "Unfinished \\(x",
+      "Escaped \\\\(x\\\\)",
+      "`\\(x\\)` and `$5`",
+      "```",
+      "\\(x\\)",
+      "$5",
+      "```",
+    ].join("\n");
+    expect(adaptMathSource(source, "native").markdown).toBe(source);
+    expect(adaptMathSource(source, "web").formulas.size).toBe(0);
+  });
+
+  it("keeps the formula that follows an identical delimiter inside inline code", () => {
+    const source = "`\\(x\\)`\n\n\\(x\\)";
+    expect(adaptMathSource(source, "native").markdown).toBe("`\\(x\\)`\n\n$x$");
+    expect(formulaSources(source)).toEqual(["\\(x\\)"]);
+  });
+
+  it("maps inline math when a blockquote prefix breaks the fragment", () => {
+    const source = "> Start\n> \\(x\\)";
+    expect(adaptMathSource(source, "native").markdown).toBe("> Start\n> $x$");
+    expect(formulaSources(source)).toEqual(["\\(x\\)"]);
+  });
+
+  it("maps the same blockquote fragment at each occurrence", () => {
+    const source = "> Start\n> \\(x\\)\n\n> Start\n> \\(x\\)";
+    expect(adaptMathSource(source, "native").markdown).toBe("> Start\n> $x$\n\n> Start\n> $x$");
+    expect(formulaSources(source)).toEqual(["\\(x\\)", "\\(x\\)"]);
+  });
+
+  it("preserves dollars that are already escaped", () => {
+    const source = String.raw`Cost \$5 and \$10`;
+    expect(adaptMathSource(source, "native").markdown).toBe(source);
+    expect(adaptMathSource(source, "web").formulas.size).toBe(0);
+  });
+
+  it("keeps already escaped dollars inside TeX byte-identical", () => {
+    const source = String.raw`\(\text{\$5}\)`;
+    expect(adaptMathSource(source, "native").markdown).toBe(String.raw`$\text{\$5}$`);
+    expect(formulaSources(source)).toEqual([String.raw`\(\text{\$5}\)`]);
+  });
+
+  it("does not insert whitespace around math glued to letters", () => {
+    expect(adaptMathSource(String.raw`a\(x\)b`, "native").markdown).toBe("a$x$b");
+  });
+
+  it("keeps indented code, link and image targets, and container markers", () => {
+    const source = [
+      "    \\(x\\)",
+      "",
+      "[label \\(a\\)](https://example.com/$id)",
+      "",
+      "![alt \\(b\\)](https://example.com/$img.png)",
+      "",
+      "> \\(c\\)",
+      "",
+      "- \\(d\\)",
+      "",
+      "| \\(e\\) |",
+      "| --- |",
+    ].join("\n");
+    expect(adaptMathSource(source, "native").markdown).toBe(
+      [
+        "    \\(x\\)",
+        "",
+        "[label $a$](https://example.com/$id)",
+        "",
+        "![alt $b$](https://example.com/$img.png)",
+        "",
+        "> $c$",
+        "",
+        "- $d$",
+        "",
+        "| $e$ |",
+        "| --- |",
+      ].join("\n"),
+    );
+  });
+
+  it("maps repeated image alt formulas independently", () => {
+    const source = "![\\(x\\)](a.png) ![\\(x\\)](b.png)";
+    expect(adaptMathSource(source, "native").markdown).toBe("![$x$](a.png) ![$x$](b.png)");
+  });
+
+  it("strips quote markers only from the copied block source", () => {
+    const source = "> \\[\n> y\n> \\]\n> after";
+    const web = adaptMathSource(source, "web");
+    expect(formulaSources(source)).toEqual(["\\[\ny\n\\]"]);
+    expect([...web.formulas.values()][0]).toMatchObject({ tex: "\ny\n", display: true });
+    expect(web.markdown).toBe(`> $$${[...web.formulas.keys()][0]}$$\n> after`);
+  });
+
+  it("parses the normalized source through the enriched math parser", async () => {
+    const parseMarkdown = await import("react-native-enriched-markdown/src/web/parseMarkdown").then(
+      (module) => module.parseMarkdown,
+    );
+    const source = "Cost $5. Use \\(x\\).\n\n\\[\ny\n\\]";
+    const tree = await parseMarkdown(adaptMathSource(source, "native").markdown, {
+      latexMath: true,
+      hardSoftBreaks: true,
+    });
+    const math: Array<{ type: string; content?: string; children?: Array<{ content?: string }> }> =
+      [];
+    const visit = (node: ASTNode) => {
+      if (node.type === "LatexMathInline" || node.type === "LatexMathDisplay") math.push(node);
+      for (const child of node.children ?? []) visit(child);
+    };
+    visit(tree);
+    expect(math.map((node) => [node.type, latexText(node)])).toEqual([
+      ["LatexMathInline", "x"],
+      ["LatexMathDisplay", "y"],
+    ]);
+    expect(JSON.stringify(tree)).toContain("$5");
+    expect(JSON.stringify(tree)).not.toContain('LatexMathInline","content":"5');
+  });
+});
+
+it("maps formulas after CRLF normalization and heading closing marks", () => {
+  expect(adaptMathSource("First \\(x\\)\r\n\r\nSecond \\(y\\)", "native").markdown).toBe(
+    "First $x$\n\nSecond $y$",
+  );
+  expect(adaptMathSource(String.raw`# \(x\) #`, "native").markdown).toBe("# $x$ #");
+  expect(adaptMathSource(String.raw`## **\(x\)** ##`, "native").markdown).toBe("## **$x$** ##");
+});

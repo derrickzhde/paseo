@@ -1,253 +1,11 @@
-import { useCallback, useMemo, useState, type ReactNode } from "react";
-import {
-  Pressable,
-  Text,
-  View,
-  type StyleProp,
-  type TextStyle,
-  type ViewStyle,
-} from "react-native";
-import { type ASTNode } from "react-native-markdown-display";
-import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import { useTranslation } from "react-i18next";
 import { MarkdownRenderer } from "@/components/markdown/renderer";
-import { ChevronRight } from "lucide-react-native";
 import { isWeb } from "@/constants/platform";
 import type { Theme } from "@/styles/theme";
-import { getMarkdownListMarker } from "@/utils/markdown-list";
-import { createMarkdownParser } from "@/utils/markdown-parser";
-import { MathFormula } from "@/components/markdown/math/formula";
-import { resolveMathTextStyle } from "@/components/markdown/math/text-style";
-
-// Without this prop react-native-markdown-display builds its own parser with
-// `typographer: true`, which would render a plan's literal `(c)` as ©. Its
-// default also leaves linkify off, so this one keeps bare URLs as plain text.
-const planMarkdownParser = createMarkdownParser({ linkify: false });
-
-type MarkdownRuleStyles = Record<string, TextStyle & ViewStyle & { [key: string]: unknown }>;
-
-function MarkdownInlineText({
-  inheritedStyle,
-  ruleStyle,
-  children,
-}: {
-  inheritedStyle: StyleProp<TextStyle>;
-  ruleStyle: StyleProp<TextStyle>;
-  children: ReactNode;
-}) {
-  const style = useMemo(() => [inheritedStyle, ruleStyle], [inheritedStyle, ruleStyle]);
-  return <Text style={style}>{children}</Text>;
-}
-
-function MarkdownListItemContent({
-  contentStyle,
-  children,
-}: {
-  contentStyle: StyleProp<ViewStyle>;
-  children: ReactNode;
-}) {
-  const style = useMemo(() => [contentStyle, LIST_ITEM_CONTENT_INNER], [contentStyle]);
-  return <View style={style}>{children}</View>;
-}
-
-function MarkdownParagraph({
-  paragraphStyle,
-  isLastChild,
-  children,
-}: {
-  paragraphStyle: StyleProp<ViewStyle>;
-  isLastChild: boolean;
-  children: ReactNode;
-}) {
-  const style = useMemo<StyleProp<ViewStyle>>(
-    () => [paragraphStyle, isLastChild ? PARAGRAPH_LAST_CHILD : null],
-    [paragraphStyle, isLastChild],
-  );
-  return <View style={style}>{children}</View>;
-}
-
-export function createPlanMarkdownRules() {
-  return {
-    text: (
-      node: ASTNode,
-      _children: ReactNode[],
-      _parent: ASTNode[],
-      styles: MarkdownRuleStyles,
-      inheritedStyles: TextStyle = {},
-    ) => (
-      <MarkdownInlineText key={node.key} inheritedStyle={inheritedStyles} ruleStyle={styles.text}>
-        {node.content}
-      </MarkdownInlineText>
-    ),
-    textgroup: (
-      node: ASTNode,
-      children: ReactNode[],
-      _parent: ASTNode[],
-      styles: MarkdownRuleStyles,
-      inheritedStyles: TextStyle = {},
-    ) => (
-      <MarkdownInlineText
-        key={node.key}
-        inheritedStyle={inheritedStyles}
-        ruleStyle={styles.textgroup}
-      >
-        {children}
-      </MarkdownInlineText>
-    ),
-    code_block: (
-      node: ASTNode,
-      _children: ReactNode[],
-      _parent: ASTNode[],
-      styles: MarkdownRuleStyles,
-      inheritedStyles: TextStyle = {},
-    ) => (
-      <MarkdownInlineText
-        key={node.key}
-        inheritedStyle={inheritedStyles}
-        ruleStyle={styles.code_block}
-      >
-        {node.content}
-      </MarkdownInlineText>
-    ),
-    fence: (
-      node: ASTNode,
-      _children: ReactNode[],
-      _parent: ASTNode[],
-      styles: MarkdownRuleStyles,
-      inheritedStyles: TextStyle = {},
-    ) => (
-      <MarkdownInlineText key={node.key} inheritedStyle={inheritedStyles} ruleStyle={styles.fence}>
-        {node.content}
-      </MarkdownInlineText>
-    ),
-    code_inline: (
-      node: ASTNode,
-      _children: ReactNode[],
-      _parent: ASTNode[],
-      styles: MarkdownRuleStyles,
-      inheritedStyles: TextStyle = {},
-    ) => (
-      <MarkdownInlineText
-        key={node.key}
-        inheritedStyle={inheritedStyles}
-        ruleStyle={styles.code_inline}
-      >
-        {node.content}
-      </MarkdownInlineText>
-    ),
-    math_inline: (
-      node: ASTNode,
-      _children: ReactNode[],
-      _parent: ASTNode[],
-      styles: MarkdownRuleStyles,
-      inheritedStyles: TextStyle = {},
-    ) => {
-      const { fontSize, color } = resolveMathTextStyle([inheritedStyles, styles.text]);
-      return (
-        <MathFormula
-          key={node.key}
-          tex={node.content ?? ""}
-          source={node.markup ?? node.content ?? ""}
-          display={false}
-          fontSize={fontSize}
-          color={color}
-        />
-      );
-    },
-    math_block: (
-      node: ASTNode,
-      _children: ReactNode[],
-      parent: ASTNode[],
-      styles: MarkdownRuleStyles,
-      inheritedStyles: TextStyle = {},
-    ) => {
-      const isBlock = (node as ASTNode & { block?: boolean }).block === true;
-      // `\[...\]` mid-sentence is math_block with block: false. Block-level
-      // ScrollView cannot live inside Text, so render inline (display: false).
-      // Display limits/subscripts differ slightly from true display math.
-      const { fontSize, color } = resolveMathTextStyle([inheritedStyles, styles.text]);
-      const formula = (
-        <MathFormula
-          key={node.key}
-          tex={node.content ?? ""}
-          source={node.markup ?? node.content ?? ""}
-          display={isBlock}
-          fontSize={fontSize}
-          color={color}
-        />
-      );
-
-      if (isBlock) {
-        const isLastChild = parent[0]?.children?.at(-1)?.key === node.key;
-        return (
-          <MarkdownParagraph
-            key={node.key}
-            paragraphStyle={styles.paragraph}
-            isLastChild={isLastChild}
-          >
-            {formula}
-          </MarkdownParagraph>
-        );
-      }
-
-      return formula;
-    },
-    bullet_list: (
-      node: ASTNode,
-      children: ReactNode[],
-      _parent: ASTNode[],
-      styles: MarkdownRuleStyles,
-    ) => (
-      <View key={node.key} style={styles.bullet_list}>
-        {children}
-      </View>
-    ),
-    ordered_list: (
-      node: ASTNode,
-      children: ReactNode[],
-      _parent: ASTNode[],
-      styles: MarkdownRuleStyles,
-    ) => (
-      <View key={node.key} style={styles.ordered_list}>
-        {children}
-      </View>
-    ),
-    list_item: (
-      node: ASTNode,
-      children: ReactNode[],
-      parent: ASTNode[],
-      styles: MarkdownRuleStyles,
-    ) => {
-      const { isOrdered, marker } = getMarkdownListMarker(node, parent);
-      const iconStyle = isOrdered ? styles.ordered_list_icon : styles.bullet_list_icon;
-      const contentStyle = isOrdered ? styles.ordered_list_content : styles.bullet_list_content;
-
-      return (
-        <View key={node.key} style={styles.list_item}>
-          <Text style={iconStyle}>{marker}</Text>
-          <MarkdownListItemContent contentStyle={contentStyle}>{children}</MarkdownListItemContent>
-        </View>
-      );
-    },
-    paragraph: (
-      node: ASTNode,
-      children: ReactNode[],
-      parent: ASTNode[],
-      styles: MarkdownRuleStyles,
-    ) => {
-      const isLastChild = parent[0]?.children?.at(-1)?.key === node.key;
-      return (
-        <MarkdownParagraph
-          key={node.key}
-          paragraphStyle={styles.paragraph}
-          isLastChild={isLastChild}
-        >
-          {children}
-        </MarkdownParagraph>
-      );
-    },
-  };
-}
+import { ChevronRight } from "lucide-react-native";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
+import { Pressable, Text, View } from "react-native";
+import { StyleSheet, withUnistyles } from "react-native-unistyles";
 
 export type PlanOutcome = "pending" | "approved" | "rejected" | "canceled";
 
@@ -263,7 +21,6 @@ interface PlanCardProps {
 
 const ThemedChevron = withUnistyles(ChevronRight);
 const chevronColor = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
-const markdownRules = createPlanMarkdownRules();
 
 export function PlanCard(props: PlanCardProps) {
   // A resolution starts its own presentation state; subsequent taps stay local.
@@ -321,7 +78,7 @@ function PlanCardContent({
       {expanded ? (
         <View style={styles.body}>
           {description ? <Text style={styles.description}>{description}</Text> : null}
-          <MarkdownRenderer text={text} rules={markdownRules} markdownit={planMarkdownParser} />
+          <MarkdownRenderer text={text} />
         </View>
       ) : null}
       {footer ? <View style={styles.footer}>{footer}</View> : null}
@@ -366,6 +123,3 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[2],
   },
 }));
-
-const LIST_ITEM_CONTENT_INNER = { flex: 1, flexShrink: 1, minWidth: 0 };
-const PARAGRAPH_LAST_CHILD = { marginBottom: 0 };
