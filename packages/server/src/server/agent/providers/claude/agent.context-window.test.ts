@@ -127,9 +127,11 @@ test.each([
   },
 );
 
-test("completed turns use the active model's window after switching both ways", async () => {
+test.each([
+  { opus: "claude-opus-5-5", opusLimit: 200_000 },
+  { opus: "claude-opus-5-5[1m]", opusLimit: 1_000_000 },
+])("completed turns use $opus's window after switching both ways", async ({ opus, opusLimit }) => {
   const haiku = "claude-haiku-4-5";
-  const opus = "claude-opus-5-5";
   const client = new ClaudeAgentClient({
     logger: createTestLogger(),
     resolveBinary: async () => process.execPath,
@@ -138,8 +140,8 @@ test("completed turns use the active model's window after switching both ways", 
       reportedLimit: 200_000,
       modelWindowsByTurn: [
         { [haiku]: 200_000 },
-        { [haiku]: 200_000, [opus]: 1_000_000 },
-        { [haiku]: 200_000, [opus]: 1_000_000 },
+        { [haiku]: 200_000, [opus]: opusLimit },
+        { [haiku]: 200_000, [opus]: opusLimit },
       ],
     }),
   });
@@ -151,7 +153,7 @@ test("completed turns use the active model's window after switching both ways", 
   try {
     for (const [model, limit] of [
       [haiku, 200_000],
-      [opus, 1_000_000],
+      [opus, opusLimit],
       [haiku, 200_000],
     ] as const) {
       await session.setModel(model);
