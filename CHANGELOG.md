@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.13.2 - 2026-10-26
+
+Updated this fork to upstream 0.13.1, including foldable layouts, connected hosts, plugin file panels and translations, terminal image paste, and the sidebar startup fix.
+
+### Improved
+
+- Kept math rendering and TeX source copying, phone 12/24-hour times, model-specific thinking options, and separate Claude 200K/1M choices.
+- Kept Codex goal-turn follow-ups, bounded push-notification retries, and this fork's mobile and desktop release destinations.
+- Replaced the fork's GLM Agent 1.8.0 pin with upstream's 1.15.0 release.
+- Adopted upstream's session-history, finish-notification, workspace and terminal improvements.
+
+### Security
+
+- Adopted upstream's relay replay protection and daemon-password enforcement. Re-add relay hosts saved without their daemon password.
+
+### Fixed
+
+- Fixed stale Claude import titles after rapid transcript rewrites.
+
 ## 0.13.1 - 2026-10-26
 
 ### Fixed
