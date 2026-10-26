@@ -2,7 +2,7 @@
 
 All workspaces share one version and release together.
 
-This fork publishes desktop releases and updates at [derrickzhde/paseo](https://github.com/derrickzhde/paseo/releases). Prepare and verify an untagged candidate with full CI, Nix and Nix-hash checks before pushing the approved release tag. The tag starts Desktop Release, Docker and Release Notes Sync; the GitHub APK release jobs are skipped, and Deploy App/Website build without deploying to Cloudflare. EAS store distribution requires the fork's separate project connection and credentials. The upstream npm release commands below remain reference material: they publish `@getpaseo/*` packages and are not the fork's GitHub release path.
+For this fork, start with [fork maintenance](fork-maintenance.md): it owns the customization inventory, upstream integration policy and verified GitHub release process. The playbook below describes upstream's npm release process and remains reference material for this fork.
 
 ## Two steps
 

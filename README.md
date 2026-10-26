@@ -190,6 +190,8 @@ Then use them in any agent conversation:
 
 ## Development
 
+For maintaining this fork, read the [fork maintenance guide](docs/fork-maintenance.md).
+
 Quick monorepo package map:
 
 - `packages/server`: Paseo daemon (agent process orchestration, WebSocket API, MCP server)
