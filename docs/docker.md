@@ -32,7 +32,7 @@ docker run -d --name paseo \
   -e PASEO_PASSWORD=change-me \
   -v "$PWD/paseo-home:/home/paseo" \
   -v "$PWD:/workspace" \
-  ghcr.io/getpaseo/paseo:latest
+  ghcr.io/derrickzhde/paseo:latest
 ```
 
 Then open:
@@ -46,7 +46,7 @@ daemon connection in the web UI or another Paseo client.
 
 ## Docker Compose
 
-Use [`docker/docker-compose.example.yml`](../docker/docker-compose.example.yml):
+Use [`docker/docker-compose.example.yml`](../docker/docker-compose.example.yml), changing its image to `ghcr.io/derrickzhde/paseo:latest` for this fork:
 
 ```bash
 cp docker/docker-compose.example.yml docker-compose.yml
@@ -59,7 +59,7 @@ Minimal example:
 ```yaml
 services:
   paseo:
-    image: ghcr.io/getpaseo/paseo:latest
+    image: ghcr.io/derrickzhde/paseo:latest
     restart: unless-stopped
     ports:
       - "6767:6767"
@@ -79,7 +79,7 @@ releases to third-party agent release cycles.
 Create a child image for the agents you use:
 
 ```Dockerfile
-FROM ghcr.io/getpaseo/paseo:latest
+FROM ghcr.io/derrickzhde/paseo:latest
 
 USER root
 RUN npm install -g @openai/codex @anthropic-ai/claude-code opencode-ai
@@ -98,7 +98,7 @@ first-run directory setup, then drops the daemon and launched agents to the
 non-root `paseo` user.
 
 An example child image is in
-[`docker/Dockerfile.agents.example`](../docker/Dockerfile.agents.example).
+[`docker/Dockerfile.agents.example`](../docker/Dockerfile.agents.example); change its `FROM` image to this fork's image before building.
 
 You can also mount credentials from the host or run agent login once inside the
 container:
@@ -207,9 +207,9 @@ docker build \
 
 The Docker workflow builds the image on pull requests and on `main` as a
 non-publishing check. Stable `vX.Y.Z` tag pushes publish
-`ghcr.io/getpaseo/paseo:X.Y.Z` and `ghcr.io/getpaseo/paseo:latest`. Beta tags
+`ghcr.io/derrickzhde/paseo:X.Y.Z` and `ghcr.io/derrickzhde/paseo:latest`. Beta tags
 publish only the exact prerelease tag, such as
-`ghcr.io/getpaseo/paseo:0.1.102-beta.1`, and do not update `latest`.
+`ghcr.io/derrickzhde/paseo:0.1.102-beta.1`, and do not update `latest`.
 
 To replace a Docker image in place without rebuilding desktop, APK, or EAS
 mobile release artifacts, dispatch the Docker workflow manually instead of

@@ -17,6 +17,7 @@ on:
       - "scripts/update-nix.sh"
       - "scripts/fix-lockfile.mjs"
       - ".github/workflows/nix-update-hash.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -43,7 +44,7 @@ jobs:
           git diff --exit-code -- package-lock.json nix/npm-deps.hash
 
   update-hash:
-    if: github.repository == 'getpaseo/paseo'
+    if: github.repository == 'getpaseo/paseo' && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/create-github-app-token@v1
