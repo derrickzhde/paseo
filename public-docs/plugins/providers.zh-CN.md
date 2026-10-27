@@ -207,6 +207,14 @@ emit({ type: "session.turn", sessionId, turnId, state: "completed" });
 
 到这一步，Provider 已经可用：用户可以选择模型、打开会话、发送消息并看到回复。
 
+## 上报会话用量 {#report-session-usage}
+
+发送 `session.usage`，并在现有的 `usage` 快照中提供上下文占用和费用。要启用会话缓存命中率，请提供可选的 `usageSample` 计数。将 `scope` 设为 `request`、`turn` 或 `session`，并为该计量单元使用稳定的 `id`。一个运行时会话内只使用一种范围；不要同时上报单次请求及包含该请求的轮次或会话总量。同一标识的重复上报会替换之前的计数；请求或轮次的最终结果可以修正早先的计数。会话计数在同一标识内必须保持累计。只有开始新的计数周期且与旧计数没有重叠时，才更换标识。若计数减少但标识不变，daemon 无法区分计数重置和历史记录缩减，会将整个会话的缓存命中率标为不可用。
+
+`inputTokens` 对每个提示词 token 只计一次，包括缓存读取和写入。`cachedInputTokens` 只统计缓存读取。`outputTokens` 是 Provider 生成的 token 数。未知计数请省略，不要用零代替；确实测得为零时应上报零。即使所有计数都未知，也保留范围和标识，让 daemon 清除过期的命中率。这些样本只用于 Provider 内部计量，不会作为原始计数发送给客户端。
+
+要提供 TPS，还需在 `session.usage` 中提供可选的 `generationSample: { id, outputTokens?, durationMs?, completedAt? }`。为每个已完成的模型响应使用一个稳定标识，上报输出总数和以毫秒为单位的活动请求耗时。输出总数应包含推理 token，且不能重复计数。排除模型调用之间的空闲时间和本地工具执行时间。原生请求耗时可能包含提示词处理和网络延迟；不要发送整个 Agent 轮次的总耗时。`completedAt` 是以 Unix 毫秒时间戳表示的响应完成时间；若只知道耗时，请省略它，daemon 会使用第一次实时接收样本的时间。同一响应的重复样本会替换其数据，但不会刷新接收时间。保留标识并省略未知字段，让最近未测得的响应清除过期 TPS。daemon 对最近五分钟内完成的响应求输出 token 总数与耗时总数之比，并在空闲时使过期数值失效。生成样本与缓存样本分开，也不会转发给客户端。
+
 ## 添加会话专属的 Composer 控件 {#add-session-specific-composer-controls}
 
 只有当原生 Agent 有用户在打开会话后需要修改的设置时，才添加 `session.configure`。在 `session.config` 中以开关或选择控件的形式发布它们：
