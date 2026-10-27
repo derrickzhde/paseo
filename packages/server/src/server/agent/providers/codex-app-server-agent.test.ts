@@ -6430,6 +6430,7 @@ describe("Codex app-server provider", () => {
         contextWindowMaxTokens: 200000,
         contextWindowUsedTokens: 50000,
       },
+      usageSample: { scope: "session", id: "test-thread" },
     });
     expect(events.at(-1)).toEqual({
       type: "turn_completed",
@@ -6442,7 +6443,109 @@ describe("Codex app-server provider", () => {
         contextWindowMaxTokens: 200000,
         contextWindowUsedTokens: 50000,
       },
+      usageSample: { scope: "session", id: "test-thread" },
     });
+  });
+
+  test("normalizes cumulative thread tokenUsage.total without guessing from last", () => {
+    const session = createSession();
+    const events: AgentStreamEvent[] = [];
+    session.subscribe((event) => events.push(event));
+
+    asInternals(session).handleNotification("thread/tokenUsage/updated", {
+      tokenUsage: {
+        model_context_window: 200000,
+        last: {
+          total_tokens: 50000,
+          inputTokens: 30000,
+          cachedInputTokens: 5000,
+          outputTokens: 15000,
+        },
+        total: {
+          inputTokens: 80000,
+          cachedInputTokens: 20000,
+          outputTokens: 40000,
+        },
+      },
+    });
+    asInternals(session).handleNotification("thread/tokenUsage/updated", {
+      tokenUsage: {
+        model_context_window: 200000,
+        last: {
+          total_tokens: 50000,
+          inputTokens: 30000,
+          cachedInputTokens: 5000,
+          outputTokens: 15000,
+        },
+        total: {
+          inputTokens: 80000,
+          outputTokens: 41000,
+        },
+      },
+    });
+    asInternals(session).handleNotification("thread/tokenUsage/updated", {
+      tokenUsage: {
+        last: {
+          total_tokens: 1000,
+          inputTokens: 1000,
+        },
+      },
+    });
+    asInternals(session).handleNotification("turn/completed", {
+      turn: { status: "completed", error: null },
+    });
+
+    expect(events[0]).toEqual({
+      type: "usage_updated",
+      provider: "codex",
+      turnId: "test-turn",
+      usage: {
+        inputTokens: 30000,
+        cachedInputTokens: 5000,
+        outputTokens: 15000,
+        contextWindowMaxTokens: 200000,
+        contextWindowUsedTokens: 50000,
+      },
+      usageSample: {
+        scope: "session",
+        id: "test-thread",
+        inputTokens: 80000,
+        cachedInputTokens: 20000,
+        outputTokens: 40000,
+      },
+    });
+    expect(events[1]).toMatchObject({
+      usage: {
+        inputTokens: 30000,
+        cachedInputTokens: 5000,
+        outputTokens: 15000,
+        contextWindowUsedTokens: 50000,
+      },
+      usageSample: {
+        scope: "session",
+        id: "test-thread",
+        inputTokens: 80000,
+        outputTokens: 41000,
+      },
+    });
+    expect(events[1]?.usageSample).not.toHaveProperty("cachedInputTokens");
+    expect(events[2]).toEqual({
+      type: "usage_updated",
+      provider: "codex",
+      turnId: "test-turn",
+      usage: {
+        inputTokens: 1000,
+        cachedInputTokens: undefined,
+        outputTokens: undefined,
+        contextWindowUsedTokens: 1000,
+      },
+      usageSample: { scope: "session", id: "test-thread" },
+    });
+    expect(events.at(-1)).toMatchObject({
+      type: "turn_completed",
+      usageSample: { scope: "session", id: "test-thread" },
+    });
+    expect(events.at(-1)?.usageSample).not.toHaveProperty("inputTokens");
   });
 
   test("streams Codex assistant message deltas and does not replay completed text", () => {

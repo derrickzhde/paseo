@@ -4091,6 +4091,12 @@ export class DaemonClient {
   }
 
   async updateDaemon(requestId?: string): Promise<DaemonUpdateResponse["payload"]> {
+    // COMPAT(forkDaemonSelfUpdate): added after fork v0.13.2, remove gate after 2027-04-27.
+    if (this.lastServerInfoMessage?.features?.forkDaemonSelfUpdate !== true) {
+      throw new Error(
+        "Install a fork release on this host once to enable updates from this fork's GitHub releases.",
+      );
+    }
     const resolvedRequestId = this.createRequestId(requestId);
     const message = SessionInboundMessageSchema.parse({
       type: "daemon.update.request",
@@ -4099,7 +4105,7 @@ export class DaemonClient {
     return this.sendRequest({
       requestId: resolvedRequestId,
       message,
-      timeout: 300_000, // 5 minutes — npm update can be slow on remote machines
+      timeout: 900_000, // Includes release metadata/download, npm installation and version checks.
       options: { skipQueue: true },
       select: (msg) => {
         const parsed = DaemonUpdateResponseSchema.safeParse(msg);

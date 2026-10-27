@@ -18,6 +18,18 @@ provider deltas (every provider streams incrementally)
 
 Every provider delivers incremental text, so there is no provider that needs special handling: Claude via `includePartialMessages`, Codex via `agent_message_delta`, ACP agents via `agent_message_chunk`, Pi and OMP via `text_delta`.
 
+## Session metrics in the context details
+
+The context meter shows **TPS (5m active)** and **Cache hit (session)** when the host advertises `agentSessionMetrics`. Keep these measurements per agent runtime session. Do not persist or backfill them, combine agents, or use account quota reports as token counters. A new runtime session starts a new ledger.
+
+TPS follows OpenCode’s active-request calculation: sum output tokens and divide by the sum of model-response durations. Include each complete response that finished in the last five minutes. A response crossing the window boundary contributes its full count and duration; do not spread its tokens across time. Idle gaps and local tool settlement are excluded. Native request duration can include prompt processing, network delay, internal retries or provider-hosted tools, so this is an approximation of generation throughput. Do not infer duration from chunk arrival gaps, daemon coalescing, app reveal or a whole agent turn.
+
+Pi supplies per-response `durationMs`; Oh My Pi supplies `duration`; OpenCode v2 pairs request dispatch with its separate response-stream end; Muse supplies per-completion `durationMs`. Count reasoning once: Pi/OMP output already includes it, while OpenCode reports it separately. Keep TPS **Unavailable** when a recent response has missing or invalid timing/counts, or when the provider has no usable response timing. Replace duplicate/corrected response samples by their stable identity. Expire samples during idle time so an open context display stays current. Cache availability is independent of TPS availability.
+
+Cache hit is the token-weighted share of cache **reads** in all input tokens, including uncached input and cache writes. Cache writes are misses. An absent counter is unknown, not zero. Keep normalized samples separate from context occupancy and cost, and strip them before wire dispatch. Replace earlier snapshots of the same request or turn with its final result. A session-wide counter that decreases without a new epoch identity can mean a reset, retained-history shrinkage or a correction; leave the session percentage unavailable rather than adding overlapping totals.
+
+Claude uses root requests and its authoritative per-turn result, excluding subagents. Codex, Pi and OMP report native session totals. Both OpenCode adapters use completed model-call counts and stable step identities, avoiding stale session snapshots during asynchronous reconciliation. Muse uses its counted-once per-completion prompt tokens and explicit cache-read count; its generic cached-token field varies by provider. Missing counters invalidate the last known percentage until a complete sample arrives. Antigravity's input convention is unverified, so its cache percentage is unavailable. Generic ACP usage has conflicting turn/session conventions ([upstream report](https://github.com/agentclientprotocol/agent-client-protocol/issues/1860)); leave unverified counters unavailable instead of guessing. Plugin providers can report [normalized usage samples](../public-docs/plugins/providers.md#report-session-usage).
+
 ## Why the reveal is paced
 
 Arrival is lumpy and there is no fixing that at the source. A 60ms coalescing window carries however many characters the model produced in those 60ms, which swings by an order of magnitude within a single turn. Painting each delta as it lands makes the size of those lumps visible, and that is what reads as jagged.

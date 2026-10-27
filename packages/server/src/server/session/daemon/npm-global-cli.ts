@@ -6,7 +6,7 @@ import { execCommand } from "../../../utils/spawn.js";
 export const PASEO_CLI_PACKAGE = "@getpaseo/cli";
 
 const NPM_PROBE_TIMEOUT_MS = 10_000;
-const NPM_INSTALL_TIMEOUT_MS = 300_000;
+const NPM_INSTALL_TIMEOUT_MS = 600_000;
 const NPM_MAX_BUFFER_BYTES = 10 * 1024 * 1024;
 
 const NpmGlobalListSchema = z
@@ -51,7 +51,7 @@ export interface NpmGlobalPaseoInstall {
 
 export interface NpmGlobalPaseoCli {
   inspect(options?: NpmGlobalOptions): Promise<NpmGlobalPaseoInstall>;
-  installLatest(options?: NpmGlobalOptions): Promise<CommandResult>;
+  installArchive(archivePath: string, options?: NpmGlobalOptions): Promise<CommandResult>;
 }
 
 interface NpmGlobalOptions {
@@ -143,9 +143,9 @@ export class DefaultNpmGlobalPaseoCli implements NpmGlobalPaseoCli {
     return install;
   }
 
-  installLatest(options: NpmGlobalOptions = {}): Promise<CommandResult> {
+  installArchive(archivePath: string, options: NpmGlobalOptions = {}): Promise<CommandResult> {
     const prefixArgs = options.prefix ? ["--prefix", options.prefix] : [];
-    return this.runCommand("npm", ["install", "-g", `${PASEO_CLI_PACKAGE}@latest`, ...prefixArgs], {
+    return this.runCommand("npm", ["install", "-g", archivePath, ...prefixArgs], {
       timeout: NPM_INSTALL_TIMEOUT_MS,
       maxBuffer: NPM_MAX_BUFFER_BYTES,
     });

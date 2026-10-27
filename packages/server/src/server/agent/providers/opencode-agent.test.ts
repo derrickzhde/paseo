@@ -6812,6 +6812,41 @@ function createOpenCodeTranslationState(sessionId: string): OpenCodeEventTransla
   };
 }
 
+test("legacy OpenCode reports inclusive request samples without changing context usage", () => {
+  const event = {
+    type: "message.part.updated",
+    properties: {
+      part: {
+        id: "step-1",
+        sessionID: "session",
+        messageID: "message",
+        type: "step-finish",
+        tokens: { input: 100, output: 20, reasoning: 5, cache: { read: 50, write: 10 } },
+      },
+    },
+  } as OpenCodeEvent;
+  const events = translateOpenCodeEvent(event, createOpenCodeTranslationState("session"));
+  expect(events).toEqual([
+    {
+      type: "usage_updated",
+      provider: "opencode",
+      usage: {
+        inputTokens: 100,
+        cachedInputTokens: 50,
+        outputTokens: 20,
+        contextWindowUsedTokens: 185,
+      },
+      usageSample: {
+        scope: "request",
+        id: "step-1",
+        inputTokens: 160,
+        cachedInputTokens: 50,
+        outputTokens: 20,
+      },
+    },
+  ]);
+});
+
 function createTestDeferred<T>(): {
   promise: Promise<T>;
   resolve: (value: T) => void;

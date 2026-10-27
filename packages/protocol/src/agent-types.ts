@@ -189,6 +189,11 @@ export interface AgentRunOptions {
   maxThinkingTokens?: number;
 }
 
+export interface AgentSessionMetrics {
+  outputTokensPerSecond5m?: number;
+  cacheHitPercentage?: number;
+}
+
 export interface AgentUsage {
   inputTokens?: number;
   cachedInputTokens?: number;
@@ -196,6 +201,7 @@ export interface AgentUsage {
   totalCostUsd?: number;
   contextWindowMaxTokens?: number;
   contextWindowUsedTokens?: number;
+  sessionMetrics?: AgentSessionMetrics;
 }
 
 export const TOOL_CALL_ICON_NAMES = [

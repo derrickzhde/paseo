@@ -2082,6 +2082,9 @@ export const ru: TranslationResources = {
     used: "Использовано: {{percentage}}%",
     tokens: "Токены: {{used}} / {{max}}",
     sessionCost: "Стоимость сессии: {{cost}}",
+    outputTokensPerSecond5m: "TPS (активный вывод за 5 мин) {{value}}",
+    cacheHitPercentage: "Попадания в кэш (сессия) {{value}}",
+    unavailable: "Нет данных",
     accessibility: "Использовано {{percentage}}% контекстного окна",
   },
   review: {

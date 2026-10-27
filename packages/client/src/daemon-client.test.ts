@@ -6725,6 +6725,61 @@ test("rejects and logs a correlated response that violates the protocol schema",
   expect(warnings).toEqual(["Message validation failed"]);
 });
 
+test("does not send an update request to a host advertising only the legacy npm updater", async () => {
+  const mock = createMockTransport();
+  const client = new DaemonClient({
+    url: "ws://test",
+    clientId: "clsk_unit_test",
+    logger: noopLogger,
+    reconnect: { enabled: false },
+    transportFactory: () => mock.transport,
+  });
+  clients.push(client);
+  const connected = client.connect();
+  mock.triggerOpen({ features: { daemonSelfUpdate: true } });
+  await connected;
+  const outcome = client.updateDaemon("req-legacy-update").catch((error: unknown) => error);
+  expect(mock.sent).toEqual([]);
+  await expect(outcome).resolves.toMatchObject({
+    message: expect.stringContaining("Install a fork release"),
+  });
+});
+
+test("waits for a release download and npm installation that together take more than five minutes", async () => {
+  vi.useFakeTimers();
+  const mock = createMockTransport();
+  const client = new DaemonClient({
+    url: "ws://test",
+    clientId: "clsk_unit_test",
+    logger: noopLogger,
+    reconnect: { enabled: false },
+    transportFactory: () => mock.transport,
+  });
+  clients.push(client);
+  const connected = client.connect();
+  mock.triggerOpen({ features: { forkDaemonSelfUpdate: true } });
+  await connected;
+  const response = client.updateDaemon("req-release-update");
+  const outcome = response.then(
+    (value) => value,
+    (error: unknown) => error,
+  );
+  await vi.advanceTimersByTimeAsync(720_000);
+  mock.triggerMessage(
+    wrapSessionMessage({
+      type: "daemon.update.response",
+      payload: {
+        requestId: "req-release-update",
+        success: true,
+        error: null,
+        previousVersion: "0.13.2",
+        newVersion: "0.13.3",
+      },
+    }),
+  );
+  await expect(outcome).resolves.toMatchObject({ success: true, newVersion: "0.13.3" });
+});
+
 test("does not reject a request for an invalid correlated progress event", async () => {
   const mock = createMockTransport();
   const client = new DaemonClient({
@@ -6737,7 +6792,7 @@ test("does not reject a request for an invalid correlated progress event", async
   clients.push(client);
 
   const connectPromise = client.connect();
-  mock.triggerOpen();
+  mock.triggerOpen({ features: { forkDaemonSelfUpdate: true } });
   await connectPromise;
 
   const response = client.updateDaemon("req-update");

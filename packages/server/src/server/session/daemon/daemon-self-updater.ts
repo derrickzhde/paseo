@@ -1,4 +1,5 @@
 import { getErrorMessage } from "@getpaseo/protocol/error-utils";
+import { lt } from "semver";
 import {
   daemonInstallOriginRuntime,
   resolveNpmGlobalPrefix,
@@ -6,6 +7,7 @@ import {
   type DaemonInstallOriginRuntime,
 } from "./install-origin.js";
 import { npmGlobalPaseoCli, type NpmGlobalPaseoCli } from "./npm-global-cli.js";
+import { withLatestForkCliArchive, type ForkCliArchive } from "./github-cli-release.js";
 
 export type DaemonSelfUpdatePhase = "starting" | "downloading" | "installing" | "complete";
 
@@ -30,6 +32,7 @@ export interface DaemonSelfUpdateLogger {
 export interface DaemonSelfUpdateRuntime {
   npm: NpmGlobalPaseoCli;
   installOrigin: DaemonInstallOriginRuntime;
+  withLatestArchive<T>(install: (archive: ForkCliArchive) => Promise<T>): Promise<T>;
 }
 
 export class DaemonSelfUpdateInProgressError extends Error {
@@ -42,6 +45,7 @@ export class DaemonSelfUpdateInProgressError extends Error {
 const defaultRuntime: DaemonSelfUpdateRuntime = {
   npm: npmGlobalPaseoCli,
   installOrigin: daemonInstallOriginRuntime,
+  withLatestArchive: withLatestForkCliArchive,
 };
 
 const DESKTOP_MANAGED_UPDATE_ERROR =
@@ -80,26 +84,34 @@ export class DaemonSelfUpdater {
       }
 
       input.onProgress("downloading");
-      input.onProgress("installing");
-
-      const result = await this.runtime.npm.installLatest(npmOptions);
-      if (result.exitCode !== 0) {
-        const error =
-          result.stderr.trim() || result.stdout.trim() || `npm exited with code ${result.exitCode}`;
-        input.logger.error(
-          { exitCode: result.exitCode, stderr: result.stderr },
-          "Daemon self-update failed",
-        );
-        return { success: false, error, newVersion: null };
-      }
-
-      const updatedInstall = await this.runtime.npm.inspect(npmOptions).catch((error: unknown) => {
-        input.logger.warn({ err: error }, "Unable to read updated npm package version");
-        return null;
+      return await this.runtime.withLatestArchive(async (archive) => {
+        if (lt(archive.version, install.version)) {
+          throw new Error(
+            `Refusing to downgrade ${install.version} to fork release ${archive.version}.`,
+          );
+        }
+        input.onProgress("installing");
+        const result = await this.runtime.npm.installArchive(archive.path, npmOptions);
+        if (result.exitCode !== 0) {
+          const error =
+            result.stderr.trim() ||
+            result.stdout.trim() ||
+            `npm exited with code ${result.exitCode}`;
+          input.logger.error(
+            { exitCode: result.exitCode, stderr: result.stderr },
+            "Daemon self-update failed",
+          );
+          return { success: false, error, newVersion: null };
+        }
+        const updatedInstall = await this.runtime.npm.inspect(npmOptions);
+        if (updatedInstall.version !== archive.version) {
+          throw new Error(
+            `Expected fork release ${archive.version}; npm reports ${updatedInstall.version}.`,
+          );
+        }
+        input.onProgress("complete");
+        return { success: true, error: null, newVersion: archive.version };
       });
-
-      input.onProgress("complete");
-      return { success: true, error: null, newVersion: updatedInstall?.version ?? null };
     } catch (error) {
       input.logger.error({ err: error }, "Daemon self-update failed with exception");
       return { success: false, error: getErrorMessage(error), newVersion: null };

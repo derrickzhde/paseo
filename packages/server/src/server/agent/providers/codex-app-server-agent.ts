@@ -30,6 +30,7 @@ import {
   type AgentTimelineItem,
   type ToolCallTimelineItem,
   type AgentUsage,
+  type AgentUsageSample,
   type FetchCatalogOptions,
   type ImportableProviderSession,
   type ImportProviderSessionContext,
@@ -642,6 +643,13 @@ function firstPositiveFiniteNumber(primary: unknown, secondary: unknown): number
   return undefined;
 }
 
+function readNonNegativeFiniteNumber(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    return undefined;
+  }
+  return value;
+}
+
 function tokenizeCommandArgs(args: string): string[] {
   const tokens: string[] = [];
   let current = "";
@@ -1063,6 +1071,29 @@ export function toAgentUsage(tokenUsage: unknown): AgentUsage | undefined {
     outputTokens: typeof last?.outputTokens === "number" ? last.outputTokens : undefined,
     ...(contextWindowMaxTokens !== undefined ? { contextWindowMaxTokens } : {}),
     ...(contextWindowUsedTokens !== undefined ? { contextWindowUsedTokens } : {}),
+  };
+}
+
+/** `total` is the thread's cumulative usage. `last` stays on the context snapshot. */
+export function toAgentUsageSample(
+  tokenUsage: unknown,
+  id: string | null,
+): AgentUsageSample | undefined {
+  if (!id) {
+    return undefined;
+  }
+  // Retain the scope even when the counters disappear, so the ledger can mark
+  // its percentage unknown instead of reusing a stale complete snapshot.
+  const total = toObjectRecord(toObjectRecord(tokenUsage)?.total) ?? {};
+  const inputTokens = readNonNegativeFiniteNumber(total.inputTokens);
+  const cachedInputTokens = readNonNegativeFiniteNumber(total.cachedInputTokens);
+  const outputTokens = readNonNegativeFiniteNumber(total.outputTokens);
+  return {
+    scope: "session",
+    id,
+    ...(inputTokens !== undefined ? { inputTokens } : {}),
+    ...(cachedInputTokens !== undefined ? { cachedInputTokens } : {}),
+    ...(outputTokens !== undefined ? { outputTokens } : {}),
   };
 }
 
@@ -3495,6 +3526,7 @@ export class CodexAppServerAgentSession implements AgentSession {
   private warnedInvalidNotificationPayloads = new Set<string>();
   private warnedIncompleteEditToolCallIds = new Set<string>();
   private latestUsage: AgentUsage | undefined;
+  private latestUsageSample: AgentUsageSample | undefined;
   private latestPlanResult: { callId: string; text: string; turnId: string | null } | null = null;
   private readonly userMessageTurnIndexes = new Map<string, number>();
   private readonly userMessageTurnIds: string[] = [];
@@ -6181,6 +6213,7 @@ export class CodexAppServerAgentSession implements AgentSession {
         type: "turn_completed",
         provider: CODEX_PROVIDER,
         usage: this.latestUsage,
+        ...(this.latestUsageSample ? { usageSample: this.latestUsageSample } : {}),
       });
     }
     this.activeForegroundTurnId = null;
@@ -6244,11 +6277,19 @@ export class CodexAppServerAgentSession implements AgentSession {
     parsed: Extract<ParsedCodexNotification, { kind: "token_usage_updated" }>,
   ): void {
     this.latestUsage = toAgentUsage(parsed.tokenUsage);
+    const usageSample = toAgentUsageSample(
+      parsed.tokenUsage,
+      parsed.threadId ?? this.currentThreadId,
+    );
+    if (usageSample) {
+      this.latestUsageSample = usageSample;
+    }
     if (this.latestUsage) {
       this.notifySubscribers({
         type: "usage_updated",
         provider: CODEX_PROVIDER,
         usage: this.latestUsage,
+        ...(usageSample ? { usageSample } : {}),
       });
     }
   }

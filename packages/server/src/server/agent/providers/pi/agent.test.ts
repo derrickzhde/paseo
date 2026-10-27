@@ -2394,6 +2394,199 @@ describe("PiRpcAgentSession", () => {
       usage: { contextWindowUsedTokens: 160 },
     });
   });
+
+  test("records a Pi generation sample from native output and durationMs", async () => {
+    const { pi, session, events } = await createSession();
+    const fakeSession = pi.latestSession();
+    const { turnId } = await session.startTurn("hello");
+    fakeSession.emit({ type: "turn_start" });
+
+    fakeSession.emit({
+      type: "message_end",
+      message: {
+        role: "assistant",
+        content: [],
+        responseId: "resp-pi-1",
+        timestamp: 1_700_000_000_000,
+        durationMs: 2_500,
+        usage: { output: 120, reasoning: 40 },
+      },
+    });
+    fakeSession.emit({
+      type: "message_end",
+      message: {
+        role: "custom",
+        content: [{ type: "text", text: "not a model response" }],
+      },
+    });
+    fakeSession.emit({
+      type: "message_end",
+      message: { role: "user", content: "hello" },
+    });
+    fakeSession.emit({
+      type: "tool_execution_end",
+      toolCallId: "tool-1",
+      toolName: "bash",
+      result: { output: "hi", exitCode: 0 },
+      isError: false,
+    });
+
+    const samples = events.usageUpdatedEvents().filter((event) => event.generationSample);
+    expect(samples).toEqual([
+      {
+        type: "usage_updated",
+        provider: "pi",
+        turnId,
+        usage: {},
+        generationSample: {
+          id: "pi:pi-session-1:response:resp-pi-1",
+          outputTokens: 120,
+          durationMs: 2_500,
+          completedAt: 1_700_000_002_500,
+        },
+      },
+    ]);
+    await session.close();
+  });
+
+  test("keeps unknown Pi generation timing and a known zero output", async () => {
+    const { pi, session, events } = await createSession();
+    const fakeSession = pi.latestSession();
+    await session.startTurn("hello");
+
+    fakeSession.emit({
+      type: "message_end",
+      message: {
+        role: "assistant",
+        content: [],
+        responseId: "resp-pi-zero",
+        timestamp: 1_700_000_010_000,
+        durationMs: 1_000,
+        usage: { output: 0, reasoning: 0 },
+      },
+    });
+    fakeSession.emit({
+      type: "message_end",
+      message: {
+        role: "assistant",
+        content: [],
+        responseId: "resp-pi-untimed",
+        usage: { output: 8 },
+      },
+    });
+    fakeSession.emit({
+      type: "message_end",
+      message: {
+        role: "assistant",
+        content: [],
+        timestamp: 42_000,
+        durationMs: 10,
+        usage: { output: 3 },
+      },
+    });
+    fakeSession.emit({
+      type: "message_end",
+      message: {
+        role: "assistant",
+        content: [],
+        responseId: "resp-pi-open",
+        durationMs: 80,
+        usage: { output: 2 },
+      },
+    });
+    fakeSession.emit({
+      type: "message_end",
+      message: {
+        role: "assistant",
+        content: [],
+        responseId: "resp-pi-bad",
+        timestamp: 1_700_000_020_000,
+        durationMs: 0,
+        usage: { output: Number.NaN },
+      },
+    });
+
+    expect(
+      events
+        .usageUpdatedEvents()
+        .flatMap((event) => (event.generationSample ? [event.generationSample] : [])),
+    ).toEqual([
+      {
+        id: "pi:pi-session-1:response:resp-pi-zero",
+        outputTokens: 0,
+        durationMs: 1_000,
+        completedAt: 1_700_000_011_000,
+      },
+      { id: "pi:pi-session-1:response:resp-pi-untimed", outputTokens: 8 },
+      {
+        id: "pi:pi-session-1:timestamp:42000",
+        outputTokens: 3,
+        durationMs: 10,
+        completedAt: 42_010,
+      },
+      {
+        id: "pi:pi-session-1:response:resp-pi-open",
+        outputTokens: 2,
+        durationMs: 80,
+      },
+      { id: "pi:pi-session-1:response:resp-pi-bad" },
+    ]);
+    await session.close();
+  });
+
+  test("records separate Pi generation samples when output decreases", async () => {
+    const { pi, session, events } = await createSession();
+    const fakeSession = pi.latestSession();
+    await session.startTurn("hello");
+    const repeated = {
+      role: "assistant" as const,
+      content: [],
+      responseId: "resp-repeat",
+      timestamp: 5_000,
+      durationMs: 100,
+      usage: { output: 40 },
+    };
+
+    fakeSession.emit({ type: "message_end", message: repeated });
+    fakeSession.emit({
+      type: "message_end",
+      message: {
+        role: "assistant",
+        content: [],
+        id: "entry-lower",
+        timestamp: 6_000,
+        durationMs: 100,
+        usage: { output: 10 },
+      },
+    });
+    fakeSession.emit({ type: "message_end", message: repeated });
+
+    expect(
+      events
+        .usageUpdatedEvents()
+        .flatMap((event) => (event.generationSample ? [event.generationSample] : [])),
+    ).toEqual([
+      {
+        id: "pi:pi-session-1:response:resp-repeat",
+        outputTokens: 40,
+        durationMs: 100,
+        completedAt: 5_100,
+      },
+      {
+        id: "pi:pi-session-1:message:entry-lower",
+        outputTokens: 10,
+        durationMs: 100,
+        completedAt: 6_100,
+      },
+      {
+        id: "pi:pi-session-1:response:resp-repeat",
+        outputTokens: 40,
+        durationMs: 100,
+        completedAt: 5_100,
+      },
+    ]);
+    await session.close();
+  });
 });
 
 describe("PiRpcAgentSession steering", () => {

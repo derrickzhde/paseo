@@ -74,6 +74,7 @@ import {
   AgentStreamCoalescer,
 } from "./agent-stream-coalescer.js";
 import { limitAgentTimelineItemContent } from "./agent-timeline-content.js";
+import { AgentSessionMetricsLedger } from "./agent-session-metrics.js";
 import {
   AgentRunState,
   type ForegroundTurnWaiter,
@@ -728,6 +729,18 @@ function detachedAgentLabelPatch(labels: Record<string, string>): AgentLabelPatc
 const RETIRED_INTERNAL_AGENT_TTL_MS = 10 * 60 * 1000;
 const RETIRED_INTERNAL_AGENT_LIMIT = 500;
 
+interface SessionMetricsEntry {
+  session: AgentSession;
+  ledger: AgentSessionMetricsLedger;
+  timer?: ReturnType<typeof setTimeout>;
+}
+
+function publicStreamEvent(event: AgentStreamEvent): AgentStreamEvent {
+  if (event.type !== "usage_updated" && event.type !== "turn_completed") return event;
+  const { usageSample: _usageSample, generationSample: _generationSample, ...publicEvent } = event;
+  return publicEvent;
+}
+
 export interface RetiredInternalAgent {
   record: ArchivedStoredAgentRecord;
   lastMessage: string | null;
@@ -743,6 +756,7 @@ export class AgentManager {
   private readonly providerEnabled = new Map<AgentProvider, boolean>();
   private readonly providerDefinitions = new Map<AgentProvider, ProviderEnabledFlag>();
   private readonly agents = new Map<string, LiveManagedAgent>();
+  private readonly sessionMetrics = new Map<string, SessionMetricsEntry>();
   private readonly timelineStore: InMemoryAgentTimelineStore;
   private readonly providerSubagents = new ProviderSubagentStore();
   private readonly agentsAwaitingInitialSnapshotPersist = new Set<string>();
@@ -2712,7 +2726,7 @@ export class AgentManager {
         };
         yield acceptedTurnStartedEvent;
         for await (const event of turnStream.events(isTurnTerminalEvent)) {
-          yield event;
+          yield publicStreamEvent(event);
         }
       } finally {
         if (turnStream) {
@@ -3614,6 +3628,10 @@ export class AgentManager {
         durableTimelineHasRows,
         options,
       });
+      if (managed.lastUsage?.sessionMetrics !== undefined) {
+        managed.lastUsage = { ...managed.lastUsage };
+        delete managed.lastUsage.sessionMetrics;
+      }
 
       // Read history before publishing the agent: a provider failure must leave the
       // session unregistered so the registration catch closes it.
@@ -3824,6 +3842,7 @@ export class AgentManager {
   ): ManagedAgentClosed {
     this.agentStreamCoalescer.flushAndDiscard(agent.id);
     this.agents.delete(agent.id);
+    this.clearSessionMetrics(agent.id);
     this.previousStatuses.delete(agent.id);
     if (agent.unsubscribeSession) {
       agent.unsubscribeSession();
@@ -4315,6 +4334,7 @@ export class AgentManager {
 
     // Only update timestamp for live events, not history replay
     if (!options?.fromHistory) {
+      event = this.observeSessionMetrics(agent, event);
       this.touchUpdatedAt(agent);
       if (this.agentStreamCoalescer.handle(agent.id, event)) {
         this.traceCoalescerBuffered(agent, event, eventTurnId);
@@ -4363,6 +4383,67 @@ export class AgentManager {
     this.traceHandleStreamEventEnd(agent, event, eventTurnId, flags);
 
     return flags.shouldNotifyWaiters;
+  }
+
+  private observeSessionMetrics(
+    agent: ActiveManagedAgent,
+    event: AgentStreamEvent,
+  ): AgentStreamEvent {
+    if (event.type !== "usage_updated" && event.type !== "turn_completed") return event;
+    let entry = this.sessionMetrics.get(agent.id);
+    if (!entry || entry.session !== agent.session) {
+      this.clearSessionMetrics(agent.id);
+      entry = { session: agent.session, ledger: new AgentSessionMetricsLedger() };
+      this.sessionMetrics.set(agent.id, entry);
+    }
+    entry.ledger.observe(event);
+    const metrics = entry.ledger.snapshot();
+    // Some providers report completion timing independently of their context
+    // snapshot. A generation-only update must retain that last raw snapshot.
+    if (event.generationSample && event.type === "usage_updated") {
+      event = { ...event, usage: { ...agent.lastUsage, ...event.usage } };
+    }
+    const hasMetrics =
+      Object.keys(metrics).length > 0 ||
+      agent.lastUsage?.sessionMetrics !== undefined ||
+      event.usage?.sessionMetrics !== undefined;
+    if (hasMetrics) {
+      agent.lastUsage = { ...agent.lastUsage, sessionMetrics: metrics };
+      event = { ...event, usage: { ...event.usage, sessionMetrics: metrics } };
+    }
+    this.scheduleSessionMetricsExpiry(agent, entry);
+    return event;
+  }
+
+  private clearSessionMetrics(agentId: string): void {
+    const entry = this.sessionMetrics.get(agentId);
+    if (entry?.timer) clearTimeout(entry.timer);
+    this.sessionMetrics.delete(agentId);
+  }
+
+  private scheduleSessionMetricsExpiry(
+    agent: ActiveManagedAgent,
+    entry: SessionMetricsEntry,
+  ): void {
+    if (entry.timer) clearTimeout(entry.timer);
+    entry.timer = undefined;
+    const expires = entry.ledger.nextExpirationAt();
+    if (expires === undefined) return;
+    entry.timer = setTimeout(
+      () => {
+        if (
+          this.sessionMetrics.get(agent.id) !== entry ||
+          this.agents.get(agent.id) !== agent ||
+          agent.session !== entry.session
+        )
+          return;
+        agent.lastUsage = { ...agent.lastUsage, sessionMetrics: entry.ledger.snapshot() };
+        this.emitState(agent);
+        this.scheduleSessionMetricsExpiry(agent, entry);
+      },
+      Math.max(1, expires - Date.now()),
+    );
+    entry.timer.unref();
   }
 
   private traceHandleStreamEventStart(
@@ -5140,6 +5221,7 @@ export class AgentManager {
       timestamp?: string;
     },
   ): void {
+    event = publicStreamEvent(event);
     if (event.type === "timeline") {
       event = {
         ...event,

@@ -284,6 +284,13 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+      - name: Package fork CLI for remote host updates
+        if: github.repository == 'derrickzhde/paseo' && env.IS_SMOKE_TAG != 'true'
+        shell: bash
+        run: |
+          npm run build:daemon-web-ui
+          node scripts/package-fork-cli.mjs --version "$RELEASE_VERSION" --output "${DESKTOP_PACKAGE_PATH}/release"
+
       - name: Upload desktop artifacts to release
         if: env.SHOULD_PUBLISH == 'true' && env.IS_SMOKE_TAG != 'true'
         env:
@@ -485,6 +492,10 @@ jobs:
           )
           release_lookup="$(node ../scripts/github-release.mjs --repo "${{ github.repository }}" --tag "$RELEASE_TAG" --cleanup-duplicates)"
           existing_assets="$(gh release view "$release_lookup" --repo "${{ github.repository }}" --json assets --jq '.assets[].name')"
+          if [[ "${{ github.repository }}" == "derrickzhde/paseo" ]] && ! grep -Fxq "paseo-cli-${RELEASE_VERSION}.tgz" <<< "$existing_assets"; then
+            echo "::error::Fork CLI archive is missing; the release remains a draft"
+            exit 1
+          fi
           for manifest_name in "${expected_manifests[@]}"; do
             if grep -Fxq "$manifest_name" <<< "$existing_assets"; then
               case "$manifest_name" in

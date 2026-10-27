@@ -547,6 +547,18 @@ function sanitizeUsage(value: unknown): AgentUsage | undefined {
       return undefined;
     }
   }
+  if (isJsonObject(sanitized.sessionMetrics)) {
+    const metrics = sanitized.sessionMetrics;
+    result.sessionMetrics = {};
+    const rate = metrics.outputTokensPerSecond5m;
+    const cached = metrics.cacheHitPercentage;
+    if (typeof rate === "number" && Number.isFinite(rate) && rate >= 0) {
+      result.sessionMetrics.outputTokensPerSecond5m = rate;
+    }
+    if (typeof cached === "number" && Number.isFinite(cached) && cached >= 0 && cached <= 100) {
+      result.sessionMetrics.cacheHitPercentage = cached;
+    }
+  }
   return Object.keys(result).length ? result : undefined;
 }
 

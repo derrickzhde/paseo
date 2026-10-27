@@ -2049,6 +2049,9 @@ export const ar: TranslationResources = {
     used: "تم استخدام{{percentage}}%",
     tokens: "رموز{{used}}/{{max}}",
     sessionCost: "تكلفة الجلسة{{cost}}",
+    outputTokensPerSecond5m: "TPS (إخراج نشط لآخر 5 دقائق) {{value}}",
+    cacheHitPercentage: "معدل إصابة ذاكرة التخزين المؤقت (الجلسة الحالية) {{value}}",
+    unavailable: "لا توجد بيانات",
     accessibility: "تم استخدام نافذة السياق{{percentage}}%",
   },
   review: {

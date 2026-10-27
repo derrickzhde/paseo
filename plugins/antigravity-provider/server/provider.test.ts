@@ -324,6 +324,12 @@ it("accounts DONE generation usage once without adding cumulative results, inclu
   expect(
     usages.map((event) => (event.type === "session.usage" ? event.usage.inputTokens : null)),
   ).toEqual([11263, 11604]);
+  expect(
+    usages.map((event) => (event.type === "session.usage" ? event.usageSample : null)),
+  ).toEqual([
+    { scope: "turn", id: expect.any(String), outputTokens: 466 },
+    { scope: "turn", id: expect.any(String), outputTokens: 3 },
+  ]);
   const persistence = h.persistence();
   await h.request({ type: "session.close", sessionId: "s", requestId: "close" });
   await h.open(persistence);

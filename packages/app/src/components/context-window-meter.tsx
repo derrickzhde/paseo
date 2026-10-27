@@ -7,6 +7,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/h
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { isNative } from "@/constants/platform";
+import type { AgentSessionMetrics } from "@getpaseo/protocol/agent-types";
 import { useHostReportsUsage } from "@/usage";
 import type { Theme } from "@/styles/theme";
 import { ContextWindowDetails } from "./context-window-details";
@@ -19,6 +20,7 @@ interface ContextWindowMeterProps {
   maxTokens: number | null;
   usedTokens: number | null;
   totalCostUsd?: number | null;
+  sessionMetrics?: AgentSessionMetrics;
   showPercentage?: boolean;
   /** Optional glyph envelope for icon-toolbar alignment. */
   glyphSize?: number;
@@ -148,6 +150,7 @@ export function ContextWindowMeter({
   maxTokens,
   usedTokens,
   totalCostUsd,
+  sessionMetrics,
   showPercentage = false,
   glyphSize,
 }: ContextWindowMeterProps) {
@@ -220,6 +223,7 @@ export function ContextWindowMeter({
             agentId={agentId}
             context={context}
             sessionCost={formattedSessionCost}
+            sessionMetrics={sessionMetrics}
             showTitle={false}
             refreshable
           />
@@ -261,6 +265,7 @@ export function ContextWindowMeter({
             agentId={agentId}
             context={context}
             sessionCost={formattedSessionCost}
+            sessionMetrics={sessionMetrics}
             showTitle
             refreshable={false}
           />
@@ -295,6 +300,7 @@ export function ContextWindowMeter({
           agentId={agentId}
           context={context}
           sessionCost={formattedSessionCost}
+          sessionMetrics={sessionMetrics}
           showTitle
           refreshable
         />

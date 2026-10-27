@@ -64,6 +64,19 @@ const OmpAssistantMessageSchema = z
     responseModel: z.string().optional(),
     errorMessage: z.string().nullable().optional(),
     stopReason: z.string().optional(),
+    id: z.string().optional(),
+    entryId: z.string().optional(),
+    timestamp: z.number().nullable().optional(),
+    // Request wall time. `ttft` is not the active-request duration.
+    duration: z.number().nullable().optional(),
+    usage: z
+      .object({
+        output: z.number().nullable().optional(),
+        // Already included in `output`.
+        reasoning: z.number().nullable().optional(),
+      })
+      .passthrough()
+      .optional(),
   })
   .passthrough();
 const OmpToolResultMessageSchema = z

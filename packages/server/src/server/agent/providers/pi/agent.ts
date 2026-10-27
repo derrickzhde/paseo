@@ -1,4 +1,5 @@
 import { mapCustomMessageToToolCall } from "../custom-message.js";
+import { buildGenerationSample } from "../generation-sample.js";
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
@@ -1177,6 +1178,7 @@ export class PiRpcAgentSession implements AgentSession {
   private activeTurnId: string | null = null;
   private activeClientMessageId: string | null = null;
   private activeAssistantMessageId: string | null = null;
+  private assistantGenerationOrdinal = 0;
   private activeTurnStarted = false;
   private activeTurnStartedEmitted = false;
   private pendingSettledMessages: PiAgentMessage[] | null = null;
@@ -1235,12 +1237,13 @@ export class PiRpcAgentSession implements AgentSession {
     this.usagePoller = new PiUsagePoller({
       scheduler: options.usagePollScheduler,
       readStats: () => this.runtimeSession.getSessionStats(),
-      onUsage: (usage, turnId) => {
+      onUsage: (usage, turnId, usageSample) => {
         this.emit({
           type: "usage_updated",
           provider: this.provider,
           usage,
           ...(turnId === undefined ? {} : { turnId }),
+          ...(usageSample ? { usageSample } : {}),
         });
       },
       onPollError: (error) => {
@@ -2373,7 +2376,9 @@ export class PiRpcAgentSession implements AgentSession {
     turnId: string | undefined,
   ): void {
     if (event.message.role === "assistant") {
+      const timelineId = this.activeAssistantMessageId;
       this.activeAssistantMessageId = null;
+      this.emitAssistantGenerationSample(event.message, timelineId, turnId);
       return;
     }
     if (event.message.role === "custom") {
@@ -2397,6 +2402,33 @@ export class PiRpcAgentSession implements AgentSession {
       }
       return;
     }
+  }
+
+  private emitAssistantGenerationSample(
+    message: Extract<PiAgentMessage, { role: "assistant" }>,
+    timelineId: string | null,
+    turnId: string | undefined,
+  ): void {
+    this.assistantGenerationOrdinal += 1;
+    this.emit({
+      type: "usage_updated",
+      provider: this.provider,
+      usage: {},
+      ...(turnId === undefined ? {} : { turnId }),
+      generationSample: buildGenerationSample({
+        provider: this.provider,
+        sessionId: this.state.sessionId,
+        responseId: message.responseId,
+        messageId: message.id,
+        entryId: message.entryId,
+        timestamp: message.timestamp,
+        timelineId,
+        completionOrdinal: this.assistantGenerationOrdinal,
+        outputTokens: message.usage?.output,
+        // durationMs is the response wall time. usage.output already includes reasoning.
+        durationMs: message.durationMs,
+      }),
+    });
   }
 
   private emitToolCallEvent(

@@ -299,6 +299,7 @@ export class Session {
           sessionId: this.options.id,
           turnId: turn.id,
           usage: { ...turn.usage },
+          usageSample: { scope: "turn", id: turn.id, outputTokens: turn.usage.outputTokens },
         });
       }
     } else if (step.step_type === "tool" || step.step_type === "subagent") {

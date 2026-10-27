@@ -18,12 +18,12 @@ Follow the active agent/session instructions and the task principal's authorizat
 
 ## Starting point
 
-As of 2026-10-26, fork **v0.13.2** incorporates upstream **v0.13.1**:
+As of 2026-10-27, fork **v0.13.3** incorporates upstream **v0.13.2**:
 
-| Reference        | Commit                                     |
-| ---------------- | ------------------------------------------ |
-| Upstream v0.13.1 | `20665a18cda5b904064be2f74b97da16cede9255` |
-| Fork v0.13.2     | `16488a6cba246fd32400658864fc961899a840a3` |
+| Reference        | Commit                                        |
+| ---------------- | --------------------------------------------- |
+| Upstream v0.13.2 | `d2941157a8f91512daf54fc688241d416e8f5ebd`    |
+| Fork v0.13.3     | Resolve the published `v0.13.3` tag with Git. |
 
 The integrated fork lives on `main`; `origin` points to `derrickzhde/paseo`. Older history mentions an upstream-mirror `main` and a rebased `mine` branch. Derive the next integration from the actual current refs; do not restore that older arrangement or rewrite published history.
 
@@ -36,7 +36,7 @@ Confirm the requested upstream release and pin its commit. Keep upstream tags in
 For example, this fetches the known baseline; substitute the requested release for the next integration:
 
 ```bash
-UPSTREAM_TAG=v0.13.1
+UPSTREAM_TAG=v0.13.2
 git fetch --no-tags https://github.com/getpaseo/paseo.git \
   "refs/tags/${UPSTREAM_TAG:?}:refs/remotes/upstream-release/${UPSTREAM_TAG:?}"
 UPSTREAM_COMMIT=$(git rev-parse "refs/remotes/upstream-release/${UPSTREAM_TAG:?}^{commit}")
@@ -51,7 +51,7 @@ Compare both changesets from that common ancestor. Read the overlapping hunks an
 
 Report each customization as **replace with upstream**, **retain unchanged**, or **retain and adapt**, with supporting source/test evidence and any verification gap. Keep the upstream tag, both heads, common ancestor and decision list in the task record. Report the comparison before editing; continue authorized integration without another routine confirmation.
 
-The v0.13.1 comparison found 24 overlapping paths among 95 locally customized paths. The GLM catalog pin was replaced with upstream's version; most unique patches remained. These counts describe that comparison, not a permanent inventory.
+The v0.13.2 comparison found 21 overlapping paths among 176 customized paths, including the uncommitted session metrics and GitHub updater. Most overlap was release metadata. The Enriched Markdown patch combines upstream's Android measurement fixes with the fork's math additions; no unique fork behavior was replaced. These counts describe that comparison, not a permanent inventory.
 
 ## Current customization inventory
 
@@ -70,7 +70,19 @@ Paths below are relative to the repository root. Recheck every row against each 
 | Claude imported-session cache              | Keep only one observed descriptor version per session path. Multiple historical metadata-keyed entries could resurrect a stale title after an append, same-length rewrite and restored mtime. Preserve bounded caching, metadata validation and the post-read stat check. This extra fix was added during v0.13.2 verification.                                                                                                                                                                                                                        | `packages/server/src/server/agent/providers/claude/agent.ts`, existing same-length rewrite case in `agent.test.ts`, and `agent.import-large-record.test.ts`.                                                                                                                                                                                                                             |
 | Fork identity and release infrastructure   | Preserve fork desktop publishing/updater URLs, mobile application IDs and EAS ownership while adopting upstream build changes. Keep fork-safe CI conditions, manual Nix candidate checks and the two-worker Nix desktop export limit. Internal `@getpaseo/*` workspace package names remain unchanged.                                                                                                                                                                                                                                                 | `packages/desktop/electron-builder.yml`; `packages/app/src/desktop/updates/desktop-updates.ts` and its test; `packages/app/app.config.js`, `eas.json`, `native-release-version.js`; `.github/workflows/`, `nix/desktop-package.nix`, `nix/npm-deps.hash`.                                                                                                                                |
 
+Keep the fork's [session metrics](agent-stream-performance.md#session-metrics-in-the-context-details) when adapting usage reporting or the context meter: active-request TPS from paired response counts and durations, and current-session cache-hit percentage with provider normalization and unknown data preserved.
+
 Mobile identity is `com.halocloudnet.paseo` with `.debug` for development. Preserve the existing fork EAS project/owner and store connection; do not copy credentials into task records or docs. [Android version codes](android.md#version-codes) owns the native version formulas, including the historical iOS 0.11.3 exception. Keep Android/mobile testing instructions aligned with the fork IDs.
+
+## Remote host self-update
+
+The host owns the upgrade source. Changing the app does not change an older daemon's updater. The client requires `features.forkDaemonSelfUpdate` before sending an upgrade request, so an older host cannot silently invoke its upstream npm updater. Install a fork release containing this updater on the host once before using the overview's upgrade action for subsequent releases.
+
+Preserve the fork CLI archive in the Desktop Release workflow: `paseo-cli-<version>.tgz`. It carries the compiled CLI and its fork workspace packages together; installing the GitHub source archive or the upstream npm CLI loses that guarantee. The Linux release job builds the browser UI and creates this platform-independent npm archive. Native third-party dependencies still install through npm on the target host.
+
+Self-update selects the fork's latest stable GitHub release and verifies the asset's published size and SHA256 before passing the local archive to npm. A missing archive, an unverifiable download or a downgrade fails without falling back to upstream. Fork v0.13.2 predates this asset; v0.13.3 adds it. Older hosts still need the one-time fork installation described above.
+
+The existing installation restrictions remain: the running daemon must belong to a normal npm global CLI install. Keep its verified npm prefix, reject linked/source installs and leave desktop-managed daemons to the desktop updater. DEB/RPM, extracted desktop bundles, Docker and Nix installations need their own installation method; this action does not migrate them or request elevated permissions.
 
 ## Prepare and verify a release
 
@@ -78,7 +90,7 @@ Mobile identity is `com.halocloudnet.paseo` with `.debug` for development. Prese
 
 Integrate the pinned upstream release in the isolated checkout. Preserve the unique behavior above; remove only patches proven redundant. A merge is acceptable: v0.13.2 used an upstream merge and normal fast-forward publication to fork `main`. Inspect the final fork-versus-upstream diff, including added/deleted files and dependency patches.
 
-Choose an unused fork version and check both local and remote tags. Previous releases used v0.12.1 for upstream v0.12.0 and v0.13.2 for upstream v0.13.1. Check for collisions each time; neither an upstream tag nor an existing fork tag may be overwritten.
+Choose an unused fork version and check both local and remote tags. Previous releases used v0.12.1 for upstream v0.12.0 and v0.13.2 for upstream v0.13.1; v0.13.3 follows upstream v0.13.2. Check for collisions each time; neither an upstream tag nor an existing fork tag may be overwritten.
 
 All workspaces and the bundled daemon must agree on the release version. Update the root package version, run `node scripts/sync-workspace-versions.mjs`, and regenerate/inspect workspace lockfile entries. Watch for nested registry copies shadowing the local workspaces after a version change. Reinstall and rebuild in the isolated checkout when needed. Do not repair stale generated declarations by adding duplicate source types.
 
@@ -150,7 +162,7 @@ Use GitHub Actions for the fork release. **Do not run upstream `release:patch`, 
 Watch runs to completion rather than stopping at a successful push. A draft is not a published release. If tag lookup does not find an in-progress draft, use the existing helper, which understands GitHub's `untagged-*` draft URLs:
 
 ```bash
-node scripts/github-release.mjs --repo derrickzhde/paseo --tag v0.13.2
+node scripts/github-release.mjs --repo derrickzhde/paseo --tag v0.13.3
 ```
 
 Substitute the new tag. Let the desktop finalizer assemble and validate the platform manifests before publishing; do not manually expose an incomplete draft. Diagnose signing/notarization failures from the actual error and resume the failed jobs when resolved. Publishing does not authorize updating installed apps or restarting their daemons.
@@ -164,7 +176,7 @@ Substitute the new tag. Let the desktop finalizer assemble and validate the plat
 ## Verify publication and hand off
 
 1. Verify remote `main` and the peeled release tag point to the checked commit. Confirm the GitHub release is public, has the intended version/notes and stable/prerelease status, and is selected as latest when intended.
-2. Check every expected platform asset against the desktop workflow's current artifact list: names, nonzero sizes and checksums where available. v0.13.2 published 23 assets; derive the next release's expectations from the workflow rather than assuming that count.
+2. Check every expected platform asset against the desktop workflow's current artifact list: names, nonzero sizes and checksums where available. Include the [fork CLI archive](#remote-host-self-update), its GitHub SHA256 digest and an isolated-prefix installation smoke check. v0.13.2 published 23 assets; derive the next release's expectations from the workflow rather than assuming that count.
 3. Download `latest.yml`, `latest-mac.yml` and `latest-linux.yml`. Verify version, referenced filenames, asset sizes, SHA512 values and rollout fields. Confirm the updater destination stays `derrickzhde/paseo`. These manifests are produced and uploaded by the release finalizer; if missing or wrong, repair/resume the pipeline and verify again.
 4. Inspect `ghcr.io/derrickzhde/paseo:<version>` and, for a stable release, `:latest`. Verify the intended tags reference the same published image digest and include `linux/amd64` and `linux/arm64`. Use the existing Docker workflow for any authorized repair; do not substitute an upstream image.
 5. Record the upstream/fork SHAs, dropped/retained/adapted patches, check/run IDs, release URL, asset/manifest verification, image digest and limitations. Refresh this guide's baseline and inventory. Preserve recovery evidence, then reclaim only task-owned agents, candidate branches and worktrees after their output is integrated and no process uses them.

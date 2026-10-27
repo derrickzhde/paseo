@@ -1,0 +1,6 @@
+Updated this fork to upstream 0.13.2 while keeping its math rendering, phone clock settings, model controls and agent fixes.
+
+Added
+- Added recent five-minute output throughput and session cache-hit percentage to context details. Throughput uses response token and generation-duration totals; unavailable timing stays unavailable.
+
+Full notes: https://paseo.sh/changelog

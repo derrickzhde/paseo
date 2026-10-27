@@ -193,7 +193,16 @@ export const toolArgsSchema = z.object({
 });
 export const tokenUsageSchema = z.object({
   cumulative: z.object({ promptTokens: z.number(), outputTokens: z.number() }),
-  usage: z.object({ cachedTokens: z.number().optional() }).optional(),
+  durationMs: z.number().optional(),
+  promptTokens: z.number().optional(),
+  viewCursor: z.string().optional(),
+  usage: z
+    .object({
+      cachedTokens: z.number().optional(),
+      cacheReadTokens: z.number().optional(),
+      outputTokens: z.number().optional(),
+    })
+    .optional(),
 });
 export const contextUsageSchema = z.object({
   usedTokens: z.number(),

@@ -194,11 +194,38 @@ test("catalog uses model effort variants, modes, and bounded cached discovery", 
   await h.wait((event) => event.type === "catalog" && event.requestId === "catalog-2");
   expect((await h.recorded()).filter((frame) => frame.method === "model/list")).toHaveLength(1);
 });
+test.each(["missing", "0", "-1"])(
+  "retains unknown generation timing without rejecting Muse usage (%s)",
+  async (duration) => {
+    const h = await harness("text-reasoning", { MUSE_TEST_GENERATION_DURATION: duration });
+    await h.open();
+    await h.prompt();
+    await h.wait((event) => event.type === "session.turn" && event.state === "completed");
+    const usage = h.events.find((event) => event.type === "session.usage");
+    expect(usage).toMatchObject({
+      generationSample: { id: expect.any(String), outputTokens: 663 },
+    });
+    expect(usage?.generationSample?.durationMs).toBeUndefined();
+    expect(ProviderEventSchema.parse(usage)).toEqual(usage);
+  },
+);
+
 test("text and reasoning stream, completion overwrites deltas, user echo retains client identity", async () => {
   const h = await harness();
   expect(await h.open()).toMatchObject({ type: "session.ready" });
   await h.prompt();
   await h.wait((event) => event.type === "session.turn" && event.state === "completed");
+  const usageEvent = h.events.find((event) => event.type === "session.usage");
+  expect(usageEvent).toMatchObject({
+    usageSample: {
+      scope: "request",
+      id: expect.any(String),
+      inputTokens: 38169,
+      cachedInputTokens: 0,
+      outputTokens: 663,
+    },
+    generationSample: { id: expect.any(String), outputTokens: 663, durationMs: 7603 },
+  });
   expect(h.events).toEqual(
     expect.arrayContaining([
       expect.objectContaining({

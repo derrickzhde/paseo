@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+  AgentStreamEventPayloadSchema,
   AgentTimelineItemPayloadSchema,
   SendAgentMessageRequestSchema,
   FileExplorerRequestSchema,
@@ -9,6 +10,37 @@ import {
   SessionOutboundMessageSchema,
   WorkspaceProjectDescriptorPayloadSchema,
 } from "./messages.js";
+
+test.each([undefined, false, true])(
+  "accepts an optional fork update capability: %s",
+  (supported) => {
+    const features: Record<string, boolean> = { daemonSelfUpdate: true };
+    if (supported !== undefined) features.forkDaemonSelfUpdate = supported;
+    const parsed = parseServerInfoStatusPayload({
+      status: "server_info",
+      serverId: "srv-fork-update",
+      features,
+    });
+    expect(parsed?.features?.forkDaemonSelfUpdate).toBe(supported);
+    expect(parsed?.features?.daemonSelfUpdate).toBe(true);
+  },
+);
+
+describe("session output metrics compatibility", () => {
+  test("preserves optional metrics without changing older usage payloads", () => {
+    const event = {
+      type: "turn_completed",
+      provider: "codex",
+      usage: {
+        outputTokens: 100,
+        sessionMetrics: { outputTokensPerSecond5m: 25, cacheHitPercentage: 80 },
+      },
+    };
+    expect(AgentStreamEventPayloadSchema.parse(event)).toEqual(event);
+    const oldEvent = { ...event, usage: { outputTokens: 100 } };
+    expect(AgentStreamEventPayloadSchema.parse(oldEvent)).toEqual(oldEvent);
+  });
+});
 
 function workspaceDescriptor(overrides: Record<string, unknown> = {}) {
   return {

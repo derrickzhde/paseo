@@ -98,7 +98,7 @@ describe("DefaultNpmGlobalPaseoCli", () => {
     ]);
   });
 
-  test("runs the global install command for the latest cli", async () => {
+  test("installs the verified release archive into the selected npm prefix", async () => {
     const calls: CommandCall[] = [];
     const cli = new DefaultNpmGlobalPaseoCli(async (command, args, options) => {
       calls.push({
@@ -110,7 +110,9 @@ describe("DefaultNpmGlobalPaseoCli", () => {
       return { exitCode: 0, stdout: "changed 42 packages", stderr: "" };
     });
 
-    await expect(cli.installLatest()).resolves.toEqual({
+    await expect(
+      cli.installArchive("/downloaded/fork cli.tgz", { prefix: "/custom npm" }),
+    ).resolves.toEqual({
       exitCode: 0,
       stdout: "changed 42 packages",
       stderr: "",
@@ -118,8 +120,8 @@ describe("DefaultNpmGlobalPaseoCli", () => {
     expect(calls).toEqual([
       {
         command: "npm",
-        args: ["install", "-g", "@getpaseo/cli@latest"],
-        timeout: 300_000,
+        args: ["install", "-g", "/downloaded/fork cli.tgz", "--prefix", "/custom npm"],
+        timeout: 600_000,
         maxBuffer: 10 * 1024 * 1024,
       },
     ]);

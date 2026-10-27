@@ -214,6 +214,11 @@ export interface SteerActiveTurnOptions extends AgentSteerOptions {
   expectedTurnId: string;
 }
 
+export interface AgentSessionMetrics {
+  outputTokensPerSecond5m?: number;
+  cacheHitPercentage?: number;
+}
+
 export interface AgentUsage {
   inputTokens?: number;
   cachedInputTokens?: number;
@@ -221,6 +226,29 @@ export interface AgentUsage {
   totalCostUsd?: number;
   contextWindowMaxTokens?: number;
   contextWindowUsedTokens?: number;
+  sessionMetrics?: AgentSessionMetrics;
+}
+
+/**
+ * Counters within one stable scope. Request/turn results reconcile that unit;
+ * session counters are cumulative within an epoch. Input includes cache reads
+ * and writes. Omit unknown counters, retaining the identity. Server-only.
+ */
+export interface AgentUsageSample {
+  scope: "request" | "turn" | "session";
+  id: string;
+  inputTokens?: number;
+  cachedInputTokens?: number;
+  outputTokens?: number;
+}
+
+/** One completed model response, timed independently of local tool execution. Server-only. */
+export interface AgentGenerationSample {
+  id: string;
+  outputTokens?: number;
+  durationMs?: number;
+  /** Completion epoch milliseconds; omitted when the provider only reports duration. */
+  completedAt?: number;
 }
 
 export const TOOL_CALL_ICON_NAMES = [
@@ -408,8 +436,22 @@ export type AgentTimelineItem =
 export type AgentStreamEvent =
   | { type: "thread_started"; sessionId: string; provider: AgentProvider }
   | { type: "turn_started"; provider: AgentProvider; turnId?: string }
-  | { type: "turn_completed"; provider: AgentProvider; usage?: AgentUsage; turnId?: string }
-  | { type: "usage_updated"; provider: AgentProvider; usage: AgentUsage; turnId?: string }
+  | {
+      type: "turn_completed";
+      provider: AgentProvider;
+      usage?: AgentUsage;
+      usageSample?: AgentUsageSample;
+      generationSample?: AgentGenerationSample;
+      turnId?: string;
+    }
+  | {
+      type: "usage_updated";
+      provider: AgentProvider;
+      usage: AgentUsage;
+      usageSample?: AgentUsageSample;
+      generationSample?: AgentGenerationSample;
+      turnId?: string;
+    }
   | {
       type: "mode_changed";
       provider: AgentProvider;

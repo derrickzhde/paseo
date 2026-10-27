@@ -412,6 +412,12 @@ const AgentUsageSchema: z.ZodType<AgentUsage> = z.object({
   totalCostUsd: z.number().optional(),
   contextWindowMaxTokens: z.number().optional(),
   contextWindowUsedTokens: z.number().optional(),
+  sessionMetrics: z
+    .object({
+      outputTokensPerSecond5m: z.number().nonnegative().optional(),
+      cacheHitPercentage: z.number().min(0).max(100).optional(),
+    })
+    .optional(),
 });
 
 const McpStdioServerConfigSchema = z.object({
@@ -3636,6 +3642,8 @@ export const ServerInfoStatusPayloadSchema = z
         connectedHosts: z.boolean().optional(),
         hostMultiplexing: z.boolean().optional(),
         usageSources: z.boolean().optional(),
+        // COMPAT(agentSessionMetrics): added in fork v0.13.2, remove gate after 2027-04-27.
+        agentSessionMetrics: z.boolean().optional(),
         // COMPAT(providersSnapshotCwd): added in v0.3.2, remove gate after 2027-02-10.
         providersSnapshotCwd: z.boolean().optional(),
         // COMPAT(directorySync): added in v0.3.x, remove gate after 2027-02-12.
@@ -3732,6 +3740,8 @@ export const ServerInfoStatusPayloadSchema = z
         daemonDiagnostics: z.boolean().optional(),
         // COMPAT(daemonSelfUpdate): added in v0.1.93, remove gate after 2026-12-13.
         daemonSelfUpdate: z.boolean().optional(),
+        // COMPAT(forkDaemonSelfUpdate): added after fork v0.13.2, remove gate after 2027-04-27.
+        forkDaemonSelfUpdate: z.boolean().optional(),
         // COMPAT(agentForkContext): added in v0.1.102, remove gate after 2026-12-28.
         agentForkContext: z.boolean().optional(),
         // COMPAT(agentForkContextCursor): added in v0.1.108, remove gate after 2027-01-14.

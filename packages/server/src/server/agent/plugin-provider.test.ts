@@ -6,6 +6,7 @@ import type {
   ProviderInput,
   ProviderRegistration,
 } from "@getpaseo/plugin/server/provider";
+import { ProviderEventSchema } from "@getpaseo/plugin/server/provider";
 import { setImmediate as nextTurn } from "node:timers/promises";
 import { describe, expect, test } from "vitest";
 import { createTestLogger } from "../../test-utils/test-logger.js";
@@ -287,6 +288,43 @@ function expectNestedChildren(events: AgentStreamEvent[]) {
 }
 
 describe("PluginAgentClientRegistry", () => {
+  test("retains optional normalized usage samples through the plugin boundary", async () => {
+    const harness = createProviderHarness();
+    const registry = new PluginAgentClientRegistry(createTestLogger());
+    registry.replace([harness.registration]);
+    const session = await registry.clients()[harness.registration.id]!.createSession({
+      provider: harness.registration.id,
+      cwd: "/tmp",
+    });
+    try {
+      const events: AgentStreamEvent[] = [];
+      session.subscribe((event) => events.push(event));
+      const opened = harness.inputs.find((input) => input.type === "session.open");
+      if (opened?.type !== "session.open") throw new Error("Missing open request");
+      const event = {
+        type: "session.usage",
+        sessionId: opened.sessionId,
+        usage: { outputTokens: 20 },
+        usageSample: { scope: "session", id: opened.sessionId, outputTokens: 20 },
+        generationSample: { id: "response", outputTokens: 20, durationMs: 1000, completedAt: 1000 },
+      };
+      expect(ProviderEventSchema.parse(event)).toEqual(event);
+      harness.emit(ProviderEventSchema.parse(event));
+      await nextTurn();
+      expect(eventsOfType(events, "usage_updated")).toEqual([
+        {
+          type: "usage_updated",
+          provider: harness.registration.id,
+          usage: { outputTokens: 20 },
+          turnId: undefined,
+          usageSample: event.usageSample,
+          generationSample: event.generationSample,
+        },
+      ]);
+    } finally {
+      await session.close();
+    }
+  });
   test("stores only agent options while the plugin receives merged defaults", async () => {
     const logger = createTestLogger();
     const harness = createProviderHarness();

@@ -465,16 +465,7 @@ export class Session {
         this.completeTurn(notification.params);
         break;
       case "session/tokenUsage": {
-        const params = tokenUsageSchema.parse(notification.params);
-        this.options.emit({
-          type: "session.usage",
-          sessionId: this.options.id,
-          usage: {
-            inputTokens: params.cumulative.promptTokens,
-            outputTokens: params.cumulative.outputTokens,
-            cachedInputTokens: params.usage?.cachedTokens,
-          },
-        });
+        this.acceptTokenUsage(tokenUsageSchema.parse(notification.params));
         break;
       }
       case "session/contextUsage": {
@@ -490,6 +481,42 @@ export class Session {
         break;
       }
     }
+  }
+  private acceptTokenUsage(params: z.infer<typeof tokenUsageSchema>): void {
+    this.options.emit({
+      type: "session.usage",
+      sessionId: this.options.id,
+      ...(params.viewCursor
+        ? {
+            generationSample: {
+              id: params.viewCursor,
+              outputTokens: params.usage?.outputTokens,
+              durationMs:
+                params.durationMs !== undefined && params.durationMs > 0
+                  ? params.durationMs
+                  : undefined,
+            },
+          }
+        : {}),
+      // MSP's promptTokens counts each input token once. Generic cachedTokens
+      // has provider-dependent semantics, so only explicit cache reads are hits.
+      ...(params.viewCursor
+        ? {
+            usageSample: {
+              scope: "request",
+              id: params.viewCursor,
+              inputTokens: params.promptTokens,
+              cachedInputTokens: params.usage?.cacheReadTokens,
+              outputTokens: params.usage?.outputTokens,
+            },
+          }
+        : {}),
+      usage: {
+        inputTokens: params.cumulative.promptTokens,
+        outputTokens: params.cumulative.outputTokens,
+        cachedInputTokens: params.usage?.cachedTokens,
+      },
+    });
   }
   private startTurn(input: unknown): void {
     const params = turnSchema.parse(input);

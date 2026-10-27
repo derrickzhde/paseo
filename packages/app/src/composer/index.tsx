@@ -55,7 +55,12 @@ import {
 } from "@/composer/agent-controls";
 import { ContextWindowMeter } from "@/components/context-window-meter";
 import { useImageAttachmentPicker } from "@/hooks/use-image-attachment-picker";
-import { selectAgentTurnPresentation, useSessionStore } from "@/stores/session-store";
+import {
+  selectAgentTurnPresentation,
+  useSessionStore,
+  type Agent,
+  type SessionState,
+} from "@/stores/session-store";
 import { useFilePicker } from "@/hooks/use-file-picker";
 import { useFileDrop } from "@/components/file-drop/use-file-drop";
 import type { DroppedItem } from "@/components/file-drop/types";
@@ -271,15 +276,33 @@ function buildRealtimeVoiceButtonStyle(
   );
 }
 
+function readAdvertisedSessionMetrics(session: SessionState | undefined, agent: Agent | null) {
+  if (session?.serverInfo?.features?.agentSessionMetrics !== true) {
+    return {
+      sessionMetricsEnabled: false,
+      outputTokensPerSecond5m: undefined,
+      cacheHitPercentage: undefined,
+    };
+  }
+  const sessionMetrics = agent?.lastUsage?.sessionMetrics;
+  return {
+    sessionMetricsEnabled: true,
+    outputTokensPerSecond5m: sessionMetrics?.outputTokensPerSecond5m,
+    cacheHitPercentage: sessionMetrics?.cacheHitPercentage,
+  };
+}
+
 function buildAgentStateSelector(serverId: string, agentId: string) {
   return (state: ReturnType<typeof useSessionStore.getState>) => {
-    const agent = state.sessions[serverId]?.agents?.get(agentId) ?? null;
+    const session = state.sessions[serverId];
+    const agent = session?.agents?.get(agentId) ?? null;
     return {
       status: agent?.status ?? null,
       contextWindowMaxTokens: agent?.lastUsage?.contextWindowMaxTokens ?? null,
       contextWindowUsedTokens: agent?.lastUsage?.contextWindowUsedTokens ?? null,
       totalCostUsd: agent?.lastUsage?.totalCostUsd ?? null,
       model: agent?.model ?? null,
+      ...readAdvertisedSessionMetrics(session, agent),
     };
   };
 }
@@ -2059,6 +2082,24 @@ function ComposerContentImpl({
   );
 
   const contextWindowMeterGlyphSize = isCompactLayout ? ICON_SIZE.md : buttonIconSize;
+  const sessionMetrics = useMemo(
+    () =>
+      agentState.sessionMetricsEnabled
+        ? {
+            ...(agentState.outputTokensPerSecond5m !== undefined
+              ? { outputTokensPerSecond5m: agentState.outputTokensPerSecond5m }
+              : {}),
+            ...(agentState.cacheHitPercentage !== undefined
+              ? { cacheHitPercentage: agentState.cacheHitPercentage }
+              : {}),
+          }
+        : undefined,
+    [
+      agentState.sessionMetricsEnabled,
+      agentState.outputTokensPerSecond5m,
+      agentState.cacheHitPercentage,
+    ],
+  );
   const beforeVoiceContent = useMemo(
     () =>
       hasAgent ? (
@@ -2069,6 +2110,7 @@ function ComposerContentImpl({
             maxTokens={agentState.contextWindowMaxTokens}
             usedTokens={agentState.contextWindowUsedTokens}
             totalCostUsd={agentState.totalCostUsd}
+            sessionMetrics={sessionMetrics}
             glyphSize={contextWindowMeterGlyphSize}
           />
         </View>
@@ -2080,6 +2122,7 @@ function ComposerContentImpl({
       agentState.contextWindowMaxTokens,
       agentState.contextWindowUsedTokens,
       agentState.totalCostUsd,
+      sessionMetrics,
       contextWindowMeterGlyphSize,
     ],
   );

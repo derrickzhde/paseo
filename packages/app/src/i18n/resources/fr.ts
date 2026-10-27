@@ -2096,6 +2096,9 @@ export const fr: TranslationResources = {
     used: "{{percentage}} % utilisés",
     tokens: "{{used}} / {{max}} tokens",
     sessionCost: "Coût de la session : {{cost}}",
+    outputTokensPerSecond5m: "TPS (sortie active sur 5 min) {{value}}",
+    cacheHitPercentage: "Taux de succès du cache (session) {{value}}",
+    unavailable: "Aucune donnée",
     accessibility: "Fenêtre de contexte : {{percentage}} % utilisés",
   },
   review: {

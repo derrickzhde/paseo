@@ -2027,6 +2027,9 @@ export const zhCN: TranslationResources = {
     used: "已使用 {{percentage}}%",
     tokens: "{{used}} / {{max}} tokens",
     sessionCost: "会话费用 {{cost}}",
+    outputTokensPerSecond5m: "TPS（近5分钟活跃输出） {{value}}",
+    cacheHitPercentage: "缓存命中率（当前会话） {{value}}",
+    unavailable: "暂无数据",
     accessibility: "上下文窗口已使用 {{percentage}}%",
   },
   review: {

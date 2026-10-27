@@ -10,7 +10,7 @@ import type { OmpAgentMessage } from "./rpc-types.js";
 import type { OmpNoTurnScheduler, OmpProviderIdleScheduler } from "./agent.js";
 import type { OmpUsagePollScheduler } from "./usage-poller.js";
 import { resolveOmpProviderOptions } from "./provider-config.js";
-import { OmpRuntimeEventSchema } from "./rpc-types.js";
+import { OmpAgentMessageSchema, OmpRuntimeEventSchema, type OmpRuntimeEvent } from "./rpc-types.js";
 import { OmpHarness } from "./test-utils/omp-harness.js";
 import { OmpAgentClient } from "./agent.js";
 import { FakeOmp } from "./test-utils/fake-omp.js";
@@ -25,6 +25,19 @@ const TURN_LIFECYCLE_EVENTS = new Set<AgentStreamEvent["type"]>([
 
 function isTurnLifecycle(type: AgentStreamEvent["type"]): boolean {
   return TURN_LIFECYCLE_EVENTS.has(type);
+}
+
+function ompAssistantMessageEnd(message: Record<string, unknown>): OmpRuntimeEvent {
+  return OmpRuntimeEventSchema.parse({
+    type: "message_end",
+    message: { content: [], ...message, role: "assistant" },
+  });
+}
+
+function generationSamples(events: AgentStreamEvent[]) {
+  return events.flatMap((event) =>
+    event.type === "usage_updated" && event.generationSample ? [event.generationSample] : [],
+  );
 }
 
 // What OMP reports for a turn the user stopped: an error message on a terminal
@@ -1541,6 +1554,180 @@ describe("OMP agent client and session", () => {
     omp.runtime().acceptPrompt("hello OMP", "user-1");
     expect(omp.timeline().filter((item) => item.type === "user_message")).toEqual([
       { type: "user_message", text: "hello OMP", messageId: "user-1" },
+    ]);
+  });
+
+  test("records an OMP generation sample from native output and duration", async () => {
+    const runtime = new FakeOmp();
+    const client = new OmpAgentClient({ logger: createTestLogger(), runtime });
+    const session = await client.createSession({ provider: "omp", cwd: process.cwd() });
+    onTestFinished(() => session.close());
+    const events: AgentStreamEvent[] = [];
+    session.subscribe((event) => events.push(event));
+    const { turnId } = await session.startTurn("hello");
+
+    runtime.latestSession().emit(
+      ompAssistantMessageEnd({
+        responseId: "resp-omp-1",
+        timestamp: 1_700_000_000_000,
+        duration: 2_500,
+        durationMs: 9_999,
+        ttft: 400,
+        usage: { output: 120, reasoning: 40 },
+      }),
+    );
+    runtime.latestSession().emit({
+      type: "message_end",
+      message: { role: "custom", content: "local note" },
+    });
+    runtime.latestSession().emit({
+      type: "message_end",
+      message: { role: "user", content: "hello", entryId: "user-1" } as OmpAgentMessage,
+    });
+    runtime.latestSession().emit(
+      OmpRuntimeEventSchema.parse({
+        type: "tool_execution_end",
+        toolCallId: "tool-1",
+        toolName: "bash",
+        result: { content: [] },
+        duration: 50_000,
+        ttft: 10,
+      }),
+    );
+
+    expect(events.filter((event) => event.type === "usage_updated")).toEqual([
+      {
+        type: "usage_updated",
+        provider: "omp",
+        turnId,
+        usage: {},
+        generationSample: {
+          id: "omp:omp-session-1:response:resp-omp-1",
+          outputTokens: 120,
+          durationMs: 2_500,
+          completedAt: 1_700_000_002_500,
+        },
+      },
+    ]);
+  });
+
+  test("keeps unknown OMP generation timing and a known zero output", async () => {
+    const runtime = new FakeOmp();
+    const client = new OmpAgentClient({ logger: createTestLogger(), runtime });
+    const session = await client.createSession({ provider: "omp", cwd: process.cwd() });
+    onTestFinished(() => session.close());
+    const events: AgentStreamEvent[] = [];
+    session.subscribe((event) => events.push(event));
+    await session.startTurn("hello");
+    const fake = runtime.latestSession();
+
+    fake.emit(
+      ompAssistantMessageEnd({
+        responseId: "resp-omp-zero",
+        timestamp: 1_700_000_010_000,
+        duration: 1_000,
+        ttft: 20,
+        usage: { output: 0, reasoning: 5 },
+      }),
+    );
+    fake.emit(
+      ompAssistantMessageEnd({ responseId: "resp-omp-untimed", usage: { output: 8 }, ttft: 250 }),
+    );
+    fake.emit(
+      ompAssistantMessageEnd({
+        entryId: "entry-timed",
+        timestamp: 42_000,
+        duration: 10,
+        usage: { output: 3 },
+      }),
+    );
+    fake.emit(
+      ompAssistantMessageEnd({
+        responseId: "resp-omp-open",
+        duration: 80,
+        usage: { output: 2 },
+      }),
+    );
+    fake.emit(
+      ompAssistantMessageEnd({
+        responseId: "resp-omp-bad",
+        timestamp: 1_700_000_020_000,
+        duration: -5,
+        usage: { output: -1 },
+      }),
+    );
+    expect(OmpAgentMessageSchema.parse({ role: "assistant", content: [] }).role).toBe("assistant");
+
+    expect(generationSamples(events)).toEqual([
+      {
+        id: "omp:omp-session-1:response:resp-omp-zero",
+        outputTokens: 0,
+        durationMs: 1_000,
+        completedAt: 1_700_000_011_000,
+      },
+      { id: "omp:omp-session-1:response:resp-omp-untimed", outputTokens: 8 },
+      {
+        id: "omp:omp-session-1:message:entry-timed",
+        outputTokens: 3,
+        durationMs: 10,
+        completedAt: 42_010,
+      },
+      {
+        id: "omp:omp-session-1:response:resp-omp-open",
+        outputTokens: 2,
+        durationMs: 80,
+      },
+      { id: "omp:omp-session-1:response:resp-omp-bad" },
+    ]);
+  });
+
+  test("records separate OMP generation samples when output decreases", async () => {
+    const runtime = new FakeOmp();
+    const client = new OmpAgentClient({ logger: createTestLogger(), runtime });
+    const session = await client.createSession({ provider: "omp", cwd: process.cwd() });
+    onTestFinished(() => session.close());
+    const events: AgentStreamEvent[] = [];
+    session.subscribe((event) => events.push(event));
+    await session.startTurn("hello");
+    const fake = runtime.latestSession();
+    const repeated = {
+      responseId: "resp-repeat",
+      timestamp: 5_000,
+      duration: 100,
+      ttft: 30,
+      usage: { output: 40, reasoning: 7 },
+    };
+
+    fake.emit(ompAssistantMessageEnd(repeated));
+    fake.emit(
+      ompAssistantMessageEnd({
+        id: "entry-lower",
+        timestamp: 6_000,
+        duration: 100,
+        usage: { output: 10, reasoning: 10 },
+      }),
+    );
+    fake.emit(ompAssistantMessageEnd(repeated));
+
+    expect(generationSamples(events)).toEqual([
+      {
+        id: "omp:omp-session-1:response:resp-repeat",
+        outputTokens: 40,
+        durationMs: 100,
+        completedAt: 5_100,
+      },
+      {
+        id: "omp:omp-session-1:message:entry-lower",
+        outputTokens: 10,
+        durationMs: 100,
+        completedAt: 6_100,
+      },
+      {
+        id: "omp:omp-session-1:response:resp-repeat",
+        outputTokens: 40,
+        durationMs: 100,
+        completedAt: 5_100,
+      },
     ]);
   });
 });

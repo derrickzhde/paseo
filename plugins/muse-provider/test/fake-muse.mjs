@@ -379,7 +379,14 @@ function parityDelivery(message) {
     });
   return false;
 }
+function applyGenerationVariant(message) {
+  if (message.method === "session/tokenUsage" && process.env.MUSE_TEST_GENERATION_DURATION) {
+    if (process.env.MUSE_TEST_GENERATION_DURATION === "missing") delete message.params.durationMs;
+    else message.params.durationMs = Number(process.env.MUSE_TEST_GENERATION_DURATION);
+  }
+}
 function applyTestVariants(message) {
+  applyGenerationVariant(message);
   applyParityVariants(message);
   if (message.method === "turn/completed" && process.env.MUSE_TEST_INTERRUPT_TERMINAL)
     message.params.terminal = process.env.MUSE_TEST_INTERRUPT_TERMINAL;

@@ -1,4 +1,5 @@
 import { mapCustomMessageToToolCall } from "../custom-message.js";
+import { buildGenerationSample } from "../generation-sample.js";
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
@@ -703,6 +704,7 @@ export class OmpAgentSession implements AgentSession {
   private readonly pendingClientMessages: Array<{ clientMessageId: string | null; text: string }> =
     [];
   private activeAssistantMessageId: string | null = null;
+  private assistantGenerationOrdinal = 0;
   private activeTurnTerminalAssistantMessage: OmpAgentMessage | null = null;
   private activeTurnStarted = false;
   private outOfBandTurnStartAnnounced = false;
@@ -761,12 +763,13 @@ export class OmpAgentSession implements AgentSession {
     this.usagePoller = new OmpUsagePoller({
       scheduler: options.usagePollScheduler,
       readStats: () => this.runtimeSession.getSessionStats(),
-      onUsage: (usage, turnId) => {
+      onUsage: (usage, turnId, usageSample) => {
         this.emit({
           type: "usage_updated",
           provider: this.provider,
           usage,
           ...(turnId === undefined ? {} : { turnId }),
+          ...(usageSample ? { usageSample } : {}),
         });
       },
       onPollError: (error) => {
@@ -1993,11 +1996,13 @@ export class OmpAgentSession implements AgentSession {
     turnId: string | undefined,
   ): void {
     if (event.message.role === "assistant") {
+      const timelineId = this.activeAssistantMessageId;
       this.activeAssistantMessageId = null;
       this.questionUi.observeMessage(event.message);
       if (turnId) {
         this.activeTurnTerminalAssistantMessage = event.message;
       }
+      this.emitAssistantGenerationSample(event.message, timelineId, turnId);
       return;
     }
     if (event.message.role === "custom") {
@@ -2072,6 +2077,34 @@ export class OmpAgentSession implements AgentSession {
         );
         emitUserMessage();
       });
+  }
+
+  private emitAssistantGenerationSample(
+    message: Extract<OmpAgentMessage, { role: "assistant" }>,
+    timelineId: string | null,
+    turnId: string | undefined,
+  ): void {
+    this.assistantGenerationOrdinal += 1;
+    this.emit({
+      type: "usage_updated",
+      provider: this.provider,
+      usage: {},
+      ...(turnId === undefined ? {} : { turnId }),
+      generationSample: buildGenerationSample({
+        provider: this.provider,
+        sessionId: this.state.sessionId,
+        responseId: message.responseId,
+        messageId: message.id,
+        entryId: message.entryId,
+        timestamp: message.timestamp,
+        timelineId,
+        completionOrdinal: this.assistantGenerationOrdinal,
+        outputTokens: message.usage?.output,
+        // `duration` is the request wall time. Do not use `ttft`.
+        // usage.output already includes reasoning.
+        durationMs: message.duration,
+      }),
+    });
   }
 
   private emitSkillPromptEcho(turnId: string | undefined): void {

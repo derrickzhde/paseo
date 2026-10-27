@@ -1,7 +1,11 @@
 import type { ModelRef, OpenCodeEvent, SessionInfo, TokenUsageInfo } from "@opencode/client";
-import type { AgentStreamEvent } from "../../../agent-sdk-types.js";
+import type {
+  AgentGenerationSample,
+  AgentStreamEvent,
+  AgentUsageSample,
+} from "../../../agent-sdk-types.js";
 import type { V2Api } from "./api.js";
-import { usageFromV2 } from "./mapping.js";
+import { generationSampleFromV2, usageFromV2, usageSampleFromV2 } from "./mapping.js";
 
 interface UsageOptions {
   client(): V2Api;
@@ -16,29 +20,65 @@ function contextWindowUsedTokens(tokens: TokenUsageInfo) {
   return tokens.input + tokens.output + tokens.reasoning + tokens.cache.read + tokens.cache.write;
 }
 
+interface StepTiming {
+  started?: number;
+  streamed?: number;
+}
+
 export class SessionUsage {
   private readonly limits = new Map<string, Promise<number | undefined>>();
+  private readonly stepTiming = new Map<string, StepTiming>();
   private reports: Promise<void> = Promise.resolve();
   constructor(private readonly options: UsageOptions) {}
   observe(event: OpenCodeEvent) {
-    if (event.type !== "session.step.ended") return;
-    const { tokens } = event.data;
+    if (
+      event.type !== "session.step.started" &&
+      event.type !== "session.step.streamed" &&
+      event.type !== "session.step.ended" &&
+      event.type !== "session.step.failed"
+    ) {
+      return;
+    }
+    if (event.data.sessionID !== this.options.info().id) return;
+    if (event.type === "session.step.started") {
+      this.stepTiming.set(event.data.assistantMessageID, { started: event.data.started });
+      return;
+    }
+    if (event.type === "session.step.streamed") {
+      const timing = this.stepTiming.get(event.data.assistantMessageID) ?? {};
+      this.stepTiming.set(event.data.assistantMessageID, { ...timing, streamed: event.created });
+      return;
+    }
+    // Snapshot before the catalog lookup. A later step.started for this response resets timing.
+    const generationSample = generationSampleFromV2(
+      event,
+      this.stepTiming.get(event.data.assistantMessageID),
+    );
+    const usageSample = usageSampleFromV2(event);
+    const tokens = event.data.tokens;
     // Reports stay in step order while a model's context limit is still being looked up.
     this.reports = this.reports
-      .then(() => this.report(tokens))
+      .then(() => this.report(tokens, usageSample, generationSample))
       .catch((error: unknown) => this.options.reportError(error));
   }
-  private async report(tokens: TokenUsageInfo) {
-    const model = this.options.info().model;
-    const contextWindowMaxTokens = model ? await this.contextLimit(model) : undefined;
+  private async report(
+    tokens: TokenUsageInfo | undefined,
+    usageSample: AgentUsageSample | undefined,
+    generationSample: AgentGenerationSample,
+  ) {
+    const info = this.options.info();
+    const model = info.model;
+    const contextWindowMaxTokens = tokens && model ? await this.contextLimit(model) : undefined;
     this.options.emit({
       type: "usage_updated",
       provider: "opencode",
       usage: {
-        ...usageFromV2(this.options.info()),
-        contextWindowUsedTokens: contextWindowUsedTokens(tokens),
+        ...usageFromV2(info),
+        ...(tokens ? { contextWindowUsedTokens: contextWindowUsedTokens(tokens) } : {}),
         ...(contextWindowMaxTokens === undefined ? {} : { contextWindowMaxTokens }),
       },
+      ...(usageSample ? { usageSample } : {}),
+      generationSample,
     });
   }
   private contextLimit(model: ModelRef) {

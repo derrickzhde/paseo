@@ -3147,6 +3147,330 @@ describe("ClaudeAgentSession context window usage", () => {
     }
   });
 
+  test("normalizes root requests and reconciles the authoritative per-turn result", async () => {
+    const session = await createSessionForTurns([
+      [
+        createInitMessage(),
+        {
+          type: "stream_event",
+          event: {
+            type: "message_start",
+            message: {
+              id: "msg-1",
+              usage: {
+                input_tokens: 100,
+                cache_creation_input_tokens: 20,
+                cache_read_input_tokens: 30,
+              },
+            },
+          },
+          session_id: "session-1",
+        },
+        createMessageDeltaUsageEvent({
+          output_tokens: 10,
+          input_tokens: 110,
+          cache_creation_input_tokens: 20,
+          cache_read_input_tokens: 30,
+        }),
+        {
+          type: "stream_event",
+          event: {
+            type: "message_start",
+            message: {
+              id: "msg-1",
+              usage: {
+                input_tokens: 9_000,
+                cache_creation_input_tokens: 9_000,
+                cache_read_input_tokens: 9_000,
+              },
+            },
+          },
+          session_id: "session-1",
+        },
+        {
+          type: "stream_event",
+          event: {
+            type: "message_start",
+            message: {
+              id: "msg-2",
+              usage: {
+                input_tokens: 5,
+                cache_creation_input_tokens: 1,
+                cache_read_input_tokens: 4,
+              },
+            },
+          },
+          session_id: "session-1",
+        },
+        createMessageDeltaEvent(3),
+        {
+          type: "stream_event",
+          parent_tool_use_id: "toolu-agent-1",
+          event: {
+            type: "message_start",
+            message: {
+              id: "msg-sub",
+              usage: {
+                input_tokens: 9_000,
+                cache_creation_input_tokens: 9_000,
+                cache_read_input_tokens: 9_000,
+              },
+            },
+          },
+          session_id: "session-1",
+        },
+        createSuccessResult({
+          usage: {
+            input_tokens: 50,
+            cache_creation_input_tokens: 100,
+            cache_read_input_tokens: 20,
+            output_tokens: 9,
+          },
+        }),
+      ],
+      [
+        createInitMessage(),
+        createSuccessResult({
+          usage: {
+            input_tokens: 8,
+            cache_creation_input_tokens: 2,
+            output_tokens: 4,
+          },
+        }),
+      ],
+    ]);
+    const events: AgentStreamEvent[] = [];
+    session.subscribe((event) => events.push(event));
+
+    try {
+      const first = await session.run("turn");
+      const turnId = events.find((event) => event.type === "usage_updated")?.turnId;
+      const sampled = events.filter(
+        (event) => event.type === "usage_updated" || event.type === "turn_completed",
+      );
+      expect(turnId).toEqual(expect.any(String));
+      expect(sampled.map((event) => event.usageSample)).toEqual([
+        { scope: "turn", id: turnId, inputTokens: 150, cachedInputTokens: 30 },
+        { scope: "turn", id: turnId, inputTokens: 160, cachedInputTokens: 30, outputTokens: 10 },
+        { scope: "turn", id: turnId, inputTokens: 170, cachedInputTokens: 34, outputTokens: 10 },
+        { scope: "turn", id: turnId, inputTokens: 170, cachedInputTokens: 34, outputTokens: 13 },
+        { scope: "turn", id: turnId, inputTokens: 170, cachedInputTokens: 20, outputTokens: 9 },
+      ]);
+      expect(
+        events
+          .filter((event) => event.type === "usage_updated")
+          .map((event) => event.usage.contextWindowUsedTokens),
+      ).toEqual([150, 170, 10, 13]);
+      expect(first.usage).toEqual({
+        inputTokens: 50,
+        cachedInputTokens: 20,
+        outputTokens: 9,
+        totalCostUsd: 0.25,
+        contextWindowMaxTokens: 200_000,
+        contextWindowUsedTokens: 13,
+      });
+
+      events.length = 0;
+      const second = await session.run("turn");
+      const secondTurnId = events.find((event) => event.type === "turn_completed")?.turnId;
+      expect(secondTurnId).toEqual(expect.any(String));
+      expect(secondTurnId).not.toBe(turnId);
+      expect(events.find((event) => event.type === "turn_completed")?.usageSample).toEqual({
+        scope: "turn",
+        id: secondTurnId,
+        outputTokens: 4,
+      });
+      expect(second.usage).toEqual({
+        inputTokens: 8,
+        cachedInputTokens: undefined,
+        outputTokens: 4,
+        totalCostUsd: 0.25,
+        contextWindowMaxTokens: 200_000,
+      });
+    } finally {
+      await session.close();
+    }
+  });
+
+  test("keeps unreported stream cache unknown and publishes a failed result sample first", async () => {
+    const session = await createSessionForTurns([
+      [
+        createInitMessage(),
+        {
+          type: "stream_event",
+          event: {
+            type: "message_start",
+            message: { id: "msg-a", usage: { input_tokens: 100 } },
+          },
+          session_id: "session-1",
+        },
+        createMessageDeltaEvent(20),
+        createMessageDeltaUsageEvent({
+          output_tokens: 25,
+          cache_creation_input_tokens: 5,
+          cache_read_input_tokens: 0,
+        }),
+        {
+          type: "stream_event",
+          event: {
+            type: "message_start",
+            message: {
+              id: "msg-b",
+              usage: {
+                input_tokens: 10,
+                cache_creation_input_tokens: 1,
+                cache_read_input_tokens: 4,
+              },
+            },
+          },
+          session_id: "session-1",
+        },
+        createMessageDeltaEvent(2),
+        {
+          type: "stream_event",
+          event: {
+            type: "message_start",
+            message: { id: "msg-c", usage: { input_tokens: 50 } },
+          },
+          session_id: "session-1",
+        },
+        createSuccessResult({
+          usage: {
+            input_tokens: 40,
+            cache_creation_input_tokens: 6,
+            cache_read_input_tokens: 11,
+            output_tokens: 9,
+          },
+        }),
+      ],
+      [
+        createInitMessage(),
+        {
+          type: "stream_event",
+          event: {
+            type: "message_start",
+            message: { id: "msg-d", usage: { input_tokens: 3 } },
+          },
+          session_id: "session-1",
+        },
+        createMessageDeltaEvent(4),
+        {
+          type: "result",
+          subtype: "error",
+          duration_ms: 10,
+          duration_api_ms: 8,
+          is_error: true,
+          num_turns: 1,
+          stop_reason: null,
+          total_cost_usd: 0.1,
+          errors: ["model failed"],
+          usage: {
+            input_tokens: 12,
+            cache_creation_input_tokens: 3,
+            cache_read_input_tokens: 8,
+            output_tokens: 6,
+          },
+          modelUsage: {
+            "claude-sonnet-4-6": { contextWindow: 200_000 },
+          },
+          permission_denials: [],
+          uuid: "result-error",
+          session_id: "session-1",
+        },
+      ],
+    ]);
+    const events: AgentStreamEvent[] = [];
+    session.subscribe((event) => events.push(event));
+
+    try {
+      const first = await session.run("turn");
+      const turnId = events.find((event) => event.type === "usage_updated")?.turnId;
+      const samples = events
+        .filter((event) => event.type === "usage_updated" || event.type === "turn_completed")
+        .map((event) => event.usageSample);
+      expect(samples).toEqual([
+        { scope: "turn", id: turnId },
+        { scope: "turn", id: turnId, outputTokens: 20 },
+        {
+          scope: "turn",
+          id: turnId,
+          inputTokens: 105,
+          cachedInputTokens: 0,
+          outputTokens: 25,
+        },
+        {
+          scope: "turn",
+          id: turnId,
+          inputTokens: 120,
+          cachedInputTokens: 4,
+          outputTokens: 25,
+        },
+        {
+          scope: "turn",
+          id: turnId,
+          inputTokens: 120,
+          cachedInputTokens: 4,
+          outputTokens: 27,
+        },
+        { scope: "turn", id: turnId, outputTokens: 27 },
+        {
+          scope: "turn",
+          id: turnId,
+          inputTokens: 57,
+          cachedInputTokens: 11,
+          outputTokens: 9,
+        },
+      ]);
+      expect(
+        events
+          .filter((event) => event.type === "usage_updated")
+          .map((event) => event.usage.contextWindowUsedTokens),
+      ).toEqual([100, 120, 130, 15, 17, 50]);
+      expect(first.usage).toEqual({
+        inputTokens: 40,
+        cachedInputTokens: 11,
+        outputTokens: 9,
+        totalCostUsd: 0.25,
+        contextWindowMaxTokens: 200_000,
+        contextWindowUsedTokens: 50,
+      });
+
+      events.length = 0;
+      await expect(session.run("turn")).rejects.toThrow("model failed");
+      const failedTurnId = events.find((event) => event.type === "turn_failed")?.turnId;
+      const failureIndex = events.findIndex((event) => event.type === "turn_failed");
+      expect(events[failureIndex - 1]).toEqual({
+        type: "usage_updated",
+        provider: "claude",
+        turnId: failedTurnId,
+        usage: {
+          inputTokens: 12,
+          cachedInputTokens: 8,
+          outputTokens: 6,
+          totalCostUsd: 0.1,
+          contextWindowMaxTokens: 200_000,
+          contextWindowUsedTokens: 7,
+        },
+        usageSample: {
+          scope: "turn",
+          id: failedTurnId,
+          inputTokens: 23,
+          cachedInputTokens: 8,
+          outputTokens: 6,
+        },
+      });
+      expect(events[failureIndex]).toMatchObject({
+        type: "turn_failed",
+        provider: "claude",
+        error: "model failed",
+        turnId: failedTurnId,
+      });
+      expect(events[failureIndex]).not.toHaveProperty("usageSample");
+    } finally {
+      await session.close();
+    }
+  });
+
   test("falls back to the active result iteration when current and stream usage are unavailable", async () => {
     const session = await createSessionForTurns([
       [

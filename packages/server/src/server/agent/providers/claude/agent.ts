@@ -118,6 +118,7 @@ import {
   type AgentStreamEvent,
   type AgentTimelineItem,
   type AgentUsage,
+  type AgentUsageSample,
   type AgentRuntimeInfo,
   type FetchCatalogOptions,
   type ImportableProviderSession,
@@ -2104,18 +2105,109 @@ function readClaudeParentToolUseId(message: SDKMessage): string | null {
   return typeof parentToolUseId === "string" && parentToolUseId.length > 0 ? parentToolUseId : null;
 }
 
+interface OpenTurnRequestUsage {
+  inputTokens?: number;
+  cacheCreationInputTokens?: number;
+  cacheReadInputTokens?: number;
+  outputTokens?: number;
+}
+
+function inclusiveKnownInput(request: OpenTurnRequestUsage): number | undefined {
+  if (
+    request.inputTokens === undefined ||
+    request.cacheCreationInputTokens === undefined ||
+    request.cacheReadInputTokens === undefined
+  ) {
+    return undefined;
+  }
+  return request.inputTokens + request.cacheCreationInputTokens + request.cacheReadInputTokens;
+}
+
+function readOpenTurnRequest(event: Record<string, unknown>): OpenTurnRequestUsage {
+  const rawUsage = toObjectRecord(toObjectRecord(event.message)?.usage);
+  return {
+    inputTokens: rawUsage ? readUsageCount(rawUsage, "input_tokens") : undefined,
+    cacheCreationInputTokens: rawUsage
+      ? readUsageCount(rawUsage, "cache_creation_input_tokens")
+      : undefined,
+    cacheReadInputTokens: rawUsage
+      ? readUsageCount(rawUsage, "cache_read_input_tokens")
+      : undefined,
+  };
+}
+
+function applyReportedUsageDelta(
+  request: OpenTurnRequestUsage,
+  event: Record<string, unknown>,
+  outputTokens: number,
+): void {
+  const deltaUsage = toObjectRecord(event.usage);
+  if (deltaUsage) {
+    const inputTokens = readUsageCount(deltaUsage, "input_tokens");
+    const cacheCreation = readUsageCount(deltaUsage, "cache_creation_input_tokens");
+    const cacheRead = readUsageCount(deltaUsage, "cache_read_input_tokens");
+    if (inputTokens !== undefined) {
+      request.inputTokens = inputTokens;
+    }
+    if (cacheCreation !== undefined) {
+      request.cacheCreationInputTokens = cacheCreation;
+    }
+    if (cacheRead !== undefined) {
+      request.cacheReadInputTokens = cacheRead;
+    }
+  }
+  request.outputTokens = outputTokens;
+}
+
+function cumulativeKnownCounter(params: {
+  turnValue: number;
+  turnKnown: boolean;
+  turnSeen: boolean;
+  hasOpen: boolean;
+  openValue: number | undefined;
+}): number | undefined {
+  const seen = params.turnSeen || params.hasOpen;
+  const known = params.turnKnown && (!params.hasOpen || params.openValue !== undefined);
+  if (!seen || !known) {
+    return undefined;
+  }
+  return params.turnValue + (params.openValue ?? 0);
+}
+
 class ClaudeContextUsageState {
   private contextWindowMaxTokens: number | undefined;
   private streamRequestInputUsage: StreamRequestInputUsage | undefined;
   private streamRequestOutputTokens: number | undefined;
   private compactedContextWindowUsedTokens: number | undefined;
   private completedResultTurns = 0;
+  private turnId: string | undefined;
+  private turnInput = 0;
+  private turnCached = 0;
+  private turnOutput = 0;
+  private turnInputSeen = false;
+  private turnCachedSeen = false;
+  private turnOutputSeen = false;
+  private turnInputKnown = true;
+  private turnCachedKnown = true;
+  private openRequest: OpenTurnRequestUsage | undefined;
+  private readonly countedMessageIds = new Set<string>();
 
   constructor(initialContextWindowMaxTokens?: number) {
     this.contextWindowMaxTokens = initialContextWindowMaxTokens;
   }
 
-  beginTurn(): void {
+  beginTurn(turnId: string): void {
+    this.turnId = turnId;
+    this.turnInput = 0;
+    this.turnCached = 0;
+    this.turnOutput = 0;
+    this.turnInputSeen = false;
+    this.turnCachedSeen = false;
+    this.turnOutputSeen = false;
+    this.turnInputKnown = true;
+    this.turnCachedKnown = true;
+    this.openRequest = undefined;
+    this.countedMessageIds.clear();
     this.streamRequestInputUsage = undefined;
     this.streamRequestOutputTokens = undefined;
     this.compactedContextWindowUsedTokens = undefined;
@@ -2144,8 +2236,17 @@ class ClaudeContextUsageState {
       if (!inputUsage) {
         return null;
       }
+      const messageId = readTrimmedString(toObjectRecord(streamEvent.message)?.id);
+      if (messageId && this.countedMessageIds.has(messageId)) {
+        return null;
+      }
+      if (messageId) {
+        this.countedMessageIds.add(messageId);
+      }
+      this.finalizeOpenRequest();
       this.streamRequestInputUsage = inputUsage;
       this.streamRequestOutputTokens = 0;
+      this.openRequest = readOpenTurnRequest(streamEvent);
     } else if (eventType === "message_delta") {
       const outputTokens = readStreamRequestOutputTokens(streamEvent);
       if (typeof outputTokens !== "number") {
@@ -2157,6 +2258,9 @@ class ClaudeContextUsageState {
           this.streamRequestInputUsage,
           streamEvent,
         );
+      }
+      if (this.openRequest) {
+        applyReportedUsageDelta(this.openRequest, streamEvent, outputTokens);
       }
     } else {
       return null;
@@ -2199,6 +2303,7 @@ class ClaudeContextUsageState {
       if (usedTokens !== undefined) {
         usage.contextWindowUsedTokens = usedTokens;
       }
+      this.reconcileResultSample(message.usage);
       return usage;
     } finally {
       this.compactedContextWindowUsedTokens = undefined;
@@ -2219,6 +2324,100 @@ class ClaudeContextUsageState {
     return usedTokens > 0 ? usedTokens : undefined;
   }
 
+  usageSample(): AgentUsageSample | undefined {
+    if (!this.turnId) {
+      return undefined;
+    }
+    const open = this.openRequest;
+    const hasOpen = open !== undefined;
+    const inputTokens = cumulativeKnownCounter({
+      turnValue: this.turnInput,
+      turnKnown: this.turnInputKnown,
+      turnSeen: this.turnInputSeen,
+      hasOpen,
+      openValue: open ? inclusiveKnownInput(open) : undefined,
+    });
+    const cachedInputTokens = cumulativeKnownCounter({
+      turnValue: this.turnCached,
+      turnKnown: this.turnCachedKnown,
+      turnSeen: this.turnCachedSeen,
+      hasOpen,
+      openValue: open?.cacheReadInputTokens,
+    });
+    const outputTokens = this.currentOutputTokens(open);
+    // Keep the turn identity when counts are not yet reported, so a new
+    // unmeasured request invalidates the session's previous cache percentage.
+    return {
+      scope: "turn",
+      id: this.turnId,
+      ...(inputTokens !== undefined ? { inputTokens } : {}),
+      ...(cachedInputTokens !== undefined ? { cachedInputTokens } : {}),
+      ...(outputTokens !== undefined ? { outputTokens } : {}),
+    };
+  }
+
+  private currentOutputTokens(open: OpenTurnRequestUsage | undefined): number | undefined {
+    const openOutput = open?.outputTokens;
+    if (!this.turnOutputSeen && typeof openOutput !== "number") {
+      return undefined;
+    }
+    return this.turnOutput + (openOutput ?? 0);
+  }
+
+  private finalizeOpenRequest(): void {
+    const open = this.openRequest;
+    if (!open) {
+      return;
+    }
+    const inclusive = inclusiveKnownInput(open);
+    if (inclusive === undefined) {
+      this.turnInputKnown = false;
+    } else {
+      this.turnInput += inclusive;
+    }
+    this.turnInputSeen = true;
+    if (open.cacheReadInputTokens === undefined) {
+      this.turnCachedKnown = false;
+    } else {
+      this.turnCached += open.cacheReadInputTokens;
+    }
+    this.turnCachedSeen = true;
+    if (typeof open.outputTokens === "number") {
+      this.turnOutput += open.outputTokens;
+      this.turnOutputSeen = true;
+    }
+    this.openRequest = undefined;
+  }
+
+  private reconcileResultSample(usage: unknown): void {
+    this.finalizeOpenRequest();
+    const record = toObjectRecord(usage);
+    if (!record) {
+      return;
+    }
+    const inputTokens = readUsageCount(record, "input_tokens");
+    const cacheCreation = readUsageCount(record, "cache_creation_input_tokens");
+    const cacheRead = readUsageCount(record, "cache_read_input_tokens");
+    const outputTokens = readUsageCount(record, "output_tokens");
+    if (inputTokens !== undefined && cacheCreation !== undefined && cacheRead !== undefined) {
+      const inclusive = inputTokens + cacheCreation + cacheRead;
+      // SDK result usage is the authoritative main-loop total for this turn,
+      // unlike cumulative modelUsage (which also includes subagents).
+      this.turnInput = inclusive;
+      this.turnInputKnown = true;
+      this.turnInputSeen = true;
+    }
+    if (cacheRead !== undefined) {
+      this.turnCached = cacheRead;
+      this.turnCachedKnown = true;
+      this.turnCachedSeen = true;
+    }
+    if (outputTokens !== undefined) {
+      this.turnOutput = outputTokens;
+      this.turnOutputSeen = true;
+    }
+  }
+
   private createUsageUpdatedEvent(contextWindowUsedTokens: number): AgentStreamEvent {
     const usage: AgentUsage = {
       contextWindowUsedTokens,
@@ -2226,14 +2425,15 @@ class ClaudeContextUsageState {
     if (this.contextWindowMaxTokens !== undefined) {
       usage.contextWindowMaxTokens = this.contextWindowMaxTokens;
     }
-    return {
+    return this.withUsageSample({
       type: "usage_updated",
       provider: "claude",
       usage,
-    };
+    });
   }
 
   buildCompactionUsageEvent(postTokens: number | undefined): AgentStreamEvent {
+    this.finalizeOpenRequest();
     this.streamRequestInputUsage = undefined;
     this.streamRequestOutputTokens = undefined;
     this.compactedContextWindowUsedTokens = postTokens;
@@ -2244,11 +2444,19 @@ class ClaudeContextUsageState {
     if (postTokens !== undefined) {
       usage.contextWindowUsedTokens = postTokens;
     }
-    return {
+    return this.withUsageSample({
       type: "usage_updated",
       provider: "claude",
       usage,
-    };
+    });
+  }
+
+  private withUsageSample(event: AgentStreamEvent): AgentStreamEvent {
+    const usageSample = this.usageSample();
+    if (!usageSample || event.type !== "usage_updated") {
+      return event;
+    }
+    return { ...event, usageSample };
   }
 }
 
@@ -2497,7 +2705,7 @@ class ClaudeAgentSession implements AgentSession {
     this.activeForegroundTurnId = turnId;
     this.foregroundHasVisibleActivity = false;
     this.activeTurnHasAssistantText = false;
-    this.contextUsage.beginTurn();
+    this.contextUsage.beginTurn(turnId);
     this.transitionTurnState("foreground", "foreground turn started");
     this.clearRecentStderr();
     if (sdkUserMessageId) this.unstartedMessageUuids.add(sdkUserMessageId);
@@ -3953,7 +4161,7 @@ class ClaudeAgentSession implements AgentSession {
     this.activeForegroundQuery = this.query;
     this.activeForegroundInput = this.input;
     this.activeTurnHasAssistantText = false;
-    this.contextUsage.beginTurn();
+    this.contextUsage.beginTurn(this.autonomousTurn.id);
     this.notifySubscribers({ type: "turn_started", provider: "claude" });
     this.syncTurnState("autonomous turn started");
   }
@@ -4852,6 +5060,7 @@ class ClaudeAgentSession implements AgentSession {
     events: AgentStreamEvent[],
   ): void {
     const usage = this.convertUsage(message);
+    const usageSample = this.contextUsage.usageSample();
     if (message.subtype === "success") {
       events.push(...this.sidechainTracker.finishAll("completed"));
       // Built-in slash commands (e.g. /voice, /usage, "Unknown command: …")
@@ -4872,7 +5081,12 @@ class ClaudeAgentSession implements AgentSession {
           },
         });
       }
-      events.push({ type: "turn_completed", provider: "claude", usage });
+      events.push({
+        type: "turn_completed",
+        provider: "claude",
+        usage,
+        ...(usageSample ? { usageSample } : {}),
+      });
       return;
     }
     const errorMessage =
@@ -4880,6 +5094,14 @@ class ClaudeAgentSession implements AgentSession {
         ? message.errors.join("\n")
         : "Claude run failed";
     events.push(...this.sidechainTracker.finishAll("failed"));
+    if (usage && usageSample) {
+      events.push({
+        type: "usage_updated",
+        provider: "claude",
+        usage,
+        usageSample,
+      });
+    }
     events.push(this.buildTurnFailedEvent(errorMessage));
   }
 

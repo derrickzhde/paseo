@@ -2059,6 +2059,9 @@ export const ko: TranslationResources = {
     used: "{{percentage}}% 사용됨",
     tokens: "{{used}} / {{max}} 토큰",
     sessionCost: "세션 비용 {{cost}}",
+    outputTokensPerSecond5m: "TPS(최근 5분 활성 출력) {{value}}",
+    cacheHitPercentage: "캐시 적중률(현재 세션) {{value}}",
+    unavailable: "데이터 없음",
     accessibility: "컨텍스트 윈도우 {{percentage}}% 사용됨",
   },
   review: {

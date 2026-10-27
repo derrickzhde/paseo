@@ -1,4 +1,6 @@
-import type { AgentUsage } from "../../agent-sdk-types.js";
+import { randomUUID } from "node:crypto";
+
+import type { AgentUsage, AgentUsageSample } from "../../agent-sdk-types.js";
 import type { PiSessionStats } from "./rpc-types.js";
 
 export interface PiUsagePollScheduler {
@@ -7,7 +9,7 @@ export interface PiUsagePollScheduler {
 
 interface PiUsagePollerOptions {
   readStats(): Promise<PiSessionStats>;
-  onUsage(usage: AgentUsage, turnId?: string): void;
+  onUsage(usage: AgentUsage, turnId?: string, usageSample?: AgentUsageSample): void;
   onPollError(error: unknown): void;
   scheduler?: PiUsagePollScheduler;
 }
@@ -50,6 +52,34 @@ function toAgentUsage(stats: PiSessionStats): AgentUsage | undefined {
   };
 }
 
+function readTokenCount(value: number | undefined): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    return undefined;
+  }
+  return value;
+}
+
+function toAgentUsageSample(stats: PiSessionStats, id: string): AgentUsageSample {
+  // An empty sample invalidates a previously known percentage when stats lose
+  // their counters. A missing sample would leave that stale percentage visible.
+  const tokens = stats.tokens ?? {};
+  const input = readTokenCount(tokens.input);
+  const cacheRead = readTokenCount(tokens.cacheRead);
+  const cacheWrite = readTokenCount(tokens.cacheWrite);
+  const output = readTokenCount(tokens.output);
+  const sample: AgentUsageSample = { scope: "session", id };
+  if (input !== undefined && cacheRead !== undefined && cacheWrite !== undefined) {
+    sample.inputTokens = input + cacheRead + cacheWrite;
+  }
+  if (cacheRead !== undefined) {
+    sample.cachedInputTokens = cacheRead;
+  }
+  if (output !== undefined) {
+    sample.outputTokens = output;
+  }
+  return sample;
+}
+
 function isSameUsage(left: AgentUsage, right: AgentUsage): boolean {
   return (
     left.inputTokens === right.inputTokens &&
@@ -61,6 +91,16 @@ function isSameUsage(left: AgentUsage, right: AgentUsage): boolean {
   );
 }
 
+function isSameSample(left: AgentUsageSample, right: AgentUsageSample): boolean {
+  return (
+    left.scope === right.scope &&
+    left.id === right.id &&
+    left.inputTokens === right.inputTokens &&
+    left.cachedInputTokens === right.cachedInputTokens &&
+    left.outputTokens === right.outputTokens
+  );
+}
+
 export class PiUsagePoller {
   private readonly scheduler: PiUsagePollScheduler;
   private active = false;
@@ -68,6 +108,8 @@ export class PiUsagePoller {
   private generation = 0;
   private cancelScheduledPoll: (() => void) | null = null;
   private lastUsage: AgentUsage | null = null;
+  private lastSample: AgentUsageSample | undefined;
+  private readonly sampleId = randomUUID();
 
   constructor(private readonly options: PiUsagePollerOptions) {
     this.scheduler = options.scheduler ?? createScheduler();
@@ -94,15 +136,18 @@ export class PiUsagePoller {
     this.active = false;
     const completionGeneration = this.invalidatePendingWork();
     let usage: AgentUsage | undefined;
+    let sample: AgentUsageSample | undefined;
     try {
-      usage = toAgentUsage(await this.options.readStats());
+      const stats = await this.options.readStats();
+      usage = toAgentUsage(stats);
+      sample = toAgentUsageSample(stats, this.sampleId);
     } catch {
       return;
     }
     if (this.closed || this.generation !== completionGeneration) {
       return;
     }
-    this.publishUsage(usage, turnId);
+    this.publishUsage(usage, sample, turnId);
   }
 
   close(): void {
@@ -127,8 +172,11 @@ export class PiUsagePoller {
 
   private async poll(generation: number): Promise<void> {
     let usage: AgentUsage | undefined;
+    let sample: AgentUsageSample | undefined;
     try {
-      usage = toAgentUsage(await this.options.readStats());
+      const stats = await this.options.readStats();
+      usage = toAgentUsage(stats);
+      sample = toAgentUsageSample(stats, this.sampleId);
     } catch (error) {
       try {
         if (this.active && !this.closed && this.generation === generation) {
@@ -143,7 +191,7 @@ export class PiUsagePoller {
     }
     try {
       if (this.active && !this.closed && this.generation === generation) {
-        this.publishUsage(usage);
+        this.publishUsage(usage, sample);
       }
     } finally {
       if (this.active && !this.closed && this.generation === generation) {
@@ -160,10 +208,28 @@ export class PiUsagePoller {
     return usage;
   }
 
-  private publishUsage(usage: AgentUsage | undefined, turnId?: string): void {
-    const changedUsage = this.takeChangedUsage(usage);
-    if (changedUsage) {
-      this.options.onUsage(changedUsage, turnId);
+  private takeChangedSample(sample: AgentUsageSample | undefined): AgentUsageSample | undefined {
+    if (!sample || (this.lastSample && isSameSample(this.lastSample, sample))) {
+      return undefined;
     }
+    this.lastSample = sample;
+    return sample;
+  }
+
+  private publishUsage(
+    usage: AgentUsage | undefined,
+    sample: AgentUsageSample | undefined,
+    turnId?: string,
+  ): void {
+    const changedUsage = this.takeChangedUsage(usage);
+    const changedSample = this.takeChangedSample(sample);
+    if (!changedUsage && !changedSample) {
+      return;
+    }
+    const deliveredUsage = changedUsage ?? this.lastUsage;
+    if (!deliveredUsage) {
+      return;
+    }
+    this.options.onUsage(deliveredUsage, turnId, changedSample ?? sample);
   }
 }

@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.13.3 - 2026-10-27
+
+Updated this fork to upstream 0.13.2 while keeping its math rendering, phone clock settings, model controls and agent fixes.
+
+### Added
+
+- Added recent five-minute output throughput and session cache-hit percentage to context details. Throughput uses response token and generation-duration totals; unavailable timing stays unavailable.
+- Added remote npm-global host upgrades from this fork's verified GitHub CLI release archive. Older hosts need one manual fork installation before using the new upgrade action.
+
+### Fixed
+
+- Fixed repeated Android animation exceptions for unmounted views ([#7907](https://github.com/getpaseo/paseo/pull/7907)).
+- Stopped Android animation work in the background and repeated measurement of finished chat messages during streaming ([#7914](https://github.com/getpaseo/paseo/pull/7914)).
+- Fixed bottom sheets retaining window-size listeners after closing ([#7914](https://github.com/getpaseo/paseo/pull/7914)).
+
 ## 0.13.2 - 2026-10-26
 
 Updated this fork to upstream 0.13.1, including foldable layouts, connected hosts, plugin file panels and translations, terminal image paste, and the sidebar startup fix.

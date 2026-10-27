@@ -1366,6 +1366,8 @@ class PluginAgentSession implements AgentSession {
             type: "usage_updated",
             provider: this.provider,
             usage: { ...event.usage },
+            ...(event.usageSample ? { usageSample: { ...event.usageSample } } : {}),
+            ...(event.generationSample ? { generationSample: { ...event.generationSample } } : {}),
             turnId: event.turnId,
           },
         ];

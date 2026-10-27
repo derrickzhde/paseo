@@ -2069,6 +2069,9 @@ export const ja: TranslationResources = {
     used: "{{percentage}}%使用",
     tokens: "{{used}} / {{max}}トークン",
     sessionCost: "セッションコスト: {{cost}}",
+    outputTokensPerSecond5m: "TPS（直近5分のアクティブ出力） {{value}}",
+    cacheHitPercentage: "キャッシュヒット率（現在のセッション） {{value}}",
+    unavailable: "データなし",
     accessibility: "コンテキストウィンドウ{{percentage}}%使用",
   },
   review: {

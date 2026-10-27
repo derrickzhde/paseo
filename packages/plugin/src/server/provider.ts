@@ -417,6 +417,27 @@ export interface ProviderUsage {
   contextWindowUsedTokens?: number;
 }
 
+/**
+ * Counters within a stable scope. Request/turn results reconcile that unit;
+ * session counters are cumulative within an epoch. Input includes cache reads
+ * and writes; cached input is read hits only. Keep the identity when counts are unknown.
+ */
+export interface ProviderUsageSample {
+  scope: "request" | "turn" | "session";
+  id: string;
+  inputTokens?: number;
+  cachedInputTokens?: number;
+  outputTokens?: number;
+}
+
+/** One completed model response, excluding local tool execution between requests. */
+export interface ProviderGenerationSample {
+  id: string;
+  outputTokens?: number;
+  durationMs?: number;
+  completedAt?: number;
+}
+
 interface ProviderTimelineIdentity {
   id: string;
   revertToken?: JsonValue;
@@ -592,7 +613,14 @@ export type ProviderEvent =
       state: "started" | "completed" | "failed" | "canceled";
       error?: ProviderError;
     }
-  | { type: "session.usage"; sessionId: string; turnId?: string; usage: ProviderUsage }
+  | {
+      type: "session.usage";
+      sessionId: string;
+      turnId?: string;
+      usage: ProviderUsage;
+      usageSample?: ProviderUsageSample;
+      generationSample?: ProviderGenerationSample;
+    }
   | { type: "session.config"; sessionId: string; config: ProviderConfigState }
   | { type: "session.commands"; sessionId: string; commands: ProviderCommand[] }
   | { type: "session.permission"; sessionId: string; request: ProviderPermissionRequest }
@@ -1375,6 +1403,23 @@ export const ProviderEventSchema: z.ZodType<ProviderEvent> = z.discriminatedUnio
       sessionId: idSchema,
       turnId: idSchema.optional(),
       usage: usageSchema,
+      usageSample: z
+        .object({
+          scope: z.enum(["request", "turn", "session"]),
+          id: idSchema,
+          inputTokens: z.number().nonnegative().optional(),
+          cachedInputTokens: z.number().nonnegative().optional(),
+          outputTokens: z.number().nonnegative().optional(),
+        })
+        .optional(),
+      generationSample: z
+        .object({
+          id: idSchema,
+          outputTokens: z.number().nonnegative().optional(),
+          durationMs: z.number().nonnegative().optional(),
+          completedAt: z.number().nonnegative().optional(),
+        })
+        .optional(),
     })
     .strip(),
   z

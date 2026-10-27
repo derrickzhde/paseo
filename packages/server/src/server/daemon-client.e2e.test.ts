@@ -1267,6 +1267,7 @@ test("receives server_info on websocket connect", async () => {
   expect(serverInfo?.features?.commitBaseClassification).toBe(true);
   expect(serverInfo?.desktopManaged).toBe(false);
   expect(serverInfo?.features?.daemonSelfUpdate).toBe(true);
+  expect(serverInfo?.features?.forkDaemonSelfUpdate).toBe(true);
   expect(serverInfo?.features?.worktreeRestore).toBe(true);
   expect(serverInfo?.features?.workspaceRecovery).toBe(true);
 
@@ -1287,6 +1288,7 @@ test("a Desktop-managed daemon does not advertise npm self-update", async () => 
 
     expect(serverInfo?.desktopManaged).toBe(true);
     expect(serverInfo?.features?.daemonSelfUpdate).toBe(false);
+    expect(serverInfo?.features?.forkDaemonSelfUpdate).toBe(false);
   } finally {
     await client.close();
     await daemon.close();

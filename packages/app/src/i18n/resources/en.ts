@@ -2074,6 +2074,9 @@ export const en = {
     used: "{{percentage}}% used",
     tokens: "{{used}} / {{max}} tokens",
     sessionCost: "Session cost {{cost}}",
+    outputTokensPerSecond5m: "TPS (5m active) {{value}}",
+    cacheHitPercentage: "Cache hit (session) {{value}}",
+    unavailable: "Unavailable",
     accessibility: "Context window {{percentage}}% used",
   },
   review: {

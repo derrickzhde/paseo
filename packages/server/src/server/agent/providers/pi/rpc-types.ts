@@ -33,6 +33,12 @@ export interface PiToolCallContent {
 
 export type PiAssistantContent = PiTextContent | PiThinkingContent | PiToolCallContent;
 
+export interface PiResponseUsage {
+  output?: number | null;
+  /** Already included in `output`. */
+  reasoning?: number | null;
+}
+
 export type PiAgentMessage =
   | {
       role: "user";
@@ -54,6 +60,11 @@ export type PiAgentMessage =
       responseModel?: string;
       errorMessage?: string | null;
       stopReason?: string;
+      id?: string;
+      entryId?: string;
+      timestamp?: number | null;
+      durationMs?: number | null;
+      usage?: PiResponseUsage;
     }
   | {
       role: "toolResult";

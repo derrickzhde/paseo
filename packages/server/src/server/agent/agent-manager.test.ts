@@ -25,6 +25,7 @@ import { projectTimelineRows } from "./timeline-projection.js";
 import { getOpenAgentTabLabel, PARENT_AGENT_ID_LABEL } from "@getpaseo/protocol/agent-labels";
 import { startAgentRun } from "./agent-prompt.js";
 import { StaleProviderSessionError } from "./stale-provider-session-error.js";
+import { asInternals } from "../test-utils/class-mocks.js";
 import { ensureAgentLoaded, ensureUnarchivedAgentLoaded } from "./agent-loading.js";
 import type { StoredAgentRecord } from "./agent-storage.js";
 import type {
@@ -269,6 +270,296 @@ class SessionRecordingAgentClient extends TestAgentClient {
     return session;
   }
 }
+
+test("session metrics stay per agent, require generation timing, and never expose raw samples", async () => {
+  vi.useFakeTimers();
+  const client = new SessionRecordingAgentClient();
+  const manager = new AgentManager({
+    clients: { codex: client },
+    providerDefinitions: { codex: { enabled: true, derivedFromProviderId: null } },
+    logger,
+    agentStreamCoalesceWindowMs: 0,
+  });
+  const ids: string[] = [];
+  try {
+    const first = await manager.createAgent({ provider: "codex", cwd: process.cwd() }, undefined, {
+      workspaceId: undefined,
+    });
+    const second = await manager.createAgent({ provider: "codex", cwd: process.cwd() }, undefined, {
+      workspaceId: undefined,
+    });
+    ids.push(first.id, second.id);
+    const events: AgentManagerEvent[] = [];
+    manager.subscribe((event) => events.push(event), { replayState: false });
+    const session = client.sessions[0];
+    session.pushEvent({
+      type: "usage_updated",
+      provider: "codex",
+      usage: { sessionMetrics: { outputTokensPerSecond5m: 999 } },
+      usageSample: {
+        scope: "session",
+        id: session.id,
+        outputTokens: 0,
+        inputTokens: 0,
+        cachedInputTokens: 0,
+      },
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(manager.getAgent(first.id)?.lastUsage).toEqual({ sessionMetrics: {} });
+    session.pushEvent({
+      type: "timeline",
+      provider: "codex",
+      item: { type: "assistant_message", text: "a" },
+    });
+    await vi.advanceTimersByTimeAsync(1_000);
+    session.pushEvent({
+      type: "timeline",
+      provider: "codex",
+      item: { type: "assistant_message", text: "ab" },
+    });
+    session.pushEvent({
+      type: "usage_updated",
+      provider: "codex",
+      usage: { inputTokens: 50 },
+      usageSample: {
+        scope: "session",
+        id: session.id,
+        outputTokens: 20,
+        inputTokens: 100,
+        cachedInputTokens: 80,
+      },
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(manager.getAgent(first.id)?.lastUsage).toEqual({
+      inputTokens: 50,
+      sessionMetrics: { cacheHitPercentage: 80 },
+    });
+    expect(manager.getAgent(second.id)?.lastUsage).toBeUndefined();
+    const usageEvent = events.find(
+      (event) => event.type === "agent_stream" && event.event.type === "usage_updated",
+    );
+    expect(usageEvent).toBeDefined();
+    if (usageEvent?.type === "agent_stream")
+      expect(usageEvent.event).not.toHaveProperty("usageSample");
+    session.pushEvent({
+      type: "usage_updated",
+      provider: "codex",
+      usage: { contextWindowUsedTokens: 12 },
+    });
+    await vi.advanceTimersByTimeAsync(300_000);
+    expect(manager.getAgent(first.id)?.lastUsage).toEqual({
+      contextWindowUsedTokens: 12,
+      sessionMetrics: { cacheHitPercentage: 80 },
+    });
+    expect(vi.getTimerCount()).toBe(0);
+    session.pushEvent({
+      type: "usage_updated",
+      provider: "codex",
+      usage: { contextWindowUsedTokens: 12 },
+      usageSample: { scope: "session", id: session.id, inputTokens: 20, cachedInputTokens: 0 },
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(manager.getAgent(first.id)?.lastUsage).toEqual({
+      contextWindowUsedTokens: 12,
+      sessionMetrics: {},
+    });
+  } finally {
+    await Promise.all(ids.map((id) => manager.closeAgent(id)));
+    vi.useRealTimers();
+  }
+});
+
+test("session TPS expires during idle time, retains context, and stays per runtime", async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(1_000_000);
+  const client = new SessionRecordingAgentClient();
+  const manager = new AgentManager({
+    clients: { codex: client },
+    providerDefinitions: { codex: { enabled: true, derivedFromProviderId: null } },
+    logger,
+    agentStreamCoalesceWindowMs: 0,
+  });
+  const first = await manager.createAgent({ provider: "codex", cwd: process.cwd() }, undefined, {
+    workspaceId: undefined,
+  });
+  const second = await manager.createAgent({ provider: "codex", cwd: process.cwd() }, undefined, {
+    workspaceId: undefined,
+  });
+  const events: AgentManagerEvent[] = [];
+  manager.subscribe((event) => events.push(event), { replayState: false });
+  try {
+    const session = client.sessions[0];
+    session.pushEvent({
+      type: "usage_updated",
+      provider: "codex",
+      usage: { contextWindowUsedTokens: 123, outputTokens: 100 },
+      usageSample: { scope: "session", id: "cache", inputTokens: 100, cachedInputTokens: 50 },
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    session.pushEvent({
+      type: "usage_updated",
+      provider: "codex",
+      usage: {},
+      generationSample: { id: "a", outputTokens: 100, durationMs: 10_000 },
+    });
+    await vi.advanceTimersByTimeAsync(60_000);
+    session.pushEvent({
+      type: "usage_updated",
+      provider: "codex",
+      usage: {},
+      generationSample: { id: "b", outputTokens: 900, durationMs: 30_000 },
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(manager.getAgent(first.id)?.lastUsage).toEqual({
+      contextWindowUsedTokens: 123,
+      outputTokens: 100,
+      sessionMetrics: { outputTokensPerSecond5m: 25, cacheHitPercentage: 50 },
+    });
+    expect(manager.getAgent(second.id)?.lastUsage).toBeUndefined();
+    const streamed = events.filter(
+      (event) => event.type === "agent_stream" && event.event.type === "usage_updated",
+    );
+    expect(streamed).toHaveLength(3);
+    for (const event of streamed)
+      if (event.type === "agent_stream") {
+        expect(event.event).not.toHaveProperty("generationSample");
+        expect(event.event).not.toHaveProperty("usageSample");
+      }
+    await vi.advanceTimersByTimeAsync(240_000);
+    expect(manager.getAgent(first.id)?.lastUsage?.sessionMetrics).toEqual({
+      outputTokensPerSecond5m: 30,
+      cacheHitPercentage: 50,
+    });
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(manager.getAgent(first.id)?.lastUsage?.sessionMetrics).toEqual({
+      cacheHitPercentage: 50,
+    });
+    const lastState = events.findLast(
+      (event) => event.type === "agent_state" && event.agent.id === first.id,
+    );
+    expect(
+      lastState?.type === "agent_state" ? lastState.agent.lastUsage?.sessionMetrics : undefined,
+    ).toEqual({ cacheHitPercentage: 50 });
+    expect(vi.getTimerCount()).toBe(0);
+    session.pushEvent({
+      type: "usage_updated",
+      provider: "codex",
+      usage: {},
+      generationSample: { id: "c", outputTokens: 10, durationMs: 1000 },
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(vi.getTimerCount()).toBe(1);
+    await manager.reloadAgentSession(first.id);
+    expect(manager.getAgent(first.id)?.lastUsage?.sessionMetrics).toBeUndefined();
+    expect(vi.getTimerCount()).toBe(0);
+  } finally {
+    await manager.closeAgent(first.id);
+    await manager.closeAgent(second.id);
+    vi.useRealTimers();
+  }
+});
+
+test("session metrics ignore history replay and reset when the runtime is reloaded", async () => {
+  vi.useFakeTimers();
+  const client = new SessionRecordingAgentClient();
+  const manager = new AgentManager({
+    clients: { codex: client },
+    providerDefinitions: { codex: { enabled: true, derivedFromProviderId: null } },
+    logger,
+    agentStreamCoalesceWindowMs: 0,
+  });
+  const snapshot = await manager.createAgent({ provider: "codex", cwd: process.cwd() }, undefined, {
+    workspaceId: undefined,
+  });
+  try {
+    const internal = asInternals<{
+      agents: Map<string, ManagedAgent>;
+      handleStreamEvent(
+        agent: ManagedAgent,
+        event: AgentStreamEvent,
+        options?: { fromHistory?: boolean },
+      ): Promise<boolean>;
+    }>(manager);
+    const live = internal.agents.get(snapshot.id)!;
+    const sample: AgentStreamEvent = {
+      type: "usage_updated",
+      provider: "codex",
+      usage: {},
+      usageSample: {
+        scope: "turn",
+        id: "native",
+        inputTokens: 100,
+        cachedInputTokens: 80,
+        outputTokens: 20,
+      },
+    };
+    await internal.handleStreamEvent(live, sample, { fromHistory: true });
+    expect(manager.getAgent(snapshot.id)?.lastUsage?.sessionMetrics).toBeUndefined();
+    await internal.handleStreamEvent(live, {
+      type: "timeline",
+      provider: "codex",
+      item: { type: "reasoning", text: "a" },
+    });
+    await vi.advanceTimersByTimeAsync(1_000);
+    await internal.handleStreamEvent(live, {
+      type: "timeline",
+      provider: "codex",
+      item: { type: "reasoning", text: "b" },
+    });
+    await internal.handleStreamEvent(live, sample);
+    expect(manager.getAgent(snapshot.id)?.lastUsage?.sessionMetrics).toEqual({
+      cacheHitPercentage: 80,
+    });
+    expect(vi.getTimerCount()).toBe(0);
+    await manager.reloadAgentSession(snapshot.id);
+    expect(manager.getAgent(snapshot.id)?.lastUsage?.sessionMetrics).toBeUndefined();
+    expect(vi.getTimerCount()).toBe(0);
+  } finally {
+    await manager.closeAgent(snapshot.id);
+    vi.useRealTimers();
+  }
+});
+
+test("foreground stream consumers do not receive internal usage samples", async () => {
+  const client = new SessionRecordingAgentClient();
+  const manager = new AgentManager({
+    clients: { codex: client },
+    providerDefinitions: { codex: { enabled: true, derivedFromProviderId: null } },
+    logger,
+  });
+  const snapshot = await manager.createAgent({ provider: "codex", cwd: process.cwd() }, undefined, {
+    workspaceId: undefined,
+  });
+  const session = client.sessions[0];
+  vi.spyOn(session, "startTurn").mockImplementation(async () => {
+    setTimeout(
+      () =>
+        session.pushEvent({
+          type: "turn_completed",
+          provider: "codex",
+          turnId: "turn-1",
+          usage: {},
+          usageSample: { scope: "turn", id: "turn-1", inputTokens: 100, cachedInputTokens: 50 },
+          generationSample: { id: "turn-1", outputTokens: 20, durationMs: 1000 },
+        }),
+      0,
+    );
+    return { turnId: "turn-1" };
+  });
+  try {
+    const events: AgentStreamEvent[] = [];
+    for await (const event of manager.streamAgent(snapshot.id, "hello")) events.push(event);
+    expect(events.map((event) => event.type)).toEqual(["turn_started", "turn_completed"]);
+    expect(events[1]).not.toHaveProperty("usageSample");
+    expect(events[1]).not.toHaveProperty("generationSample");
+    expect(manager.getAgent(snapshot.id)?.lastUsage?.sessionMetrics).toEqual({
+      cacheHitPercentage: 50,
+      outputTokensPerSecond5m: 20,
+    });
+  } finally {
+    await manager.closeAgent(snapshot.id);
+  }
+});
 
 class HeldAgentCreationClient extends TestAgentClient {
   private readonly creationStarted = deferred<void>();

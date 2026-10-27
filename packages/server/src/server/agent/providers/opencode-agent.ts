@@ -43,6 +43,7 @@ import {
   type AgentStreamEvent,
   type AgentTimelineItem,
   type AgentUsage,
+  type AgentUsageSample,
   type FetchCatalogOptions,
   type ProviderRefreshContext,
   type ImportableProviderSession,
@@ -964,6 +965,26 @@ function hasNormalizedOpenCodeUsage(usage: AgentUsage): boolean {
     usage.contextWindowMaxTokens,
     usage.contextWindowUsedTokens,
   ].some((value) => typeof value === "number" && Number.isFinite(value));
+}
+
+function openCodeStepUsageSample(
+  part: Extract<OpenCodePart, { type: "step-finish" }>,
+): AgentUsageSample {
+  const readCount = (value: number | undefined) =>
+    typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
+  const input = readCount(part.tokens?.input);
+  const cached = readCount(part.tokens?.cache?.read);
+  const written = readCount(part.tokens?.cache?.write);
+  return {
+    scope: "request",
+    id: part.id,
+    inputTokens:
+      input !== undefined && cached !== undefined && written !== undefined
+        ? input + cached + written
+        : undefined,
+    cachedInputTokens: cached,
+    outputTokens: readCount(part.tokens?.output),
+  };
 }
 
 function getOpenCodeAttachmentExtension(mimeType: string): string {
@@ -2847,6 +2868,7 @@ function appendOpenCodeMessagePartUpdated(
         type: "usage_updated",
         provider: "opencode",
         usage: { ...state.accumulatedUsage },
+        usageSample: openCodeStepUsageSample(part),
       });
     }
   }

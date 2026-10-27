@@ -229,6 +229,14 @@ terminal `completed`, `failed`, or `canceled` event.
 At this point the provider is usable: users can select a model, open a session, send a message, and
 see the response.
 
+## Report session usage
+
+Send `session.usage` with the existing `usage` snapshot for context occupancy and cost. To enable session cache-hit measurements, supply optional `usageSample` counters. Set `scope` to `request`, `turn` or `session` and use a stable `id` for that accounting unit. Use one scope throughout a runtime session; never report both a request and a turn/session total that includes it. Repeated reports replace the previous counts for that identity; a final request or turn result can correct its earlier counts. Session counters must remain cumulative within their identity. Rotate the identity only when starting a new counter epoch with no overlapping counts. A decrease without a new identity makes the overall session percentage unavailable because the daemon cannot distinguish a reset from retained history.
+
+`inputTokens` counts every prompt token once, including cache reads and writes. `cachedInputTokens` counts cache reads only. `outputTokens` is the provider's generated token count. Omit unknown counters rather than substituting zero; include zero when measured. Keep the scope and identity even when all counters are unknown, so the daemon clears a stale percentage. These samples are internal to provider accounting and are not sent to clients as raw counters.
+
+For TPS, also supply optional `generationSample: { id, outputTokens?, durationMs?, completedAt? }` on `session.usage`. Use one stable identity per completed model response, its output count including reasoning once, and its active request duration in milliseconds. Exclude idle time and local tool execution between model calls. Native request durations may include prompt/network delay; do not send whole agent-turn elapsed time. `completedAt` is the response completion time in epoch milliseconds; omit it when only duration is known, and the daemon uses the first live receipt time. Repeated samples replace that response without refreshing its receipt age. Keep the identity and omit unknown fields so a recent unmeasured response clears stale TPS. The daemon divides summed tokens by summed durations for responses completed in the last five minutes and expires the value while idle. Generation samples are separate from cache samples and are not forwarded to clients.
+
 ## Add session-specific composer controls
 
 Add `session.configure` only when the native agent has settings users should change after opening a

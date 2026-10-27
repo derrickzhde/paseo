@@ -2082,6 +2082,9 @@ export const ptBR: TranslationResources = {
     used: "{{percentage}}% usado",
     tokens: "{{used}} / {{max}} tokens",
     sessionCost: "Custo da sessão {{cost}}",
+    outputTokensPerSecond5m: "TPS (saída ativa de 5 min) {{value}}",
+    cacheHitPercentage: "Taxa de acerto do cache (sessão) {{value}}",
+    unavailable: "Sem dados",
     accessibility: "Janela de contexto {{percentage}}% usada",
   },
   review: {
