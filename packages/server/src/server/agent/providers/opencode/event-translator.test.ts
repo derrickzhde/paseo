@@ -703,6 +703,13 @@ describe("translateOpenCodeEvent", () => {
           outputTokens: 12_000,
           totalCostUsd: 0.25,
         },
+        usageSample: {
+          scope: "request",
+          id: "step-finish-1",
+          inputTokens: 33_000,
+          cachedInputTokens: 2_000,
+          outputTokens: 12_000,
+        },
       },
     ]);
     expect(state.accumulatedUsage).toEqual({
@@ -754,6 +761,13 @@ describe("translateOpenCodeEvent", () => {
         usage: expect.objectContaining({
           totalCostUsd: 0.75,
         }),
+        usageSample: {
+          scope: "request",
+          id: "step-finish-1",
+          inputTokens: 33_000,
+          cachedInputTokens: 2_000,
+          outputTokens: 12_000,
+        },
       },
     ]);
     expect(state.sessionTotalCostUsd).toBe(0.75);
