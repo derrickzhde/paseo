@@ -33,7 +33,11 @@ describe("session output metrics compatibility", () => {
       provider: "codex",
       usage: {
         outputTokens: 100,
-        sessionMetrics: { outputTokensPerSecond5m: 25, cacheHitPercentage: 80 },
+        sessionMetrics: {
+          outputTokensPerSecond5m: 25,
+          outputTokensPerSecond5mEstimated: true,
+          cacheHitPercentage: 80,
+        },
       },
     };
     expect(AgentStreamEventPayloadSchema.parse(event)).toEqual(event);

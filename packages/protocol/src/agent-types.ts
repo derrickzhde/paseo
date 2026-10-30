@@ -191,6 +191,8 @@ export interface AgentRunOptions {
 
 export interface AgentSessionMetrics {
   outputTokensPerSecond5m?: number;
+  /** At least one response uses a timestamp-based duration estimate. */
+  outputTokensPerSecond5mEstimated?: boolean;
   cacheHitPercentage?: number;
 }
 

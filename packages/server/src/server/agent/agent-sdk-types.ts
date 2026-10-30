@@ -216,6 +216,8 @@ export interface SteerActiveTurnOptions extends AgentSteerOptions {
 
 export interface AgentSessionMetrics {
   outputTokensPerSecond5m?: number;
+  /** At least one response uses a timestamp-based duration estimate. */
+  outputTokensPerSecond5mEstimated?: boolean;
   cacheHitPercentage?: number;
 }
 
@@ -249,6 +251,7 @@ export interface AgentGenerationSample {
   durationMs?: number;
   /** Completion epoch milliseconds; omitted when the provider only reports duration. */
   completedAt?: number;
+  estimated?: boolean;
 }
 
 export const TOOL_CALL_ICON_NAMES = [
@@ -658,6 +661,9 @@ export interface AgentSessionConfig {
 }
 
 export interface AgentLaunchContext {
+  /** Launch-only plugin MCP servers and their owners; never persisted. */
+  mcpServers?: Record<string, McpServerConfig>;
+  mcpServerOwners?: Record<string, string>;
   agentId?: string;
   env?: Record<string, string>;
   /**
@@ -736,6 +742,10 @@ export interface AgentSession {
    * still uncertain.
    */
   interrupt(): Promise<void>;
+  /** True only when releasing this runtime loses no background work or pending replies.
+   * An optional additional veto: missing methods use daemon baseline eligibility;
+   * implemented checks that reject or return false keep the runtime resident. */
+  canStopRuntime?(): Promise<boolean>;
   /** Release live runtime resources without archiving or deleting the durable native session. */
   close(): Promise<void>;
   listCommands?(): Promise<AgentSlashCommand[]>;

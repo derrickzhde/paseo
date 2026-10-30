@@ -1,6 +1,10 @@
 import { describe, expect, test } from "vitest";
 
-import { buildGenerationSample, type GenerationSampleSource } from "./generation-sample.js";
+import {
+  buildGenerationSample,
+  EstimatedGenerationTimer,
+  type GenerationSampleSource,
+} from "./generation-sample.js";
 
 function source(overrides: Partial<GenerationSampleSource> = {}): GenerationSampleSource {
   return {
@@ -12,6 +16,98 @@ function source(overrides: Partial<GenerationSampleSource> = {}): GenerationSamp
 }
 
 describe("generation samples", () => {
+  test("estimates request throughput from the preceding boundary, including first-output wait", () => {
+    let now = 1000;
+    const timer = new EstimatedGenerationTimer(() => now);
+    timer.startTurn();
+    now = 5000;
+    timer.output();
+    now = 13_000;
+    expect(timer.finish("request", 600)).toEqual({
+      id: "request",
+      outputTokens: 600,
+      durationMs: 12_000,
+      completedAt: 13_000,
+      estimated: true,
+    });
+    expect(timer.finish("request", 600)).toBeUndefined();
+  });
+
+  test("excludes tool settlement when usage arrives after tools and starts again after tool results", () => {
+    let now = 1000;
+    const timer = new EstimatedGenerationTimer(() => now);
+    timer.startTurn();
+    now = 11_000;
+    timer.output();
+    now = 91_000;
+    timer.boundary();
+    expect(timer.finish("before-tool", 500)).toEqual({
+      id: "before-tool",
+      outputTokens: 500,
+      durationMs: 10_000,
+      completedAt: 11_000,
+      estimated: true,
+    });
+    now = 101_000;
+    timer.output();
+    now = 111_000;
+    expect(timer.finish("after-tool", 400)).toEqual({
+      id: "after-tool",
+      outputTokens: 400,
+      durationMs: 20_000,
+      completedAt: 111_000,
+      estimated: true,
+    });
+  });
+
+  test("drops an unfinished request on a new turn rather than counting idle time", () => {
+    let now = 1000;
+    const timer = new EstimatedGenerationTimer(() => now);
+    timer.startTurn();
+    timer.output();
+    now = 100_000;
+    timer.reset();
+    timer.output();
+    expect(timer.finish("idle", 1000)).toBeUndefined();
+    timer.startTurn();
+    now = 105_000;
+    timer.output();
+    expect(timer.finish("fresh", 500)?.durationMs).toBe(5000);
+  });
+
+  test.each([
+    { tokens: 200, duration: 1000 },
+    { tokens: 300, duration: 3_600_000 },
+  ])("accepts eligible estimate boundaries (%j)", ({ tokens, duration }) => {
+    let now = 1000;
+    const timer = new EstimatedGenerationTimer(() => now);
+    timer.startTurn();
+    now += duration;
+    timer.output();
+    expect(timer.finish("eligible", tokens)).toEqual({
+      id: "eligible",
+      outputTokens: tokens,
+      durationMs: duration,
+      completedAt: now,
+      estimated: true,
+    });
+  });
+
+  test.each([
+    { tokens: 199, duration: 10_000 },
+    { tokens: 200, duration: 999 },
+    { tokens: Number.NaN, duration: 10_000 },
+    { tokens: 300, duration: -1000 },
+    { tokens: 300, duration: 3_600_001 },
+  ])("keeps an unreliable estimate unavailable (%j)", ({ tokens, duration }) => {
+    let now = 10_000;
+    const timer = new EstimatedGenerationTimer(() => now);
+    timer.startTurn();
+    now += duration;
+    timer.output();
+    expect(timer.finish("unreliable", tokens)).toBeUndefined();
+  });
+
   test("builds one generation sample from output tokens and duration", () => {
     expect(
       buildGenerationSample(

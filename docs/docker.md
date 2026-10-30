@@ -205,8 +205,8 @@ docker build \
   .
 ```
 
-The Docker workflow builds the image on pull requests and on `main` as a
-non-publishing check. Stable `vX.Y.Z` tag pushes publish
+The Docker workflow builds the image on pushes to `main` and on manual dispatch
+without publishing. Stable `vX.Y.Z` tag pushes publish
 `ghcr.io/derrickzhde/paseo:X.Y.Z` and `ghcr.io/derrickzhde/paseo:latest`. Beta tags
 publish only the exact prerelease tag, such as
 `ghcr.io/derrickzhde/paseo:0.1.102-beta.1`, and do not update `latest`.

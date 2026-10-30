@@ -41,6 +41,12 @@ it("updates live values and expiry in the same open details view", async () => {
   renderDetails({ outputTokensPerSecond5m: 26.7, cacheHitPercentage: 80 });
   expect(container.textContent).toContain("TPS (5m active) 26.7");
   expect(container.textContent).toContain("Cache hit (session) 80%");
+  renderDetails({
+    outputTokensPerSecond5m: 50,
+    outputTokensPerSecond5mEstimated: true,
+    cacheHitPercentage: 80,
+  });
+  expect(container.textContent).toContain("TPS (5m active) ≈ 50");
   await page.screenshot({ element: container });
   renderDetails({ cacheHitPercentage: 80 });
   expect(container.textContent).toContain("TPS (5m active) Unavailable");

@@ -1,0 +1,8 @@
+Integrate upstream 0.14.0 while retaining this fork's customizations.
+
+Improved
+- Show estimated five-minute active TPS for Claude and Codex with an ≈ marker, alongside session cache-hit percentage. Providers with response durations keep their measured TPS.
+- Upload stable and beta iOS builds to TestFlight through EAS without App Store review or external-group distribution.
+- Keep the fork CLI archive in GitHub releases for remote-host upgrades.
+
+Full notes: https://paseo.sh/changelog

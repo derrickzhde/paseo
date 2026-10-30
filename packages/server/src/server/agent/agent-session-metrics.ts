@@ -35,25 +35,8 @@ export class AgentSessionMetricsLedger {
   }
 
   snapshot(): AgentSessionMetrics {
-    const metrics: AgentSessionMetrics = {};
     this.pruneGenerations();
-    let output = 0;
-    let duration = 0;
-    let known = this.generations.size > 0;
-    for (const sample of this.generations.values()) {
-      const tokens = counter(sample.outputTokens);
-      const elapsed = counter(sample.durationMs);
-      if (tokens === undefined || elapsed === undefined || elapsed <= 0) {
-        known = false;
-        break;
-      }
-      output += tokens;
-      duration += elapsed;
-    }
-    if (known && Number.isFinite(output) && Number.isFinite(duration) && duration > 0) {
-      const rate = output / (duration / 1000);
-      if (Number.isFinite(rate)) metrics.outputTokensPerSecond5m = rate;
-    }
+    const metrics = this.generationMetrics();
     let input = 0;
     let cached = 0;
     for (const state of this.counters.values()) {
@@ -70,6 +53,33 @@ export class AgentSessionMetricsLedger {
     }
     if (input > 0 && Number.isFinite(input) && Number.isFinite(cached)) {
       metrics.cacheHitPercentage = (cached / input) * 100;
+    }
+    return metrics;
+  }
+
+  private generationMetrics(): AgentSessionMetrics {
+    const metrics: AgentSessionMetrics = {};
+    let output = 0;
+    let duration = 0;
+    let estimated = false;
+    let known = this.generations.size > 0;
+    for (const sample of this.generations.values()) {
+      const tokens = counter(sample.outputTokens);
+      const elapsed = counter(sample.durationMs);
+      if (tokens === undefined || elapsed === undefined || elapsed <= 0) {
+        known = false;
+        break;
+      }
+      output += tokens;
+      duration += elapsed;
+      estimated ||= sample.estimated === true;
+    }
+    if (known && Number.isFinite(output) && Number.isFinite(duration) && duration > 0) {
+      const rate = output / (duration / 1000);
+      if (Number.isFinite(rate)) {
+        metrics.outputTokensPerSecond5m = rate;
+        if (estimated) metrics.outputTokensPerSecond5mEstimated = true;
+      }
     }
     return metrics;
   }

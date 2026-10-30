@@ -22,8 +22,9 @@ const patchedPackages = [
     patchPrefix: "react-native-enriched-markdown+",
     cwd: "packages/app",
   },
-  // Remove after react-native-unistyles ships
+  // Registry cleanup: remove after react-native-unistyles ships
   // https://github.com/jpudysz/react-native-unistyles/pull/1203.
+  // withUnistyles: also keep the uniProps filter until upstream consumes its control prop.
   {
     nodeModulesPath: "node_modules/react-native-unistyles",
     patchPrefix: "react-native-unistyles+",

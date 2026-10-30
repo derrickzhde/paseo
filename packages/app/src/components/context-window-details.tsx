@@ -42,6 +42,13 @@ export function ContextWindowDetails({
   const { t, i18n } = useTranslation();
   const locale = i18n.resolvedLanguage;
   const unavailable = t("contextWindow.unavailable");
+  const outputRate = formatSessionOutputTokensPerSecond(
+    sessionMetrics?.outputTokensPerSecond5m,
+    locale,
+  );
+  let outputRateValue = outputRate ?? unavailable;
+  if (outputRate !== null && sessionMetrics?.outputTokensPerSecond5mEstimated)
+    outputRateValue = `≈ ${outputRate}`;
   return (
     <>
       <View style={styles.summary}>
@@ -68,11 +75,7 @@ export function ContextWindowDetails({
           <>
             <Text style={styles.detail}>
               {t("contextWindow.outputTokensPerSecond5m", {
-                value:
-                  formatSessionOutputTokensPerSecond(
-                    sessionMetrics.outputTokensPerSecond5m,
-                    locale,
-                  ) ?? unavailable,
+                value: outputRateValue,
               })}
             </Text>
             <Text style={styles.detail}>

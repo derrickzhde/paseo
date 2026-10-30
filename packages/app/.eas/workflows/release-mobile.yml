@@ -26,13 +26,10 @@ jobs:
   distribute_ios:
     name: Distribute iOS to TestFlight
     needs: [build_ios]
-    type: testflight
+    type: submit
     params:
       build_id: ${{ needs.build_ios.outputs.build_id }}
       profile: production
-      external_groups:
-        - Paseo Beta
-      submit_beta_review: true
 
   submit_android:
     name: Submit Android
@@ -42,17 +39,16 @@ jobs:
       build_id: ${{ needs.build_android.outputs.build_id }}
       profile: production
 
-  submit_ios_for_review:
-    name: Submit iOS for App Store review
-    needs: [build_ios, distribute_ios]
+  upload_android_screenshots:
+    name: Upload Google Play screenshots
+    needs: [build_android, submit_android]
     environment: production
     runs_on: macos-medium
     steps:
       - uses: eas/checkout
       - name: Install fastlane
         run: bundle install
-      - name: Submit for review
+      - name: Upload screenshots
         run: |
-          export APP_VERSION="${{ needs.build_ios.outputs.app_version }}"
-          export APP_BUILD_VERSION="${{ needs.build_ios.outputs.app_build_version }}"
-          bundle exec fastlane ios submit_review
+          export ANDROID_VERSION_CODE="${{ needs.build_android.outputs.app_build_version }}"
+          bundle exec fastlane android upload_screenshots

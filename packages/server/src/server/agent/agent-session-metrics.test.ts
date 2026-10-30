@@ -24,6 +24,51 @@ function generation(sample: AgentGenerationSample): AgentStreamEvent {
 }
 
 describe("current-session metrics", () => {
+  it("removes the estimate marker when only native-timed responses remain", () => {
+    let now = 1000;
+    const ledger = new AgentSessionMetricsLedger(() => now);
+    ledger.observe(
+      generation({ id: "estimated", outputTokens: 200, durationMs: 10_000, estimated: true }),
+    );
+    now = 2000;
+    ledger.observe(generation({ id: "native", outputTokens: 400, durationMs: 20_000 }));
+    expect(ledger.snapshot()).toEqual({
+      outputTokensPerSecond5m: 20,
+      outputTokensPerSecond5mEstimated: true,
+    });
+    now = 301_000;
+    expect(ledger.snapshot()).toEqual({ outputTokensPerSecond5m: 20 });
+  });
+
+  it("weights estimated requests by their durations and expires the estimate marker", () => {
+    let now = 300_000;
+    const ledger = new AgentSessionMetricsLedger(() => now);
+    ledger.observe(
+      generation({
+        id: "estimate-a",
+        outputTokens: 200,
+        durationMs: 10_000,
+        completedAt: 100_000,
+        estimated: true,
+      }),
+    );
+    ledger.observe(
+      generation({
+        id: "estimate-b",
+        outputTokens: 800,
+        durationMs: 30_000,
+        completedAt: 299_000,
+        estimated: true,
+      }),
+    );
+    expect(ledger.snapshot()).toEqual({
+      outputTokensPerSecond5m: 25,
+      outputTokensPerSecond5mEstimated: true,
+    });
+    now = 599_000;
+    expect(ledger.snapshot()).toEqual({});
+  });
+
   it("expires whole completed responses and preserves the cache percentage while idle", () => {
     let now = 300_000;
     const ledger = new AgentSessionMetricsLedger(() => now);

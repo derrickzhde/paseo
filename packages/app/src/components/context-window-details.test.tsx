@@ -29,6 +29,7 @@ function renderDetails(
   sessionMetrics?:
     | {
         outputTokensPerSecond5m?: number;
+        outputTokensPerSecond5mEstimated?: boolean;
         cacheHitPercentage?: number;
       }
     | "omit",
@@ -68,6 +69,17 @@ describe("context window session metrics", () => {
     expect(screen.getByText("TPS (5m active) 0")).toBeTruthy();
     expect(screen.getByText("Cache hit (session) 0%")).toBeTruthy();
     expect(screen.queryByText(/Unavailable/)).toBeNull();
+  });
+
+  it("marks a timestamp estimate and removes the marker when the value expires", () => {
+    const view = renderDetails({
+      outputTokensPerSecond5m: 50,
+      outputTokensPerSecond5mEstimated: true,
+    });
+    expect(screen.getByText("TPS (5m active) ≈ 50")).toBeTruthy();
+    view.unmount();
+    renderDetails({ outputTokensPerSecond5mEstimated: true });
+    expect(screen.getByText("TPS (5m active) Unavailable")).toBeTruthy();
   });
 
   it("shows the translated unavailable label when a supported host has no sample yet", () => {

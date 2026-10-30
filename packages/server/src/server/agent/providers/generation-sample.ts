@@ -60,3 +60,66 @@ export function buildGenerationSample(source: GenerationSampleSource): AgentGene
   }
   return sample;
 }
+
+/**
+ * CC Switch's session-log estimate: request output / elapsed request time,
+ * including first-output wait. Freeze the input/tool boundary on first output;
+ * delayed usage after a tool result ends at the preceding model output.
+ * Source: farion1231/cc-switch@ee8ee25, services/session_usage_codex.rs RequestTimer
+ * and components/usage/format.ts isSpeedEstimateEligible (200 tokens, 1 second).
+ */
+export class EstimatedGenerationTimer {
+  private boundaryAt: number | undefined;
+  private startedAt: number | undefined;
+  private lastOutputAt: number | undefined;
+  private toolResultAfterOutput = false;
+
+  constructor(private readonly now: () => number = Date.now) {}
+
+  startTurn(): void {
+    this.reset();
+    this.boundaryAt = this.now();
+  }
+
+  reset(): void {
+    this.boundaryAt = undefined;
+    this.startedAt = undefined;
+    this.lastOutputAt = undefined;
+    this.toolResultAfterOutput = false;
+  }
+
+  boundary(): void {
+    if (this.boundaryAt === undefined) return;
+    this.boundaryAt = this.now();
+    if (this.lastOutputAt !== undefined) this.toolResultAfterOutput = true;
+  }
+
+  output(): void {
+    if (this.boundaryAt === undefined) return;
+    this.startedAt ??= this.boundaryAt;
+    this.lastOutputAt = this.now();
+    this.toolResultAfterOutput = false;
+  }
+
+  finish(id: string, outputTokens: number | undefined): AgentGenerationSample | undefined {
+    const startedAt = this.startedAt;
+    const completedAt = this.toolResultAfterOutput ? this.lastOutputAt : this.now();
+    const hasOutput = this.lastOutputAt !== undefined;
+    this.startedAt = undefined;
+    this.lastOutputAt = undefined;
+    this.toolResultAfterOutput = false;
+    if (this.boundaryAt !== undefined) this.boundaryAt = this.now();
+    if (startedAt === undefined || completedAt === undefined || !hasOutput) return undefined;
+    const durationMs = completedAt - startedAt;
+    if (
+      outputTokens === undefined ||
+      !Number.isFinite(outputTokens) ||
+      outputTokens < 200 ||
+      !Number.isFinite(durationMs) ||
+      durationMs < 1000 ||
+      durationMs > 3_600_000
+    )
+      return undefined;
+    return { id, outputTokens, durationMs, completedAt, estimated: true };
+  }
+}
