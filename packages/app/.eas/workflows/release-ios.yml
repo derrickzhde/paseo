@@ -1,0 +1,25 @@
+name: Release iOS
+
+on:
+  push:
+    tags:
+      - "v*"
+      - "!v*-rc.*"
+      - "!v*-beta.*"
+  workflow_dispatch: {}
+
+jobs:
+  build_ios:
+    name: Build iOS
+    type: build
+    params:
+      platform: ios
+      profile: production
+
+  distribute_ios:
+    name: Distribute iOS to TestFlight
+    needs: [build_ios]
+    type: submit
+    params:
+      build_id: ${{ needs.build_ios.outputs.build_id }}
+      profile: production

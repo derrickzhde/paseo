@@ -78,7 +78,7 @@ Mobile identity is `com.halocloudnet.paseo` with `.debug` for development. Prese
 
 ## iOS releases to TestFlight
 
-Use the existing EAS Workflows in `packages/app/.eas/workflows/`. Stable `v*` tags, excluding beta and release-candidate tags, run `release-mobile.yml`; `v*-beta.*` tags run `release-ios-beta.yml`. Both iOS paths build the `production` profile and upload through a plain EAS `submit` job using the `production` submission profile. They finish at TestFlight, without external-group distribution, Beta App Review or public App Store review. The stable workflow retains its Android jobs.
+Use the existing EAS Workflows in `packages/app/.eas/workflows/`. Stable `v*` tags, excluding beta and release-candidate tags, run the iOS-only `release-ios.yml`; `v*-beta.*` tags run `release-ios-beta.yml`. Both iOS paths build the `production` profile and upload through a plain EAS `submit` job using the `production` submission profile. They finish at TestFlight, without external-group distribution, Beta App Review or public App Store review. Keep iOS separate from `release-mobile.yml` so an Android startup failure cannot prevent TestFlight submission; that workflow retains its Android jobs.
 
 Connect `derrickzhde/paseo` to the existing fork Expo project through Expo's GitHub app, with **Base directory** set to `packages/app`. Keep iOS signing managed by EAS. This path needs no GitHub `EXPO_TOKEN` secret.
 
