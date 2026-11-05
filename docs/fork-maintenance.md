@@ -18,12 +18,12 @@ Follow the active agent/session instructions and the task principal's authorizat
 
 ## Starting point
 
-Fork **v0.15.2** incorporates upstream **v0.15.1**:
+Fork **v0.15.3** incorporates upstream **v0.15.1**. Upstream created its `v0.15.2` tag during candidate verification, so the fork uses the next unused version. The integrated source remains pinned to v0.15.1:
 
 | Reference        | Commit                                        |
 | ---------------- | --------------------------------------------- |
 | Upstream v0.15.1 | `c4dc36272cda1bb07a8c11b7beee41f247ee7952`    |
-| Fork v0.15.2     | Resolve the published `v0.15.2` tag with Git. |
+| Fork v0.15.3     | Resolve the published `v0.15.3` tag with Git. |
 
 The integrated fork lives on `main`; `origin` points to `derrickzhde/paseo`. Older history mentions an upstream-mirror `main` and a rebased `mine` branch. Derive the next integration from the actual current refs; do not restore that older arrangement or rewrite published history.
 
@@ -174,7 +174,7 @@ Use GitHub Actions for the fork release. **Do not run upstream `release:patch`, 
 Watch runs to completion rather than stopping at a successful push. A draft is not a published release. If tag lookup does not find an in-progress draft, use the existing helper, which understands GitHub's `untagged-*` draft URLs:
 
 ```bash
-node scripts/github-release.mjs --repo derrickzhde/paseo --tag v0.15.2
+node scripts/github-release.mjs --repo derrickzhde/paseo --tag v0.15.3
 ```
 
 Substitute the new tag. Let the desktop finalizer assemble and validate the platform manifests before publishing; do not manually expose an incomplete draft. Diagnose signing/notarization failures from the actual error and resume the failed jobs when resolved. Publishing does not authorize updating installed apps or restarting their daemons.

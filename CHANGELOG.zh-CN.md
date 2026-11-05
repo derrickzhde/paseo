@@ -1,6 +1,6 @@
 # 更新日志
 
-## 0.15.2 - 2026-11-05
+## 0.15.3 - 2026-11-05
 
 集成[上游 0.15.1](https://github.com/getpaseo/paseo/releases/tag/v0.15.1)，保留并适配本 fork 的定制。
 
