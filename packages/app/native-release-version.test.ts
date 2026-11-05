@@ -7,6 +7,14 @@ const {
 } = require("./native-release-version");
 
 describe("native release version", () => {
+  it("preserves the fork's submitted 0.11.3 rebuild number", () => {
+    expect(getNativeReleaseVersion("0.11.3")).toEqual({
+      appVersion: "0.11.3",
+      androidVersionCode: 11003,
+      iosBuildNumber: "11004000",
+    });
+  });
+
   it("reserves the final iOS build slot for a stable release", () => {
     expect(getNativeReleaseVersion("0.2.6")).toEqual({
       appVersion: "0.2.6",
