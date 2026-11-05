@@ -24,6 +24,64 @@ function generation(sample: AgentGenerationSample): AgentStreamEvent {
 }
 
 describe("current-session metrics", () => {
+  it("retains the last active window while idle and computes a fresh window on new output", () => {
+    let now = 300_000;
+    const ledger = new AgentSessionMetricsLedger(() => now);
+    ledger.observe(usage({ inputTokens: 100, cachedInputTokens: 50 }));
+    ledger.observe(
+      generation({ id: "a", outputTokens: 100, durationMs: 10_000, completedAt: 100_000 }),
+    );
+    ledger.observe(
+      generation({
+        id: "b",
+        outputTokens: 900,
+        durationMs: 30_000,
+        completedAt: 299_000,
+        estimated: true,
+      }),
+    );
+    expect(ledger.snapshot()).toEqual({
+      outputTokensPerSecond5m: 25,
+      outputTokensPerSecond5mEstimated: true,
+      cacheHitPercentage: 50,
+    });
+    now = 400_000;
+    expect(ledger.snapshot()).toEqual({
+      outputTokensPerSecond5m: 30,
+      outputTokensPerSecond5mEstimated: true,
+      cacheHitPercentage: 50,
+    });
+    now = 10_000_000;
+    ledger.observe(usage({ inputTokens: 400 }));
+    expect(ledger.snapshot()).toEqual({
+      outputTokensPerSecond5m: 30,
+      outputTokensPerSecond5mEstimated: true,
+    });
+    ledger.observe(usage({ inputTokens: 400, cachedInputTokens: 100 }));
+    expect(ledger.snapshot()).toEqual({
+      outputTokensPerSecond5m: 30,
+      outputTokensPerSecond5mEstimated: true,
+      cacheHitPercentage: 25,
+    });
+    expect(ledger.nextExpirationAt()).toBeUndefined();
+    ledger.observe(generation({ id: "c", outputTokens: 200, durationMs: 2000 }));
+    expect(ledger.snapshot()).toEqual({ outputTokensPerSecond5m: 100, cacheHitPercentage: 25 });
+  });
+
+  it("keeps new responses with unknown timing unavailable despite a retained rate", () => {
+    let now = 1000;
+    const ledger = new AgentSessionMetricsLedger(() => now);
+    expect(ledger.snapshot()).toEqual({});
+    ledger.observe(generation({ id: "known", outputTokens: 10, durationMs: 1000 }));
+    expect(ledger.snapshot()).toEqual({ outputTokensPerSecond5m: 10 });
+    now = 301_000;
+    expect(ledger.snapshot()).toEqual({ outputTokensPerSecond5m: 10 });
+    ledger.observe(generation({ id: "unknown", outputTokens: 20 }));
+    expect(ledger.snapshot()).toEqual({});
+    now = 601_000;
+    expect(ledger.snapshot()).toEqual({ outputTokensPerSecond5m: 10 });
+  });
+
   it("removes the estimate marker when only native-timed responses remain", () => {
     let now = 1000;
     const ledger = new AgentSessionMetricsLedger(() => now);
@@ -40,7 +98,7 @@ describe("current-session metrics", () => {
     expect(ledger.snapshot()).toEqual({ outputTokensPerSecond5m: 20 });
   });
 
-  it("weights estimated requests by their durations and expires the estimate marker", () => {
+  it("weights estimated requests by their durations and retains the marker while idle", () => {
     let now = 300_000;
     const ledger = new AgentSessionMetricsLedger(() => now);
     ledger.observe(
@@ -66,7 +124,10 @@ describe("current-session metrics", () => {
       outputTokensPerSecond5mEstimated: true,
     });
     now = 599_000;
-    expect(ledger.snapshot()).toEqual({});
+    expect(ledger.snapshot()).toEqual({
+      outputTokensPerSecond5m: 25,
+      outputTokensPerSecond5mEstimated: true,
+    });
   });
 
   it("expires whole completed responses and preserves the cache percentage while idle", () => {
@@ -84,7 +145,7 @@ describe("current-session metrics", () => {
     expect(ledger.snapshot()).toEqual({ outputTokensPerSecond5m: 30, cacheHitPercentage: 50 });
     expect(ledger.nextExpirationAt()).toBe(599_000);
     now = 599_000;
-    expect(ledger.snapshot()).toEqual({ cacheHitPercentage: 50 });
+    expect(ledger.snapshot()).toEqual({ outputTokensPerSecond5m: 30, cacheHitPercentage: 50 });
     expect(ledger.nextExpirationAt()).toBeUndefined();
   });
 
@@ -108,11 +169,12 @@ describe("current-session metrics", () => {
     const ledger = new AgentSessionMetricsLedger(() => now);
     const response = generation({ id: "replayed", outputTokens: 10, durationMs: 1000 });
     ledger.observe(response);
+    expect(ledger.snapshot()).toEqual({ outputTokensPerSecond5m: 10 });
     now = 301_000;
-    expect(ledger.snapshot()).toEqual({});
+    expect(ledger.snapshot()).toEqual({ outputTokensPerSecond5m: 10 });
     now = 302_000;
     ledger.observe(response);
-    expect(ledger.snapshot()).toEqual({});
+    expect(ledger.snapshot()).toEqual({ outputTokensPerSecond5m: 10 });
     expect(ledger.nextExpirationAt()).toBeUndefined();
   });
 
@@ -132,10 +194,10 @@ describe("current-session metrics", () => {
     ledger.observe(response);
     expect(ledger.nextExpirationAt()).toBe(301_000);
     now = 301_000;
-    expect(ledger.snapshot()).toEqual({});
+    expect(ledger.snapshot()).toEqual({ outputTokensPerSecond5m: 10 });
     now = 302_000;
     ledger.observe(response);
-    expect(ledger.snapshot()).toEqual({});
+    expect(ledger.snapshot()).toEqual({ outputTokensPerSecond5m: 10 });
     expect(ledger.nextExpirationAt()).toBeUndefined();
   });
 
@@ -172,9 +234,12 @@ describe("current-session metrics", () => {
   });
 
   it("keeps a measured zero distinct from unavailable and does not depend on valid cache counters", () => {
-    const ledger = new AgentSessionMetricsLedger(() => 1000);
+    let now = 1000;
+    const ledger = new AgentSessionMetricsLedger(() => now);
     ledger.observe(usage({ inputTokens: 10, cachedInputTokens: 20 }));
     ledger.observe(generation({ id: "zero", outputTokens: 0, durationMs: 1000 }));
+    expect(ledger.snapshot()).toEqual({ outputTokensPerSecond5m: 0 });
+    now = 301_000;
     expect(ledger.snapshot()).toEqual({ outputTokensPerSecond5m: 0 });
   });
 

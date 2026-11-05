@@ -24,6 +24,7 @@ export class AgentSessionMetricsLedger {
   // Retain only completion ages after window eviction so a replay cannot look
   // like new output. This identity history is discarded with the runtime session.
   private readonly generationCompletions = new Map<string, number>();
+  private lastGenerationMetrics: AgentSessionMetrics = {};
 
   constructor(private readonly now: () => number = Date.now) {}
 
@@ -37,6 +38,12 @@ export class AgentSessionMetricsLedger {
   snapshot(): AgentSessionMetrics {
     this.pruneGenerations();
     const metrics = this.generationMetrics();
+    if (metrics.outputTokensPerSecond5m !== undefined) {
+      this.lastGenerationMetrics = { ...metrics };
+    } else if (this.generations.size === 0) {
+      // Keep the last active rate without adding expired responses to a later window.
+      Object.assign(metrics, this.lastGenerationMetrics);
+    }
     let input = 0;
     let cached = 0;
     for (const state of this.counters.values()) {

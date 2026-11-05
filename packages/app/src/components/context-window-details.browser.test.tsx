@@ -33,7 +33,7 @@ function renderDetails(metrics?: AgentSessionMetrics) {
   );
 }
 
-it("updates live values and expiry in the same open details view", async () => {
+it("updates live values and missing samples in the same open details view", async () => {
   container = document.createElement("div");
   container.style.cssText = "width:320px;padding:20px;background:white;box-sizing:border-box";
   document.body.appendChild(container);

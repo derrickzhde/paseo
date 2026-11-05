@@ -213,7 +213,7 @@ emit({ type: "session.turn", sessionId, turnId, state: "completed" });
 
 `inputTokens` 对每个提示词 token 只计一次，包括缓存读取和写入。`cachedInputTokens` 只统计缓存读取。`outputTokens` 是 Provider 生成的 token 数。未知计数请省略，不要用零代替；确实测得为零时应上报零。即使所有计数都未知，也保留范围和标识，让 daemon 清除过期的命中率。这些样本只用于 Provider 内部计量，不会作为原始计数发送给客户端。
 
-要提供 TPS，还需在 `session.usage` 中提供可选的 `generationSample: { id, outputTokens?, durationMs?, completedAt? }`。为每个已完成的模型响应使用一个稳定标识，上报输出总数和以毫秒为单位的活动请求耗时。输出总数应包含推理 token，且不能重复计数。排除模型调用之间的空闲时间和本地工具执行时间。原生请求耗时可能包含提示词处理和网络延迟；不要发送整个 Agent 轮次的总耗时。`completedAt` 是以 Unix 毫秒时间戳表示的响应完成时间；若只知道耗时，请省略它，daemon 会使用第一次实时接收样本的时间。同一响应的重复样本会替换其数据，但不会刷新接收时间。保留标识并省略未知字段，让最近未测得的响应清除过期 TPS。daemon 对最近五分钟内完成的响应求输出 token 总数与耗时总数之比，并在空闲时使过期数值失效。生成样本与缓存样本分开，也不会转发给客户端。
+要提供 TPS，还需在 `session.usage` 中提供可选的 `generationSample: { id, outputTokens?, durationMs?, completedAt? }`。为每个已完成的模型响应使用一个稳定标识，上报输出总数和以毫秒为单位的活动请求耗时。输出总数应包含推理 token，且不能重复计数。排除模型调用之间的空闲时间和本地工具执行时间。原生请求耗时可能包含提示词处理和网络延迟；不要发送整个 Agent 轮次的总耗时。`completedAt` 是以 Unix 毫秒时间戳表示的响应完成时间；若只知道耗时，请省略它，daemon 会使用第一次实时接收样本的时间。同一响应的重复样本会替换其数据，但不会刷新接收时间。保留标识并省略未知字段，让最近未测得的响应清除过期 TPS。daemon 对最近五分钟内完成的响应求输出 token 总数与耗时总数之比；空闲时的显示行为遵循[会话指标约定](https://github.com/derrickzhde/paseo/blob/main/docs/agent-stream-performance.md#session-metrics-in-the-context-details)。生成样本与缓存样本分开，也不会转发给客户端。
 
 ## 添加会话专属的 Composer 控件 {#add-session-specific-composer-controls}
 

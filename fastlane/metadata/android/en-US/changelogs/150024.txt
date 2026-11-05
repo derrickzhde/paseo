@@ -3,8 +3,6 @@ Integrate upstream 0.15.1 while retaining this fork's customizations.
 Improved
 - Keep session TPS and cache-hit metrics, math rendering and copying, phone clock preferences, model controls, and fork GitHub release upgrades on the new upstream code.
 - Preserve separate stable and beta iOS TestFlight workflows, independent of Android, and the CLI release archive.
-
-Fixed
-- Combine upstream's pending-turn steering fix with autonomous Codex /goal follow-ups.
+- Keep the last active five-minute TPS value visible while a session is idle.
 
 Full notes: https://paseo.sh/changelog

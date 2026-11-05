@@ -8,6 +8,7 @@ Integrate [upstream 0.15.1](https://github.com/getpaseo/paseo/releases/tag/v0.15
 
 - Keep session TPS and cache-hit metrics, math rendering and copying, phone clock preferences, model controls, and fork GitHub release upgrades on the new upstream code.
 - Preserve separate stable and beta iOS TestFlight workflows, independent of Android, and the CLI release archive.
+- Keep the last active five-minute TPS value visible while a session is idle.
 
 ### Fixed
 

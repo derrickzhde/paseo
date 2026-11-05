@@ -371,7 +371,7 @@ test("session metrics stay per agent, require generation timing, and never expos
   }
 });
 
-test("session TPS expires during idle time, retains context, and stays per runtime", async () => {
+test("session TPS retains the last active window while idle and stays per runtime", async () => {
   vi.useFakeTimers();
   vi.setSystemTime(1_000_000);
   const client = new SessionRecordingAgentClient();
@@ -439,6 +439,8 @@ test("session TPS expires during idle time, retains context, and stays per runti
     });
     await vi.advanceTimersByTimeAsync(60_000);
     expect(manager.getAgent(first.id)?.lastUsage?.sessionMetrics).toEqual({
+      outputTokensPerSecond5m: 30,
+      outputTokensPerSecond5mEstimated: true,
       cacheHitPercentage: 50,
     });
     const lastState = events.findLast(
@@ -446,7 +448,11 @@ test("session TPS expires during idle time, retains context, and stays per runti
     );
     expect(
       lastState?.type === "agent_state" ? lastState.agent.lastUsage?.sessionMetrics : undefined,
-    ).toEqual({ cacheHitPercentage: 50 });
+    ).toEqual({
+      outputTokensPerSecond5m: 30,
+      outputTokensPerSecond5mEstimated: true,
+      cacheHitPercentage: 50,
+    });
     expect(vi.getTimerCount()).toBe(0);
     session.pushEvent({
       type: "usage_updated",
@@ -455,6 +461,11 @@ test("session TPS expires during idle time, retains context, and stays per runti
       generationSample: { id: "c", outputTokens: 10, durationMs: 1000 },
     });
     await vi.advanceTimersByTimeAsync(0);
+    expect(manager.getAgent(first.id)?.lastUsage?.sessionMetrics).toEqual({
+      outputTokensPerSecond5m: 10,
+      cacheHitPercentage: 50,
+    });
+    expect(manager.getAgent(second.id)?.lastUsage).toBeUndefined();
     expect(vi.getTimerCount()).toBe(1);
     await manager.reloadAgentSession(first.id);
     expect(manager.getAgent(first.id)?.lastUsage?.sessionMetrics).toBeUndefined();
