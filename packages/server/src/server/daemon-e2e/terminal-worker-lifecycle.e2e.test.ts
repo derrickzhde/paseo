@@ -11,6 +11,8 @@ import {
 } from "node:fs";
 import { createServer } from "node:net";
 import { createRequire } from "node:module";
+import { createHash } from "node:crypto";
+import { pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -90,7 +92,7 @@ async function getAvailablePort(): Promise<number> {
 }
 
 async function startSupervisor(
-  options: { home?: string; port?: number; pathPrefix?: string } = {},
+  options: { home?: string; port?: number; pathPrefix?: string; preload?: string } = {},
 ): Promise<Harness> {
   const home = options.home ?? mkdtempSync(path.join(tmpdir(), "tw-life-"));
   const workDir = path.join(home, "work");
@@ -111,6 +113,11 @@ async function startSupervisor(
   };
   if (options.pathPrefix) {
     env.PATH = `${options.pathPrefix}${path.delimiter}${env.PATH ?? ""}`;
+  }
+  if (options.preload) {
+    env.NODE_OPTIONS = [env.NODE_OPTIONS, `--import=${pathToFileURL(options.preload).href}`]
+      .filter(Boolean)
+      .join(" ");
   }
   let output = "";
   const supervisor = spawn(
@@ -406,15 +413,47 @@ describe("terminals across daemon restarts", { timeout: 240_000 }, () => {
   });
 
   test("daemon.update.request restarts the daemon and keeps the terminal", async () => {
-    // Fake npm only: `ls` reports this checkout as the global install at the daemon's
-    // version, `install -g` does nothing, and anything else fails so real npm never runs.
+    // Keep release download and npm installation local; exercise the real updater/restart.
     const fakeBin = mkdtempSync(path.join(tmpdir(), "tw-npm-"));
     extraDirs.push(fakeBin);
+    const version = resolveDaemonVersion(import.meta.url);
+    const archiveName = `paseo-cli-${version}.tgz`;
+    const archiveContents = "fork CLI archive fixture";
+    const installedArchive = path.join(fakeBin, "installed-archive.json");
+    const preload = path.join(fakeBin, "fork-release.mjs");
+    const release = {
+      tag_name: `v${version}`,
+      draft: false,
+      prerelease: false,
+      assets: [
+        {
+          name: archiveName,
+          size: Buffer.byteLength(archiveContents),
+          digest: `sha256:${createHash("sha256").update(archiveContents).digest("hex")}`,
+        },
+      ],
+    };
+    writeFileSync(
+      preload,
+      `
+const originalFetch = globalThis.fetch;
+globalThis.fetch = async (input, init) => {
+  const url = String(input);
+  if (url === "https://api.github.com/repos/derrickzhde/paseo/releases/latest") {
+    return new Response(${JSON.stringify(JSON.stringify(release))});
+  }
+  if (url === ${JSON.stringify(`https://github.com/derrickzhde/paseo/releases/download/v${version}/${archiveName}`)}) {
+    return new Response(${JSON.stringify(archiveContents)});
+  }
+  return originalFetch(input, init);
+};
+`,
+    );
     const listing = JSON.stringify({
       path: path.join(fakeBin, "global"),
       dependencies: {
         "@getpaseo/cli": {
-          version: resolveDaemonVersion(import.meta.url),
+          version,
           path: SERVER_ROOT,
         },
       },
@@ -426,8 +465,12 @@ describe("terminals across daemon restarts", { timeout: 240_000 }, () => {
 const has = (...tokens) => tokens.every((token) => args.includes(token));
 if (has("-g", "ls", "@getpaseo/cli", "--json", "--depth=0", "--long")) {
   process.stdout.write(${JSON.stringify(listing)} + "\\n");
-} else if (args[0] === "install" && has("-g", "@getpaseo/cli@latest")) {
-  // The installed version is already the running one: nothing to do.
+} else if (args[0] === "install" && has("-g")) {
+  const archive = args.find((arg) => require("node:path").basename(arg) === ${JSON.stringify(archiveName)});
+  if (!archive || require("node:fs").readFileSync(archive, "utf8") !== ${JSON.stringify(archiveContents)}) {
+    throw new Error("unexpected fork CLI archive");
+  }
+  require("node:fs").writeFileSync(${JSON.stringify(installedArchive)}, JSON.stringify(args));
 } else {
   process.stderr.write("unexpected npm call: " + args.join(" ") + "\\n");
   process.exit(1);
@@ -438,14 +481,23 @@ if (has("-g", "ls", "@getpaseo/cli", "--json", "--depth=0", "--long")) {
     writeFileSync(npmScript, `#!/bin/sh\nexec "${process.execPath}" "${fakeNpm}" "$@"\n`);
     chmodSync(npmScript, 0o755);
     writeFileSync(path.join(fakeBin, "npm.cmd"), `@"${process.execPath}" "${fakeNpm}" %*\r\n`);
-    const harness = await startSupervisor({ pathPrefix: fakeBin });
+    const harness = await startSupervisor({ pathPrefix: fakeBin, preload });
     let client = await connect(harness);
     const workspaceId = await createWorkspace(client, harness);
     const terminal = await createMarkedTerminal(client, harness, workspaceId, "MARKER-UPDATE");
     const daemonPid = await daemonWorkerPid(client);
 
     const update = await client.updateDaemon();
-    expect(update).toMatchObject({ success: true });
+    expect(update).toMatchObject({
+      success: true,
+      error: null,
+      newVersion: resolveDaemonVersion(import.meta.url),
+    });
+    expect(JSON.parse(readFileSync(installedArchive, "utf8"))).toEqual([
+      "install",
+      "-g",
+      expect.stringContaining(archiveName),
+    ]);
     await client.close();
     client = await waitForReplacement(harness, daemonPid);
     await expectKept(client, terminal, "MARKER-UPDATE", "update");
