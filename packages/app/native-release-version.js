@@ -35,9 +35,10 @@ function getNativeReleaseVersion(version) {
     throw new Error(`Derived Android versionCode is out of range: ${versionCode}`);
   }
 
-  const iosBuildSlot = betaNumber ?? stableIosBuildSlot;
-  // The fork's 0.11.3 startup-fix rebuild needs a new iOS build number.
-  const iosBuildNumber = version === "0.11.3" ? 11_004_000 : versionCode * 1_000 + iosBuildSlot;
+  // These fork rebuilds need a slot above the already submitted stable build.
+  const iosBuildSlot =
+    version === "0.11.3" || version === "0.15.3" ? 1_000 : (betaNumber ?? stableIosBuildSlot);
+  const iosBuildNumber = versionCode * 1_000 + iosBuildSlot;
   if (!Number.isSafeInteger(iosBuildNumber)) {
     throw new Error(`Derived iOS buildNumber is out of range: ${iosBuildNumber}`);
   }

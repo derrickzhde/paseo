@@ -23,6 +23,24 @@ describe("native release version", () => {
     });
   });
 
+  it("gives the replacement 0.15.3 upload a higher iOS build without changing Android or the next release", () => {
+    expect(getNativeReleaseVersion("0.15.3")).toEqual({
+      appVersion: "0.15.3",
+      androidVersionCode: 15003,
+      iosBuildNumber: "15004000",
+    });
+    expect(getNativeReleaseVersion("0.15.4")).toEqual({
+      appVersion: "0.15.4",
+      androidVersionCode: 15004,
+      iosBuildNumber: "15004999",
+    });
+    expect(getNativeReleaseVersion("0.15.3-beta.2")).toEqual({
+      appVersion: "0.15.3",
+      androidVersionCode: 15003,
+      iosBuildNumber: "15003002",
+    });
+  });
+
   it("gives each beta a unique iOS build slot under the stable app version", () => {
     expect(getNativeReleaseVersion("0.2.6-beta.2")).toEqual({
       appVersion: "0.2.6",

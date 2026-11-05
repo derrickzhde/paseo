@@ -2,7 +2,11 @@
 
 ## 0.15.3 - 2026-11-05
 
-Integrate [upstream 0.15.1](https://github.com/getpaseo/paseo/releases/tag/v0.15.1) while retaining this fork's customizations.
+Integrate [upstream 0.15.2](https://github.com/getpaseo/paseo/releases/tag/v0.15.2) while retaining this fork's customizations.
+
+### Added
+
+- Include upstream’s first-run setup, project suggestions and refreshed settings controls.
 
 ### Improved
 
@@ -14,6 +18,24 @@ Integrate [upstream 0.15.1](https://github.com/getpaseo/paseo/releases/tag/v0.15
 
 - Combine upstream's pending-turn steering fix with autonomous Codex `/goal` follow-ups.
 - Retain Claude usage identity reconciliation and imported-session cache fixes.
+- Raise the iOS build number to 15004000 for this replacement 0.15.3 TestFlight upload.
+
+## 0.15.2 - 2026-11-05
+
+### Added
+
+- Added a first-run setup on Paseo Desktop and web that walks new users through theme, providers, projects, agent orchestration and the mobile app, with Settings → General → Show setup again to reopen it ([#8363](https://github.com/getpaseo/paseo/pull/8363))
+- Added project suggestions from the folders where you ran Claude Code, Codex, OpenCode or Pi, shown in the setup Projects step ([#8363](https://github.com/getpaseo/paseo/pull/8363))
+
+### Improved
+
+- Changed the theme picker to a grid of tiles with a preview of each theme ([#8363](https://github.com/getpaseo/paseo/pull/8363))
+- Replaced the "Loading…" text in Providers settings with skeleton rows ([#8363](https://github.com/getpaseo/paseo/pull/8363))
+- Changed controls to two sizes: default controls are 32px tall on desktop and 44px on phones, and compact controls are 28px ([#8363](https://github.com/getpaseo/paseo/pull/8363))
+- Changed first launch to go from the loading screen straight into setup instead of showing the empty home first ([#8824](https://github.com/getpaseo/paseo/pull/8824))
+- Changed dialogs on desktop and web to fade in over about 160ms ([#8824](https://github.com/getpaseo/paseo/pull/8824))
+- Changed modal and sheet backgrounds to match the screen background ([#8363](https://github.com/getpaseo/paseo/pull/8363))
+- Changed documentation links in Settings sections to a `Label ↗` link beside the section title ([#8363](https://github.com/getpaseo/paseo/pull/8363))
 
 ## 0.15.1 - 2026-11-05
 

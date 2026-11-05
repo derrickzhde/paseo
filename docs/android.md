@@ -23,7 +23,7 @@ The base version code comes from the package version:
 major * 1_000_000 + minor * 1_000 + patch
 ```
 
-Android ignores prerelease metadata, so `0.1.102-beta.1` and `0.1.102` both produce `1102`. iOS uses `versionCode * 1_000 + slot`, with slots 1–998 for beta builds and 999 for stable builds. The fork's historical `0.11.3` startup-fix rebuild uses iOS build `11_004_000` instead.
+Android ignores prerelease metadata, so `0.1.102-beta.1` and `0.1.102` both produce `1102`. iOS uses `versionCode * 1_000 + slot`, with slots 1–998 for beta builds and 999 for stable builds. The fork's same-version rebuilds use slot 1000: `0.11.3` uses `11_004_000`, and the replacement `0.15.3` uses `15_004_000`. Apple cannot accept another upload with the previous build number.
 
 EAS uses the local app version source. Do not re-enable EAS remote version counters or Android `autoIncrement`; F-Droid and other source-based builders need the native build number to be visible in the repo.
 

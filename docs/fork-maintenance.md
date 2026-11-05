@@ -18,11 +18,11 @@ Follow the active agent/session instructions and the task principal's authorizat
 
 ## Starting point
 
-Fork **v0.15.3** incorporates upstream **v0.15.1**. Upstream created its `v0.15.2` tag during candidate verification, so the fork uses the next unused version. The integrated source remains pinned to v0.15.1:
+Fork **v0.15.3** incorporates upstream **v0.15.2**. This replaces the earlier fork v0.15.3, which incorporated upstream v0.15.1, under explicit task-principal authorization to replace that release and tag. This one-time approval does not change the unused-version policy for future releases.
 
 | Reference        | Commit                                        |
 | ---------------- | --------------------------------------------- |
-| Upstream v0.15.1 | `c4dc36272cda1bb07a8c11b7beee41f247ee7952`    |
+| Upstream v0.15.2 | `e896c05b09707e711a2324fcab7da84a0ae57291`    |
 | Fork v0.15.3     | Resolve the published `v0.15.3` tag with Git. |
 
 The integrated fork lives on `main`; `origin` points to `derrickzhde/paseo`. Older history mentions an upstream-mirror `main` and a rebased `mine` branch. Derive the next integration from the actual current refs; do not restore that older arrangement or rewrite published history.
@@ -36,7 +36,7 @@ Confirm the requested upstream release and pin its commit. Keep upstream tags in
 For example, this fetches the known baseline; substitute the requested release for the next integration:
 
 ```bash
-UPSTREAM_TAG=v0.15.1
+UPSTREAM_TAG=v0.15.2
 git fetch --no-tags https://github.com/getpaseo/paseo.git \
   "refs/tags/${UPSTREAM_TAG:?}:refs/remotes/upstream-release/${UPSTREAM_TAG:?}"
 UPSTREAM_COMMIT=$(git rev-parse "refs/remotes/upstream-release/${UPSTREAM_TAG:?}^{commit}")
@@ -51,7 +51,7 @@ Compare both changesets from that common ancestor. Read the overlapping hunks an
 
 Report each customization as **replace with upstream**, **retain unchanged**, or **retain and adapt**, with supporting source/test evidence and any verification gap. Keep the upstream tag, both heads, common ancestor and decision list in the task record. Report the comparison before editing; continue authorized integration without another routine confirmation.
 
-The v0.15.1 comparison found 64 upstream overlaps among 202 fork customization paths relative to the previously integrated upstream v0.14.0. No named unique fork behavior had a complete upstream replacement. The common ancestor also contains release cherry-picks, so common-ancestor path counts overstate the customization inventory. Keep the combined Enriched Markdown patch: upstream v0.15.1 carries the same library patch as v0.14.0, while the app renderer adds command links that must coexist with math source adaptation.
+The v0.15.2 comparison found 30 upstream overlaps among 209 fork customization paths relative to the previously integrated upstream v0.15.1. No named unique fork behavior had a complete upstream replacement. Merge the new project-suggestions hooks, onboarding translations and theme changes alongside the fork's protocol additions, metrics labels and symbol-font fallbacks. The combined Enriched Markdown patch remains unchanged from the previous fork release.
 
 ## Current customization inventory
 
