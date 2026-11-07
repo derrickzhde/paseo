@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.15.4 - 2026-11-07
+
+Integrate [upstream 0.15.3](https://github.com/getpaseo/paseo/releases/tag/v0.15.3) while retaining this fork's customizations.
+
+### Fixed
+
+- Fixed conversation text becoming blurred when opening or dismissing the keyboard on iOS 26+ ([upstream #8918](https://github.com/getpaseo/paseo/pull/8918)).
+
 ## 0.15.3 - 2026-11-05
 
 Integrate [upstream 0.15.2](https://github.com/getpaseo/paseo/releases/tag/v0.15.2) while retaining this fork's customizations.

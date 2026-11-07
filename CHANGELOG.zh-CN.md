@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.15.4 - 2026-11-07
+
+集成[上游 0.15.3](https://github.com/getpaseo/paseo/releases/tag/v0.15.3)，保留并适配本 fork 的定制。
+
+### 修复
+
+- 修复 iOS 26+ 打开或关闭键盘时聊天文字模糊的问题（[上游 #8918](https://github.com/getpaseo/paseo/pull/8918)）。
+
 ## 0.15.3 - 2026-11-05
 
 集成[上游 0.15.2](https://github.com/getpaseo/paseo/releases/tag/v0.15.2)，保留并适配本 fork 的定制。
