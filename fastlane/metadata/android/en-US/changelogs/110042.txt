@@ -1,1 +1,4 @@
-Fixed conversation text becoming blurred when opening or dismissing the keyboard on iOS 26+.
+Fixed
+- Fixed conversation text becoming blurred when opening or dismissing the keyboard on iOS 26+
+
+Full notes: https://paseo.sh/changelog
