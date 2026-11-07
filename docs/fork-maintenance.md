@@ -18,12 +18,12 @@ Follow the active agent/session instructions and the task principal's authorizat
 
 ## Starting point
 
-Fork **v0.15.3** incorporates upstream **v0.15.2**. This replaces the earlier fork v0.15.3, which incorporated upstream v0.15.1, under explicit task-principal authorization to replace that release and tag. This one-time approval does not change the unused-version policy for future releases.
+Fork **v0.15.4** incorporates upstream **v0.15.3**. Previous fork v0.15.3 incorporated upstream v0.15.2.
 
 | Reference        | Commit                                        |
 | ---------------- | --------------------------------------------- |
-| Upstream v0.15.2 | `e896c05b09707e711a2324fcab7da84a0ae57291`    |
-| Fork v0.15.3     | Resolve the published `v0.15.3` tag with Git. |
+| Upstream v0.15.3 | `d91ae138cb931447635e94296023414a58bedcc5`    |
+| Fork v0.15.4     | Resolve the published `v0.15.4` tag with Git. |
 
 The integrated fork lives on `main`; `origin` points to `derrickzhde/paseo`. Older history mentions an upstream-mirror `main` and a rebased `mine` branch. Derive the next integration from the actual current refs; do not restore that older arrangement or rewrite published history.
 
@@ -51,7 +51,7 @@ Compare both changesets from that common ancestor. Read the overlapping hunks an
 
 Report each customization as **replace with upstream**, **retain unchanged**, or **retain and adapt**, with supporting source/test evidence and any verification gap. Keep the upstream tag, both heads, common ancestor and decision list in the task record. Report the comparison before editing; continue authorized integration without another routine confirmation.
 
-The v0.15.2 comparison found 30 upstream overlaps among 209 fork customization paths relative to the previously integrated upstream v0.15.1. No named unique fork behavior had a complete upstream replacement. Merge the new project-suggestions hooks, onboarding translations and theme changes alongside the fork's protocol additions, metrics labels and symbol-font fallbacks. The combined Enriched Markdown patch remains unchanged from the previous fork release.
+The v0.15.3 comparison found 1 upstream overlap (iOS keyboard scroll edge blur fix in `paseo-scroll` module) among 210 fork customization paths relative to the previously integrated upstream v0.15.2. No named unique fork behavior had a complete upstream replacement. The iOS fix was adopted from upstream PR #8918. All other fork customizations (math rendering, clock preferences, per-model controls, Claude variants, Codex follow-ups, Expo push recovery, fork release infrastructure) remain unchanged from the previous fork release. The combined Enriched Markdown patch remains unchanged.
 
 ## Current customization inventory
 
