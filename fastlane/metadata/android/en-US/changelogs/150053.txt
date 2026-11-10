@@ -1,0 +1,8 @@
+Added
+- Added Claude Fable 5.2 and Mythos 5.2 with medium default effort, including 200K and 1M context window variants following fork pattern
+
+Notes
+- Both models require Claude Code 2.1.321 or newer; Mythos 5.2 appears only when Claude Code advertises access
+- Fork preserves 200K/1M context window splits for all Opus 5.5, Opus 5, Fable 5.2, Fable 5.1, and Fable 5 models
+
+Full notes: https://paseo.sh/changelog
