@@ -84,7 +84,11 @@ describe("getClaudeModels", () => {
       "claude-opus-5-5",
       "claude-opus-5[1m]",
       "claude-opus-5",
+      "claude-mythos-5-2[1m]",
+      "claude-mythos-5-2",
       "claude-mythos-5-1",
+      "claude-fable-5-2[1m]",
+      "claude-fable-5-2",
       "claude-fable-5-1[1m]",
       "claude-fable-5-1",
       "claude-fable-5[1m]",
@@ -123,7 +127,11 @@ describe("getClaudeModels", () => {
         ["claude-opus-5-5", 200_000],
         ["claude-opus-5[1m]", 1_000_000],
         ["claude-opus-5", 200_000],
+        ["claude-mythos-5-2[1m]", 1_000_000],
+        ["claude-mythos-5-2", 200_000],
         ["claude-mythos-5-1", 1_000_000],
+        ["claude-fable-5-2[1m]", 1_000_000],
+        ["claude-fable-5-2", 200_000],
         ["claude-fable-5-1[1m]", 1_000_000],
         ["claude-fable-5-1", 200_000],
         ["claude-fable-5[1m]", 1_000_000],
@@ -179,6 +187,18 @@ describe("getClaudeModels", () => {
     );
   });
 
+  it("gates Fable 5.2 and Mythos 5.2 on Claude Code 2.1.321 without changing the default", () => {
+    expect(getClaudeModels("2.1.320").map((model) => model.id)).not.toContain("claude-fable-5-2[1m]");
+    expect(getClaudeModels("2.1.320").map((model) => model.id)).not.toContain("claude-fable-5-2");
+    expect(getClaudeModels("2.1.320").map((model) => model.id)).not.toContain("claude-mythos-5-2[1m]");
+    expect(getClaudeModels("2.1.320").map((model) => model.id)).not.toContain("claude-mythos-5-2");
+    expect(getClaudeModels("2.1.321").map((model) => model.id)).toContain("claude-fable-5-2[1m]");
+    expect(getClaudeModels("2.1.321").map((model) => model.id)).toContain("claude-fable-5-2");
+    expect(getClaudeModels("2.1.321").map((model) => model.id)).toContain("claude-mythos-5-2[1m]");
+    expect(getClaudeModels("2.1.321").map((model) => model.id)).toContain("claude-mythos-5-2");
+    expect(getClaudeModels("2.1.321").find((model) => model.isDefault)?.id).toBe("claude-opus-5-5[1m]");
+  });
+
   it("derives thinking options from model effort capabilities", () => {
     const models = new Map(getClaudeModels().map((model) => [model.id, model]));
 
@@ -227,7 +247,7 @@ describe("getClaudeModels", () => {
       "high",
       "max",
     ]);
-    for (const modelId of ["claude-fable-5", "claude-fable-5-1[1m]", "claude-fable-5-1"]) {
+    for (const modelId of ["claude-fable-5", "claude-fable-5[1m]", "claude-fable-5-1[1m]", "claude-fable-5-1", "claude-fable-5-2[1m]", "claude-fable-5-2"]) {
       expect(models.get(modelId)?.thinkingOptions?.map((option) => option.id)).not.toContain(
         CLAUDE_DISABLED_THINKING_OPTION_ID,
       );
@@ -248,6 +268,10 @@ describe("getClaudeModels", () => {
     ["claude-fable-5", false, "high"],
     ["claude-fable-5-1[1m]", false, "high"],
     ["claude-fable-5-1", false, "high"],
+    ["claude-fable-5-2[1m]", false, "medium"],
+    ["claude-fable-5-2", false, "medium"],
+    ["claude-mythos-5-2[1m]", false, "medium"],
+    ["claude-mythos-5-2", false, "medium"],
     ["claude-haiku-5-5", true, "medium"],
     ["claude-haiku-5-5-20261007", true, "medium"],
     ["claude-haiku-4-5", false, undefined],
