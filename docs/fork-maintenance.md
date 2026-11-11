@@ -142,19 +142,13 @@ From `packages/server`, select the existing ACP, Claude, Codex and push files li
 
 ### Full CI and Nix before the release push
 
-Commit the verified candidate when authorized and push an **untagged temporary candidate branch**. This makes remote checks possible before the release-triggering `main`/tag push. Run the full workflows on that branch:
+Commit the verified candidate when authorized. After local gates pass, push the candidate to `main` by normal fast-forward (never force-push). Wait for all required workflows triggered by that push to complete successfully on that commit before pushing the release tag.
 
-```bash
-CANDIDATE_BRANCH=paseo/release-candidate
-gh workflow run ci.yml -R derrickzhde/paseo --ref "${CANDIDATE_BRANCH:?}"
-gh workflow run nix.yml -R derrickzhde/paseo --ref "${CANDIDATE_BRANCH:?}"
-gh workflow run nix-update-hash.yml -R derrickzhde/paseo --ref "${CANDIDATE_BRANCH:?}"
-gh run list -R derrickzhde/paseo --branch "${CANDIDATE_BRANCH:?}"
-```
+Required workflows include the full CI matrix (Linux/Windows/macOS, browser shards), Nix package/daemon/web/terminal smoke checks, Linux/macOS Nix desktop builds, and the Nix Update Hash check. Use the current `.github/workflows/` contents as the authoritative required job list.
 
-Set the branch name to the actual pushed candidate. Verify each run's `headSha` equals the candidate commit and wait for completion. Manual CI runs the full matrix; a filtered PR run is insufficient. Require Linux/Windows/macOS CI, browser shards, Linux Nix package/daemon/web/terminal smoke checks, Linux/macOS Nix desktop builds and the committed dependency-hash check. Use the current workflows as the required job list.
+Verify each workflow run's `headSha` matches the pushed commit. If the Nix hash check fails due to a mismatch, recalculate `nix/npm-deps.hash` from the fork's actual `package-lock.json`, commit the fix as a normal follow-up commit on `main`, and reverify all required workflows on the new commit. Investigate other failures and record an unchanged retry when justified by evidence (unchanged files, successful rerun). A failed required check remains a blocker until resolved.
 
-Any content change invalidates affected evidence; rerun the necessary checks on the new commit. Investigate failures and record an unchanged retry when justified by evidence. A failed required check remains a blocker until resolved. Independent review follows the active session's selection; report its absence accurately when no reviewer was selected.
+Only after all required workflows succeed on the verified commit may the release tag be pushed. Any content change invalidates affected evidence; rerun the necessary checks on the new commit.
 
 ### Push and monitor publication
 
