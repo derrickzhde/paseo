@@ -18,12 +18,12 @@ Follow the active agent/session instructions and the task principal's authorizat
 
 ## Starting point
 
-Fork **v0.15.4** incorporates upstream **v0.15.3**. Previous fork v0.15.3 incorporated upstream v0.15.2.
+Fork **v0.15.5** incorporates upstream **v0.15.4**. Previous fork v0.15.4 incorporated upstream v0.15.3.
 
 | Reference        | Commit                                        |
 | ---------------- | --------------------------------------------- |
-| Upstream v0.15.3 | `d91ae138cb931447635e94296023414a58bedcc5`    |
-| Fork v0.15.4     | Resolve the published `v0.15.4` tag with Git. |
+| Upstream v0.15.4 | `1c00b365c9e0b74c1580eba33d905d693125ae21`    |
+| Fork v0.15.5     | Resolve the published `v0.15.5` tag with Git. |
 
 The integrated fork lives on `main`; `origin` points to `derrickzhde/paseo`. Older history mentions an upstream-mirror `main` and a rebased `mine` branch. Derive the next integration from the actual current refs; do not restore that older arrangement or rewrite published history.
 
