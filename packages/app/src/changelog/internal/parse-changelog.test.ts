@@ -280,8 +280,7 @@ describe("the repository's own CHANGELOG.md", () => {
   const releases = parseChangelog(markdown);
 
   it("parses every release heading", () => {
-    // Fork maintains a focused changelog with recent releases
-    expect(releases.length).toBeGreaterThan(3);
+    expect(releases.length).toBeGreaterThan(50);
     for (const release of releases) {
       expect(release.version).toMatch(/^\d+\.\d+\.\d+/);
       expect(release.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
