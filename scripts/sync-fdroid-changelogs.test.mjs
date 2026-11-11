@@ -265,7 +265,15 @@ test("renders the real 0.1.109 notice, which is the entry's whole point", () => 
   );
 });
 
-// Fork maintains recent changelogs only, skipping historical version 0.1.96 test
+test("preserves the standalone 0.1.96 Android notice", () => {
+  const changelog = readFileSync(path.resolve("CHANGELOG.md"), "utf8");
+  const entry = changelog.match(/## 0\.1\.96 - 2026-06-13\n([\s\S]*?)(?=\n## |$)/)?.[1];
+  assert.ok(entry);
+
+  const contents = formatFdroidChangelog(entry.split("\n"));
+  assert.match(contents, /This release only fixes an Android issue/);
+  assert.equal(contents.includes("_This release"), false);
+});
 
 test("--check fails when the generated files are missing or stale", () => {
   const changelog = "## 0.2.3 - 2026-07-27\n\n### Fixed\n\n- Something broke.\n";
