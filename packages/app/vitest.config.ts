@@ -164,7 +164,7 @@ export default defineConfig({
     // Unit and browser suites each boot Vite; running both projects at once races the
     // browser dev server and surfaces as random "Failed to fetch dynamically imported module".
     sequence: { concurrent: false },
-    maxWorkers: 2,
+    maxWorkers: 1,
     server: {
       deps: {
         fallbackCJS: true,
@@ -180,6 +180,7 @@ export default defineConfig({
           "@dnd-kit/core",
           "@dnd-kit/sortable",
           "@dnd-kit/utilities",
+          "expo-router",
         ],
       },
     },
@@ -189,9 +190,12 @@ export default defineConfig({
   // so it scans the native files and dies on imports react-native-web has no answer for.
   // Unbundled, the same imports go through the resolver below and land on the web files.
   optimizeDeps: {
+    // Crawl every browser test up front so Vite does not reload mid-suite.
+    entries: ["src/**/*.browser.{test,spec}.{ts,tsx}", "src/i18n/i18next.ts"],
     // Browser tests run a long suite; discovering xterm or dnd-kit mid-run reloads Vite and
     // fails unrelated suites with "Failed to fetch dynamically imported module".
     holdUntilCrawlEnd: true,
+    force: true,
     // Expo's public navigation barrel also loads screens. Match Metro's web-first resolution
     // while optimizing its CJS dependencies, including DebugContainer.web.js.
     esbuildOptions: {
@@ -213,7 +217,15 @@ export default defineConfig({
       "react-dom/client",
       "@xterm/addon-serialize",
       "react/compiler-runtime",
-      "expo-router/react-navigation",
+      "@xterm/xterm",
+      "@xterm/addon-fit",
+      "@xterm/addon-clipboard",
+      "@xterm/addon-image",
+      "@xterm/addon-search",
+      "@xterm/addon-unicode11",
+      "@xterm/addon-unicode-graphemes",
+      "@xterm/addon-web-links",
+      "@xterm/addon-webgl",
       "@testing-library/react",
       "@tanstack/react-query",
       "@tanstack/react-virtual",
@@ -231,12 +243,77 @@ export default defineConfig({
       "@dnd-kit/core",
       "@dnd-kit/sortable",
       "@dnd-kit/utilities",
+      "@testing-library/dom",
+      "@react-native-masked-view/masked-view",
+      "turndown",
+      "turndown-plugin-gfm",
+      "react",
+      "react-dom",
+      "react-freeze",
+      "react-native-web/dist/index.js",
+      "react-native-worklets",
+      "zustand",
+      "zustand/shallow",
+      "zustand/middleware",
+      "zustand/vanilla",
+      "fast-deep-equal",
+      "fast-deep-equal/es6",
+      "zod",
+      "markdown-it",
+      "@gorhom/portal",
+      "expo-constants",
+      "expo-modules-core",
+      "mnemonic-id",
+      "buffer",
+      "base64-js",
+      "tweetnacl",
+      "htmlparser2",
+      "use-sync-external-store/shim/with-selector",
+      "@floating-ui/react-native",
+      "semver/functions/parse.js",
+      "semver/ranges/valid.js",
+      "semver/functions/satisfies.js",
+      "@noble/curves/ed25519.js",
+      "@noble/ciphers/chacha.js",
+      "@noble/hashes/sha2.js",
+      "@noble/hashes/hmac.js",
+      "mdast-util-from-markdown",
+      "mdast-util-gfm-table",
+      "micromark-extension-gfm-table",
+      "micromark-util-decode-string",
+      "@codemirror/language",
+      "@codemirror/legacy-modes/mode/clike",
+      "@codemirror/legacy-modes/mode/swift",
+      "@lezer/highlight",
+      "@lezer/common",
+      "@lezer/lr",
+      "@lezer/javascript",
+      "@lezer/json",
+      "@lezer/css",
+      "@lezer/cpp",
+      "@lezer/go",
+      "@lezer/html",
+      "@lezer/java",
+      "@lezer/python",
+      "@lezer/markdown",
+      "@lezer/php",
+      "@lezer/rust",
+      "@lezer/xml",
+      "@lezer/yaml",
+      "lezer-elixir",
+      "mathjax-full/js/mathjax.js",
+      "mathjax-full/js/input/tex.js",
+      "mathjax-full/js/input/tex/ams/AmsConfiguration.js",
+      "mathjax-full/js/output/svg.js",
+      "mathjax-full/js/adaptors/liteAdaptor.js",
+      "mathjax-full/js/handlers/html.js",
     ],
     exclude: [
       "react-native-enriched-markdown",
       "react-native-reanimated",
       "react-native-gesture-handler",
       "react-native-keyboard-controller",
+      "expo-router",
     ],
   },
   // babel-preset-expo compiles JSX with the automatic runtime, so app modules don't import React.
@@ -357,6 +434,23 @@ export default defineConfig({
       {
         find: /^expo-linking$/,
         replacement: path.resolve(__dirname, "test-stubs/expo-linking.ts"),
+      },
+      // Prebundled expo-router breaks Vitest browser imports and drops the default export.
+      {
+        find: /^expo-router\/react-navigation$/,
+        replacement: path.resolve(__dirname, "test-stubs/expo-router-react-navigation.ts"),
+      },
+      {
+        find: /^expo-router\/native-stack$/,
+        replacement: path.resolve(__dirname, "test-stubs/expo-router-native-stack.ts"),
+      },
+      {
+        find: /^expo-router\/head$/,
+        replacement: path.resolve(__dirname, "test-stubs/expo-router-head.ts"),
+      },
+      {
+        find: /^expo-router$/,
+        replacement: path.resolve(__dirname, "test-stubs/expo-router.ts"),
       },
       // No Node implementation: every call on the real module rejects, so a test
       // touching a persisted store drowns in unhandled rejections.
