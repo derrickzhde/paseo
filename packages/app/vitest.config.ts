@@ -219,6 +219,9 @@ export default defineConfig({
       // Loaded by the reanimated-web-style-helpers plugin, which the dependency scan does not see.
       "react-native-web/dist/exports/StyleSheet/compiler/createReactDOMStyle",
       "react-native-web/dist/exports/StyleSheet/preprocess",
+      "@dnd-kit/core",
+      "@dnd-kit/sortable",
+      "@dnd-kit/utilities",
     ],
     exclude: [
       "react-native-enriched-markdown",
@@ -237,6 +240,9 @@ export default defineConfig({
     global: "globalThis",
   },
   resolve: {
+    // @dnd-kit and the browser test entry each resolve `react` separately unless deduped;
+    // a second copy leaves hooks on null and breaks DraggableList browser tests.
+    dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime"],
     extensions: [
       ".web.mjs",
       ".web.js",
