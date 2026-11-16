@@ -1,0 +1,6 @@
+Integrate upstream 0.16.0 while retaining this fork's customizations.
+
+Improved
+- Adopt upstream provider draft controls (listControls), the built-in plugin gallery, command center tabs, and the rest of the 0.16.0 feature set on the fork release channel.
+
+Full notes: https://paseo.sh/changelog

@@ -27,13 +27,9 @@ import { useMarkdownSource, type MarkdownImageContext } from "./images";
 import { MermaidFence, MermaidStreamingContext, splitMermaidFences } from "./fence/mermaid";
 
 const ThemedMarkdown = withUnistyles(EnrichedMarkdownText);
-<<<<<<< HEAD
 const MD4C_FLAGS = { latexMath: true, hardSoftBreaks: true, admonitions: true };
-=======
-const MD4C_FLAGS = { latexMath: false, hardSoftBreaks: true, admonitions: true };
 // A README is written for its forge, where the lines of a paragraph join into one.
 const EXTERNAL_MD4C_FLAGS = { ...MD4C_FLAGS, hardSoftBreaks: false };
->>>>>>> refs/remotes/upstream-release/v0.16.0^{commit}
 
 // Reading the breakpoint here makes Unistyles restyle the text when the layout crosses it.
 const markdownStyle =
@@ -169,7 +165,6 @@ const MarkdownPart = memo(function MarkdownPart({
   );
   return (
     <MermaidStreamingContext.Provider value={streaming}>
-<<<<<<< HEAD
       <MathFormulaSources.Provider value={math.formulas}>
         <MarkdownBlockStack imageSources={imageSources}>
           {segments.map((segment) =>
@@ -182,7 +177,7 @@ const MarkdownPart = memo(function MarkdownPart({
                 uniProps={pickMarkdownStyle(compact, muted)}
                 flavor="github"
                 selectable={selectable}
-                md4cFlags={MD4C_FLAGS}
+                md4cFlags={external ? EXTERNAL_MD4C_FLAGS : MD4C_FLAGS}
                 linkRecognition={linkRecognition}
                 enableTaskListItemToggle={false}
                 enableLinkPreview={false}
@@ -197,33 +192,6 @@ const MarkdownPart = memo(function MarkdownPart({
           )}
         </MarkdownBlockStack>
       </MathFormulaSources.Provider>
-=======
-      <MarkdownBlockStack imageSources={imageSources}>
-        {segments.map((segment) =>
-          segment.kind === "mermaid" ? (
-            <MermaidFence key={`${segment.kind}:${segment.id}`} code={segment.source} />
-          ) : (
-            <ThemedMarkdown
-              key={`${segment.kind}:${segment.id}`}
-              markdown={segment.source}
-              uniProps={pickMarkdownStyle(compact, muted)}
-              flavor="github"
-              selectable={selectable}
-              md4cFlags={external ? EXTERNAL_MD4C_FLAGS : MD4C_FLAGS}
-              linkRecognition={linkRecognition}
-              enableTaskListItemToggle={false}
-              enableLinkPreview={false}
-              enableBlockContextMenu={false}
-              // JS reveal owns pacing; native fade animation is a separate experiment.
-              streamingAnimation={false}
-              onLinkPress={pressLink}
-              onImagePress={pressImage}
-              renderers={isWeb ? WEB_RENDERERS : undefined}
-            />
-          ),
-        )}
-      </MarkdownBlockStack>
->>>>>>> refs/remotes/upstream-release/v0.16.0^{commit}
       {image ? <AttachmentLightbox source={image} onClose={closeImage} /> : null}
     </MermaidStreamingContext.Provider>
   );

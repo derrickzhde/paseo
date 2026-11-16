@@ -71,7 +71,6 @@ const mockState = vi.hoisted(() => {
       this.runtimeModels.clear();
       this.cursorListFeaturesConfigs = [];
       this.codexNativeArchiveCalls = [];
-      this.cursorListDraftOptionsConfigs = [];
     },
   };
 });
@@ -406,15 +405,6 @@ vi.mock("./providers/cursor-acp-agent.js", () => ({
             choices: [{ value: "false", label: "Off" }],
           },
         ],
-      };
-    }
-
-    async listDraftOptions(config: AgentSessionConfig) {
-      mockState.cursorListDraftOptionsConfigs.push(config);
-      return {
-        features: await this.listFeatures(config),
-        thinkingOptions: [{ id: "high", label: "High" }],
-        defaultThinkingOptionId: "high",
       };
     }
   },
@@ -897,40 +887,6 @@ test("wrapped cursor client lists ACP controls through the inner provider", asyn
     {
       provider: "acp",
       cwd: "/tmp/cursor",
-    },
-  ]);
-});
-
-// A wrapper that forwards listFeatures but drops listDraftOptions degrades silently: the
-// per-model thinking levels just stop arriving and the catalog's wrong list wins again.
-test("wrapped cursor client forwards draft option resolution to the inner provider", async () => {
-  const registry = buildProviderRegistry(logger, {
-    providerOverrides: {
-      cursor: {
-        extends: "acp",
-        label: "Cursor",
-        command: ["cursor-agent", "acp"],
-      },
-    },
-  });
-
-  const client = registry.cursor.createClient(logger);
-
-  await expect(
-    client.listDraftOptions?.({
-      provider: "cursor",
-      cwd: "/tmp/cursor",
-      model: "grok-4.6",
-    }),
-  ).resolves.toMatchObject({
-    thinkingOptions: [{ id: "high", label: "High" }],
-    defaultThinkingOptionId: "high",
-  });
-  expect(mockState.cursorListDraftOptionsConfigs).toEqual([
-    {
-      provider: "acp",
-      cwd: "/tmp/cursor",
-      model: "grok-4.6",
     },
   ]);
 });
