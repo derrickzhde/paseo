@@ -344,6 +344,10 @@ export function getClaudeManifestModels(
       definition.thinkingOptions = thinkingOptions;
       definition.defaultThinkingOptionId = getDefaultThinkingOptionId(model);
     }
+    // COMPAT(claudeFable5LegacyCatalogEntry): runtime resolution keeps this ID; CLI hides it.
+    if (model.id === "claude-fable-5[1m]") {
+      definition.isSelectable = false;
+    }
     definitions.push(definition);
     if (!("aliases" in model) || !model.aliases) {
       continue;

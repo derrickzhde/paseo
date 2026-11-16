@@ -475,9 +475,7 @@ describe("ClaudeAgentClient.fetchCatalog", () => {
         "claude-sonnet-4-6",
         "claude-haiku-4-5",
       ]);
-      expect(models.find((model) => model.id === "claude-fable-5[1m]")?.isSelectable).not.toBe(
-        false,
-      );
+      expect(models.find((model) => model.id === "claude-fable-5[1m]")?.isSelectable).toBe(false);
 
       for (const model of models) {
         expect(model.provider).toBe("claude");

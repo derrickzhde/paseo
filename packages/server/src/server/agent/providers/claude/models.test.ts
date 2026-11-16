@@ -822,7 +822,7 @@ describe("Claude Fable 5 catalog", () => {
   // Fable 5 follows the same shape as every other 1M model: the bare id is the 200K model and
   // the suffixed id is its own selectable 1M entry. Collapsing them hid the 1M variant and
   // labelled the 200K one as 1M, so picking Fable could never reach a million tokens.
-  it("offers the 1M variant and the 200K base as separate selectable entries", () => {
+  it("keeps the legacy 1M ID for runtime resolution but hides it from selection", () => {
     const fable5Models = getClaudeModels()
       .filter((model) => model.id === "claude-fable-5" || model.id === "claude-fable-5[1m]")
       .map(({ id, aliases, isSelectable, label, contextWindowMaxTokens }) => ({
@@ -837,7 +837,7 @@ describe("Claude Fable 5 catalog", () => {
       {
         id: "claude-fable-5[1m]",
         aliases: undefined,
-        isSelectable: undefined,
+        isSelectable: false,
         label: "Fable 5 1M",
         contextWindowMaxTokens: 1_000_000,
       },

@@ -27,7 +27,13 @@ export default defineConfig({
         // Vite can request the file with a version query (`md4c.js?v=<hash>`), so match the
         // path without it.
         if (!id.split("?")[0].endsWith("/lib/module/web/wasm/md4c.js")) return;
-        const trailer = source.lastIndexOf("\nif (typeof exports === 'object'");
+        if (source.includes("export default createMd4cModule")) {
+          return;
+        }
+        const trailer = Math.max(
+          source.lastIndexOf("\nif (typeof exports === 'object'"),
+          source.lastIndexOf('\nif (typeof exports === "object"'),
+        );
         if (trailer < 0) throw new Error("Markdown WASM CommonJS trailer was not found");
         return {
           code: `${source.slice(0, trailer)}\nexport default createMd4cModule;`,

@@ -1,7 +1,7 @@
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import { PortalProvider } from "@gorhom/portal";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { Text } from "react-native";
 import { page } from "vitest/browser";
 import {
@@ -17,7 +17,9 @@ import { WindowLayoutActions, WindowLayoutActionsHost } from "./actions";
 import { WindowLayoutDivisionGap } from "./surface";
 import { lightTheme } from "@/styles/theme";
 
-vi.stubGlobal("React", React);
+beforeEach(() => {
+  vi.stubGlobal("React", React);
+});
 const layout = { sidebarWidth: 465, gap: 21, contentWidth: 381 };
 const geometry: WindowLayout = {
   bounds: { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight },
@@ -30,6 +32,7 @@ document.body.appendChild(container);
 const root = createRoot(container);
 afterEach(() => {
   act(() => root.render(null));
+  vi.unstubAllGlobals();
 });
 
 it("paints the reserved division with the sidebar surface", () => {

@@ -24,6 +24,7 @@ let root: Root | null = null;
 let container: HTMLDivElement | null = null;
 
 beforeEach(() => {
+  vi.stubGlobal("React", React);
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -34,6 +35,7 @@ afterEach(() => {
   container?.remove();
   root = null;
   container = null;
+  vi.unstubAllGlobals();
 });
 
 function renderRowWithHandle(info: DraggableRenderItemInfo<Item>) {
