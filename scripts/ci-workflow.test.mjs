@@ -379,32 +379,39 @@ test("desktop packaging smokes main pushes and only the pull requests that touch
   }
 });
 
-test("stable iOS releases upload once and distribute to external testers before App Store review", () => {
-  const source = readFileSync(
+test("stable and beta iOS releases upload once to TestFlight without review or external distribution", () => {
+  for (const workflow of ["release-ios.yml", "release-ios-beta.yml"]) {
+    const source = readFileSync(
+      new URL(`packages/app/.eas/workflows/${workflow}`, repoRoot),
+      "utf8",
+    );
+    const jobs = jobBlocks(source);
+    assert.deepEqual(
+      [...jobs.keys()],
+      ["build_ios", workflow === "release-ios.yml" ? "distribute_ios" : "distribute_ios_beta"],
+    );
+    const uploads = [...jobs.entries()].filter(
+      ([, lines]) =>
+        lines.some((line) => /^    type: (submit|testflight)$/.test(line)) &&
+        lines.some((line) => line.includes("needs.build_ios.outputs.build_id")),
+    );
+    assert.equal(uploads.length, 1, "the iOS binary must be uploaded exactly once");
+    const [, distributionLines] = uploads[0];
+    const distribution = distributionLines.join("\n");
+    assert.match(distribution, /^    needs: \[build_ios\]$/m);
+    assert.match(distribution, /^    type: submit$/m);
+    assert.match(distribution, /^      profile: production$/m);
+    assert.equal(jobs.has("submit_ios_for_review"), false);
+    assert.doesNotMatch(
+      source,
+      /external_groups:|submit_beta_review:|submit_review|type: testflight/,
+    );
+  }
+  const android = readFileSync(
     new URL("packages/app/.eas/workflows/release-mobile.yml", repoRoot),
     "utf8",
   );
-  const jobs = jobBlocks(source);
-  const uploads = [...jobs.entries()].filter(
-    ([, lines]) =>
-      lines.some((line) => /^    type: (submit|testflight)$/.test(line)) &&
-      lines.some((line) => line.includes("needs.build_ios.outputs.build_id")),
-  );
-  assert.equal(uploads.length, 1, "the iOS binary must be uploaded exactly once");
-  const [distributionId, distributionLines] = uploads[0];
-  const distribution = distributionLines.join("\n");
-  assert.match(distribution, /^    type: testflight$/m);
-  assert.match(distribution, /external_groups:\s*\n\s+- Paseo Beta/);
-  assert.match(distribution, /^      submit_beta_review: true$/m);
-
-  const review = jobs.get("submit_ios_for_review").join("\n");
-  assert.match(review, new RegExp(`needs: \\[build_ios, ${distributionId}\\]`));
-  assert.match(review, /APP_VERSION="\$\{\{ needs\.build_ios\.outputs\.app_version \}\}"/);
-  assert.match(
-    review,
-    /APP_BUILD_VERSION="\$\{\{ needs\.build_ios\.outputs\.app_build_version \}\}"/,
-  );
-  assert.match(review, /bundle exec fastlane ios submit_review/);
+  assert.doesNotMatch(android, /platform: ios|build_ios|submit_ios/);
 });
 
 test("eight Playwright shards share two-worker coverage", () => {

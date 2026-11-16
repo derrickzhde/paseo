@@ -2,17 +2,9 @@
 
 ## 0.16.1 - 2026-11-16
 
-合并 [上游 0.16.0](https://github.com/getpaseo/paseo/releases/tag/v0.16.0)，并保留本 fork 的定制行为。
-
-### 改进
-
-- 在 fork 发布渠道上采用上游的草稿控件（`listControls`）、内置插件库、命令中心标签页以及 0.16.0 的其余功能。
-- 继续保留数学公式渲染与复制、手机 12/24 小时制时钟偏好、Claude 200K 与 `[1m]` 模型变体、fork 的 GitHub Desktop/Android 更新目标、远程主机 CLI 归档自更新，以及会话用量指标。
-
-### 说明
-
-- 从 [derrickzhde/paseo](https://github.com/derrickzhde/paseo/releases) 下载发布包。
-- ACP 草稿探测在按模型解析控件后，仍会恢复 agent 先前记住的模型选择。
+- **Fork 渠道整合上游 0.16.0：** 合并 [上游 0.16.0](https://github.com/getpaseo/paseo/releases/tag/v0.16.0) 的草稿控件、内置插件库、命令中心标签页等能力，同时保留本 fork 的定制行为。
+- **保留的 fork 能力：** 数学公式渲染与复制、手机 12/24 小时制时钟偏好、Claude 200K 与 `[1m]` 模型变体、会话用量指标、GitHub Desktop/Android 更新目标，以及远程主机 CLI 归档自更新路径。
+- **下载地址：** 发布包见 [derrickzhde/paseo](https://github.com/derrickzhde/paseo/releases)。
 
 ## 0.16.0 - 2026-11-16
 

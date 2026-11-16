@@ -2,17 +2,9 @@
 
 ## 0.16.1 - 2026-11-16
 
-Integrate [upstream 0.16.0](https://github.com/getpaseo/paseo/releases/tag/v0.16.0) while retaining this fork's customizations.
-
-### Improved
-
-- Adopt upstream provider draft controls (`listControls`), the built-in plugin gallery, command center tabs, and the rest of the 0.16.0 feature set on the fork release channel.
-- Keep math rendering and copy behavior, phone 12/24-hour clock preferences, Claude 200K and `[1m]` model variants, fork GitHub Desktop/Android updater targets, remote-host CLI archive upgrades, and session usage metrics.
-
-### Notes
-
-- Download releases from [derrickzhde/paseo](https://github.com/derrickzhde/paseo/releases).
-- ACP draft probes still restore an agent's remembered model after model-specific control resolution.
+- **Upstream 0.16.0 on the fork channel:** Integrates [upstream 0.16.0](https://github.com/getpaseo/paseo/releases/tag/v0.16.0) — provider draft controls, built-in plugin gallery, command center tabs, and the rest of that release — while keeping this fork's custom behavior.
+- **Preserved fork behavior:** Math rendering and copy, phone 12/24-hour clock preferences, Claude 200K and `[1m]` variants, session usage metrics, GitHub Desktop/Android updater targets, and the remote-host CLI archive upgrade path.
+- **Downloads:** Release packages are published at [derrickzhde/paseo](https://github.com/derrickzhde/paseo/releases).
 
 ## 0.16.0 - 2026-11-16
 

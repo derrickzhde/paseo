@@ -1,6 +1,4 @@
-Integrate upstream 0.16.0 while retaining this fork's customizations.
-
-Improved
-- Adopt upstream provider draft controls (listControls), the built-in plugin gallery, command center tabs, and the rest of the 0.16.0 feature set on the fork release channel.
+- Upstream 0.16.0 on the fork channel: Integrates upstream 0.16.0 — provider draft controls, built-in plugin gallery, command center tabs, and the rest of that release — while keeping this fork's custom behavior.
+- Preserved fork behavior: Math rendering and copy, phone 12/24-hour clock preferences, Claude 200K and [1m] variants, session usage metrics, GitHub Desktop/Android updater targets, and the remote-host CLI archive upgrade path.
 
 Full notes: https://paseo.sh/changelog
