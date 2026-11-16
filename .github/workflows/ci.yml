@@ -416,7 +416,9 @@ jobs:
         run: npm run build:app-deps
 
       - name: Run app unit tests
-        run: npm run test --workspace=@getpaseo/app
+        run: npm run test --workspace=@getpaseo/app -- --project unit
+      - name: Run app browser tests
+        run: npm run test --workspace=@getpaseo/app -- --project browser
 
   playwright-1:
     name: playwright (shard 1/8)

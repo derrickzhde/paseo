@@ -164,7 +164,7 @@ export default defineConfig({
     // Unit and browser suites each boot Vite; running both projects at once races the
     // browser dev server and surfaces as random "Failed to fetch dynamically imported module".
     sequence: { concurrent: false },
-    maxWorkers: 2,
+    maxWorkers: 1,
     server: {
       deps: {
         fallbackCJS: true,
@@ -180,6 +180,7 @@ export default defineConfig({
           "@dnd-kit/core",
           "@dnd-kit/sortable",
           "@dnd-kit/utilities",
+          "expo-router",
         ],
       },
     },
@@ -189,6 +190,8 @@ export default defineConfig({
   // so it scans the native files and dies on imports react-native-web has no answer for.
   // Unbundled, the same imports go through the resolver below and land on the web files.
   optimizeDeps: {
+    // Crawl every browser test up front so Vite does not reload mid-suite.
+    entries: ["src/**/*.browser.{test,spec}.{ts,tsx}", "src/i18n/i18next.ts"],
     // Browser tests run a long suite; discovering xterm or dnd-kit mid-run reloads Vite and
     // fails unrelated suites with "Failed to fetch dynamically imported module".
     holdUntilCrawlEnd: true,
@@ -213,7 +216,15 @@ export default defineConfig({
       "react-dom/client",
       "@xterm/addon-serialize",
       "react/compiler-runtime",
-      "expo-router/react-navigation",
+      "@xterm/xterm",
+      "@xterm/addon-fit",
+      "@xterm/addon-clipboard",
+      "@xterm/addon-image",
+      "@xterm/addon-search",
+      "@xterm/addon-unicode11",
+      "@xterm/addon-unicode-graphemes",
+      "@xterm/addon-web-links",
+      "@xterm/addon-webgl",
       "@testing-library/react",
       "@tanstack/react-query",
       "@tanstack/react-virtual",
@@ -231,12 +242,17 @@ export default defineConfig({
       "@dnd-kit/core",
       "@dnd-kit/sortable",
       "@dnd-kit/utilities",
+      "@testing-library/dom",
+      "@react-native-masked-view/masked-view",
+      "turndown",
+      "turndown-plugin-gfm",
     ],
     exclude: [
       "react-native-enriched-markdown",
       "react-native-reanimated",
       "react-native-gesture-handler",
       "react-native-keyboard-controller",
+      "expo-router",
     ],
   },
   // babel-preset-expo compiles JSX with the automatic runtime, so app modules don't import React.
@@ -357,6 +373,23 @@ export default defineConfig({
       {
         find: /^expo-linking$/,
         replacement: path.resolve(__dirname, "test-stubs/expo-linking.ts"),
+      },
+      // Prebundled expo-router breaks Vitest browser imports and drops the default export.
+      {
+        find: /^expo-router\/react-navigation$/,
+        replacement: path.resolve(__dirname, "test-stubs/expo-router-react-navigation.ts"),
+      },
+      {
+        find: /^expo-router\/native-stack$/,
+        replacement: path.resolve(__dirname, "test-stubs/expo-router-native-stack.ts"),
+      },
+      {
+        find: /^expo-router\/head$/,
+        replacement: path.resolve(__dirname, "test-stubs/expo-router-head.ts"),
+      },
+      {
+        find: /^expo-router$/,
+        replacement: path.resolve(__dirname, "test-stubs/expo-router.ts"),
       },
       // No Node implementation: every call on the real module rejects, so a test
       // touching a persisted store drowns in unhandled rejections.
