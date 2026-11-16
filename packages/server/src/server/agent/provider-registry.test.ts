@@ -4,7 +4,7 @@ import type { ToolPolicy } from "@getpaseo/protocol/agent-types";
 import { createTestLogger } from "../../test-utils/test-logger.js";
 import type {
   AgentClient,
-  AgentFeature,
+  AgentDraftControls,
   AgentModelDefinition,
   AgentMode,
   AgentSessionConfig,
@@ -57,7 +57,6 @@ const mockState = vi.hoisted(() => {
     runtimeModels: new Map<string, AgentModelDefinition[]>(),
     cursorListFeaturesConfigs: [] as AgentSessionConfig[],
     codexNativeArchiveCalls: [] as Array<{ state: "archive" | "restore"; handle: unknown }>,
-    cursorListDraftOptionsConfigs: [] as AgentSessionConfig[],
     reset() {
       this.constructorArgs.claude = [];
       this.constructorArgs.codex = [];
@@ -394,17 +393,20 @@ vi.mock("./providers/cursor-acp-agent.js", () => ({
       return true;
     }
 
-    async listFeatures(config: AgentSessionConfig): Promise<AgentFeature[]> {
+    async listControls(config: AgentSessionConfig): Promise<AgentDraftControls> {
       mockState.cursorListFeaturesConfigs.push(config);
-      return [
-        {
-          type: "select",
-          id: "fast",
-          label: "Fast",
-          value: "false",
-          options: [{ id: "false", label: "Off" }],
-        },
-      ];
+      return {
+        options: config.providerOptions ?? {},
+        controls: [
+          {
+            type: "select",
+            key: "fast",
+            label: "Fast",
+            defaultValue: "false",
+            choices: [{ value: "false", label: "Off" }],
+          },
+        ],
+      };
     }
 
     async listDraftOptions(config: AgentSessionConfig) {
@@ -802,6 +804,33 @@ test("ACP provider configuration retains opaque options", () => {
   });
 });
 
+test("a saved legacy Codex Fast preference wins over a configured service_tier default", () => {
+  const registry = buildProviderRegistry(logger, {
+    providerOverrides: { codex: { options: { service_tier: "default", plan_mode: false } } },
+  });
+  const client = registry.codex.createClient(logger);
+
+  // The manager hands the registry a pre-v0.10 record's `fast_mode` already converted.
+  expect(client.effectiveOptions?.({ service_tier: "fast" })).toEqual({
+    service_tier: "fast",
+    plan_mode: false,
+  });
+  expect(client.effectiveOptions?.({})).toEqual({ service_tier: "default", plan_mode: false });
+});
+
+test("a configured legacy Codex Fast default supplies the service_tier default", () => {
+  const registry = buildProviderRegistry(logger, {
+    providerOverrides: { codex: { options: { fast_mode: true } } },
+  });
+  const client = registry.codex.createClient(logger);
+
+  // Removing an agent's own speed falls back to the configured Fast.
+  expect(client.effectiveOptions?.({})).toEqual({ service_tier: "fast" });
+  expect(client.effectiveOptions?.({ service_tier: "default" })).toEqual({
+    service_tier: "default",
+  });
+});
+
 test("cursor provider extending acp uses CursorACPAgentClient", () => {
   const registry = buildProviderRegistry(logger, {
     providerOverrides: {
@@ -834,7 +863,7 @@ test("cursor provider extending acp uses CursorACPAgentClient", () => {
   expect(mockState.constructorArgs.genericAcp).toEqual([]);
 });
 
-test("wrapped cursor client lists ACP features through the inner provider", async () => {
+test("wrapped cursor client lists ACP controls through the inner provider", async () => {
   const registry = buildProviderRegistry(logger, {
     providerOverrides: {
       cursor: {
@@ -848,19 +877,22 @@ test("wrapped cursor client lists ACP features through the inner provider", asyn
   const client = registry.cursor.createClient(logger);
 
   await expect(
-    client.listFeatures?.({
+    client.listControls?.({
       provider: "cursor",
       cwd: "/tmp/cursor",
     }),
-  ).resolves.toEqual([
-    {
-      type: "select",
-      id: "fast",
-      label: "Fast",
-      value: "false",
-      options: [{ id: "false", label: "Off" }],
-    },
-  ]);
+  ).resolves.toEqual({
+    controls: [
+      {
+        type: "select",
+        key: "fast",
+        label: "Fast",
+        defaultValue: "false",
+        choices: [{ value: "false", label: "Off" }],
+      },
+    ],
+    options: {},
+  });
   expect(mockState.cursorListFeaturesConfigs).toEqual([
     {
       provider: "acp",

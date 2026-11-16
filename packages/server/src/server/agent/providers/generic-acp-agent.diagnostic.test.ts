@@ -319,7 +319,7 @@ describe("GenericACPAgentClient diagnostics", () => {
       });
       const client = registry["configured-acp"].createClient(logger);
 
-      await client.listDraftOptions?.({
+      await client.listControls?.({
         provider: "configured-acp",
         cwd: testDir,
         model: "fake-model",

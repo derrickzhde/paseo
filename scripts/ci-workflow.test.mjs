@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
+import { execFileSync, spawnSync } from "node:child_process";
 import { readFileSync, readdirSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
-import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { relative as relativePath } from "node:path";
@@ -137,6 +137,43 @@ test("change gating allows superseded workflow runs to cancel", () => {
       /\$\{\{\s*always\(\)/,
       "always() keeps jobs alive after concurrency cancellation; use !cancelled() for fail-open gating",
     );
+  }
+});
+
+test("published npm packages declare and ship the repository license", () => {
+  const rootManifest = JSON.parse(readFileSync(new URL("package.json", repoRoot), "utf8"));
+  const workspaceArgs = rootManifest.scripts["release:publish"].match(/--workspace=\S+/g);
+  assert.notEqual(workspaceArgs, null, "release:publish must select public packages");
+  const packed = JSON.parse(
+    execFileSync("npm", ["pack", "--dry-run", "--ignore-scripts", "--json", ...workspaceArgs], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    }),
+  );
+  const manifests = new Map(
+    rootManifest.workspaces.map((workspace) => {
+      const directory = new URL(`${workspace}/`, repoRoot);
+      const manifest = JSON.parse(readFileSync(new URL("package.json", directory), "utf8"));
+      return [manifest.name, { directory, manifest }];
+    }),
+  );
+  const licenses = packed.map(({ name, files }) => ({
+    name,
+    license: manifests.get(name).manifest.license,
+    files: files.filter((file) => file.path === "LICENSE").map((file) => file.path),
+  }));
+  assert.deepEqual(
+    licenses,
+    workspaceArgs.map((workspace) => ({
+      name: workspace.slice("--workspace=".length),
+      license: "Apache-2.0",
+      files: ["LICENSE"],
+    })),
+  );
+  const repositoryLicense = readFileSync(new URL("LICENSE", repoRoot), "utf8");
+  for (const { name } of packed) {
+    const { directory } = manifests.get(name);
+    assert.equal(readFileSync(new URL("LICENSE", directory), "utf8"), repositoryLicense, name);
   }
 });
 
@@ -342,39 +379,32 @@ test("desktop packaging smokes main pushes and only the pull requests that touch
   }
 });
 
-test("stable and beta iOS releases upload once to TestFlight without review or external distribution", () => {
-  for (const workflow of ["release-ios.yml", "release-ios-beta.yml"]) {
-    const source = readFileSync(
-      new URL(`packages/app/.eas/workflows/${workflow}`, repoRoot),
-      "utf8",
-    );
-    const jobs = jobBlocks(source);
-    assert.deepEqual(
-      [...jobs.keys()],
-      ["build_ios", workflow === "release-ios.yml" ? "distribute_ios" : "distribute_ios_beta"],
-    );
-    const uploads = [...jobs.entries()].filter(
-      ([, lines]) =>
-        lines.some((line) => /^    type: (submit|testflight)$/.test(line)) &&
-        lines.some((line) => line.includes("needs.build_ios.outputs.build_id")),
-    );
-    assert.equal(uploads.length, 1, "the iOS binary must be uploaded exactly once");
-    const [, distributionLines] = uploads[0];
-    const distribution = distributionLines.join("\n");
-    assert.match(distribution, /^    needs: \[build_ios\]$/m);
-    assert.match(distribution, /^    type: submit$/m);
-    assert.match(distribution, /^      profile: production$/m);
-    assert.equal(jobs.has("submit_ios_for_review"), false);
-    assert.doesNotMatch(
-      source,
-      /external_groups:|submit_beta_review:|submit_review|type: testflight/,
-    );
-  }
-  const android = readFileSync(
+test("stable iOS releases upload once and distribute to external testers before App Store review", () => {
+  const source = readFileSync(
     new URL("packages/app/.eas/workflows/release-mobile.yml", repoRoot),
     "utf8",
   );
-  assert.doesNotMatch(android, /platform: ios|build_ios|submit_ios/);
+  const jobs = jobBlocks(source);
+  const uploads = [...jobs.entries()].filter(
+    ([, lines]) =>
+      lines.some((line) => /^    type: (submit|testflight)$/.test(line)) &&
+      lines.some((line) => line.includes("needs.build_ios.outputs.build_id")),
+  );
+  assert.equal(uploads.length, 1, "the iOS binary must be uploaded exactly once");
+  const [distributionId, distributionLines] = uploads[0];
+  const distribution = distributionLines.join("\n");
+  assert.match(distribution, /^    type: testflight$/m);
+  assert.match(distribution, /external_groups:\s*\n\s+- Paseo Beta/);
+  assert.match(distribution, /^      submit_beta_review: true$/m);
+
+  const review = jobs.get("submit_ios_for_review").join("\n");
+  assert.match(review, new RegExp(`needs: \\[build_ios, ${distributionId}\\]`));
+  assert.match(review, /APP_VERSION="\$\{\{ needs\.build_ios\.outputs\.app_version \}\}"/);
+  assert.match(
+    review,
+    /APP_BUILD_VERSION="\$\{\{ needs\.build_ios\.outputs\.app_build_version \}\}"/,
+  );
+  assert.match(review, /bundle exec fastlane ios submit_review/);
 });
 
 test("eight Playwright shards share two-worker coverage", () => {
@@ -687,51 +717,46 @@ test("macOS jobs use latest runners while preserving release architectures", () 
   assert.match(release, /runner: macos-26-intel\n\s+electron_arch: x64/);
 });
 
-test("macOS signing repair keeps certificate and keychain passwords separate", () => {
-  const workflow = readFileSync(new URL(".github/workflows/desktop-release.yml", repoRoot), "utf8");
-  const match = workflow.match(/<<'KEYCHAIN_FIX'\n([\s\S]*?)\n          KEYCHAIN_FIX/);
-  assert.ok(match, "the release workflow repairs the pinned signing tool");
-  const script = match[1].replace(/^          /gm, "");
-  const original = [
-    "return await importCerts(keychainFile, certPaths, cscPasswords);",
-    "async function importCerts(keychainFile, paths, keyPasswords) {",
-    '["import", paths[i], "-P", password]',
-    '["set-key-partition-list", "-S", "apple-tool:,apple:", "-s", "-k", password, keychainFile]',
-    "}",
-  ].join("\n");
-  const directory = mkdtempSync(join(tmpdir(), "signing-repair-"));
+test("Nix desktop packaging resolves the workspace-local builder", () => {
+  const source = readFileSync(new URL("nix/desktop-package.nix", repoRoot), "utf8");
+  const invocation = source.match(/^\s+([^\n]*electron-builder) \\\n/m)?.[1];
+  assert.ok(invocation, "Nix invokes the desktop packaging tool");
+  const directory = mkdtempSync(join(tmpdir(), "nix-builder-resolution-"));
   try {
-    const packageDirectory = join(directory, "node_modules/app-builder-lib");
-    mkdirSync(join(packageDirectory, "out/codeSign"), { recursive: true });
-    const manifest = join(packageDirectory, "package.json");
-    const sourcePath = join(packageDirectory, "out/codeSign/macCodeSign.js");
-    for (const [version, source, succeeds] of [
-      ["26.8.1", original, true],
-      ["26.8.1", original.replace("cscPasswords);", "differentArguments);"), false],
-      ["26.18.0", original, false],
-    ]) {
-      writeFileSync(manifest, JSON.stringify({ name: "app-builder-lib", version }));
-      writeFileSync(sourcePath, source);
-      const result = spawnSync(process.execPath, ["-e", script], {
-        cwd: directory,
-        encoding: "utf8",
-      });
-      const actual = readFileSync(sourcePath, "utf8");
-      if (succeeds) {
-        assert.equal(result.status, 0, result.stderr);
-        assert.ok(
-          actual.includes("importCerts(keychainFile, certPaths, cscPasswords, keychainPassword)"),
-        );
-        assert.ok(
-          actual.includes("importCerts(keychainFile, paths, keyPasswords, keychainPassword)"),
-        );
-        assert.ok(actual.includes('["import", paths[i], "-P", password]'));
-        assert.ok(actual.includes('"-k", keychainPassword, keychainFile]'));
-      } else {
-        assert.notEqual(result.status, 0);
-        assert.equal(actual, source, "unexpected tool inputs must fail without a partial write");
-      }
-    }
+    const desktop = join(directory, "packages/desktop");
+    mkdirSync(join(desktop, "node_modules/.bin"), { recursive: true });
+    mkdirSync(join(desktop, "node_modules/electron-builder"));
+    writeFileSync(
+      join(desktop, "node_modules/electron-builder/package.json"),
+      JSON.stringify({
+        name: "electron-builder",
+        version: "1.0.0",
+        bin: { "electron-builder": "../.bin/electron-builder" },
+      }),
+    );
+    writeFileSync(
+      join(directory, "package.json"),
+      JSON.stringify({ private: true, workspaces: ["packages/desktop"] }),
+    );
+    writeFileSync(
+      join(desktop, "package.json"),
+      JSON.stringify({
+        name: "desktop-fixture",
+        private: true,
+        devDependencies: { "electron-builder": "1.0.0" },
+      }),
+    );
+    writeFileSync(
+      join(desktop, "node_modules/.bin/electron-builder"),
+      '#!/bin/sh\nprintf "workspace-builder\\n"\n',
+      { mode: 0o755 },
+    );
+    const result = spawnSync("sh", ["-c", `${invocation} --version`], {
+      cwd: desktop,
+      encoding: "utf8",
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout.trim(), "workspace-builder");
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

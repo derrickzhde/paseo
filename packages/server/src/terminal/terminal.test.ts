@@ -410,7 +410,12 @@ describe("createTerminal", () => {
           cwd: realpathSync(tmpdir()),
           cols: 500,
           command: process.execPath,
-          args: ["-e", "process.stdout.write(JSON.stringify(process.argv.slice(1)))", nastyPrompt],
+          // Keep the PTY alive until the screen assertion; exit disposes its parser.
+          args: [
+            "-e",
+            "process.stdout.write(JSON.stringify(process.argv.slice(1))); setInterval(() => {}, 100000)",
+            nastyPrompt,
+          ],
         }),
       );
 
@@ -1696,6 +1701,52 @@ it.each([false, true])(
     }
   },
 );
+
+it.each([
+  { name: "SGR", modes: "\x1b[?1006h", wheel: "\x1b[<64;10;5M" },
+  { name: "SGR pixels", modes: "\x1b[?1016h", wheel: "\x1b[<64;80;90M" },
+  { name: "disabled SGR", modes: "\x1b[?1006h\x1b[?1006l", wheel: "\x1b[M`*%" },
+])("preserves $name wheel reports across repeated terminal replays", async (input) => {
+  const source = new xterm.Terminal({ rows: 10, cols: 80, allowProposedApi: true });
+  const receiver = new xterm.Terminal({ rows: 10, cols: 80, allowProposedApi: true });
+  const serialize = createTerminalSerializer(source);
+  const wheel = {
+    button: 4,
+    action: 0,
+    col: 10,
+    row: 5,
+    x: 80,
+    y: 90,
+    ctrl: false,
+    alt: false,
+    shift: false,
+  };
+  // Mouse encoding is not exposed by xterm's public modes API.
+  const mouse = (
+    receiver as unknown as {
+      _core: {
+        mouseStateService: {
+          encodeMouseEvent(event: typeof wheel): string;
+        };
+      };
+    }
+  )._core.mouseStateService;
+  try {
+    await new Promise<void>((resolve) =>
+      source.write("\x1b[?1049h\x1b[?1002h" + input.modes + "TRANSCRIPT", resolve),
+    );
+    for (let replay = 0; replay < 2; replay++) {
+      receiver.reset();
+      await new Promise<void>((resolve) => receiver.write(serialize(), resolve));
+      expect(receiver.buffer.active.type).toBe("alternate");
+      expect(receiver.modes.mouseTrackingMode).toBe("drag");
+      expect(mouse.encodeMouseEvent(wheel)).toBe(input.wheel);
+    }
+  } finally {
+    receiver.dispose();
+    source.dispose();
+  }
+});
 
 it.each([
   { name: "unset", presentation: "", style: undefined, visible: true },

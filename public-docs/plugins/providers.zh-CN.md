@@ -19,7 +19,7 @@ Provider 插件把一个编程 Agent 接入 Paseo，而无需把它加入 Paseo 
 
 示例有：
 
-- [`provider-direct`](https://github.com/getpaseo/paseo/tree/main/plugin-examples/provider-direct)：会话、设置、提示词、持久化、子会话，以及一个由 Provider 拥有的时间线渲染器；
+- [`provider-direct`](https://github.com/getpaseo/paseo/tree/main/plugin-examples/provider-direct)：会话、选项控件、提示词、持久化、子会话，以及一个由 Provider 拥有的时间线渲染器；
 - [`provider-acp-transformer`](https://github.com/getpaseo/paseo/tree/main/plugin-examples/provider-acp-transformer)：一个 ACP 命令模板，带有一个用 Zod 校验的厂商编辑转换器。加载之前，请把 `example-acp --stdio` 替换为一个已安装的 ACP Agent；
 - [`inline-thinking`](https://github.com/getpaseo/paseo/tree/main/plugin-examples/inline-thinking)：一个只包含渲染器、不实现 Provider 的插件。
 
@@ -125,7 +125,7 @@ if (input.type === "catalog") {
 
 ## 打开会话 {#open-a-session}
 
-`session.open` 包含完整的启动配置：工作目录、环境变量、系统提示词、MCP 服务器、工具策略、模型、模式、设置、不透明的 Provider 选项以及持久化偏好。
+`session.open` 包含完整的启动配置：工作目录、环境变量、系统提示词、MCP 服务器、工具策略、模型、模式、`providerOptions` 以及持久化偏好。
 
 对于持久化的、作用于主机的插件设置，请使用 `server.registerSettings()` 返回的句柄。在目录和会话回调中读取它；当 Provider 在内存中保留配置时，订阅它。`read()` 和 `subscribe()` 的契约见[设置](./reference.md#persisted-values)。
 
@@ -160,7 +160,8 @@ emit({
     models,
     modes,
     thinkingOptions,
-    settings: [],
+    controls: [],
+    providerOptions: {},
   },
 });
 emit({ type: "session.ready", requestId: input.requestId, sessionId: input.sessionId });
@@ -207,17 +208,11 @@ emit({ type: "session.turn", sessionId, turnId, state: "completed" });
 
 到这一步，Provider 已经可用：用户可以选择模型、打开会话、发送消息并看到回复。
 
-## 上报会话用量 {#report-session-usage}
+## 为 Provider 选项添加 Composer 控件 {#add-composer-controls-for-provider-options}
 
-发送 `session.usage`，并在现有的 `usage` 快照中提供上下文占用和费用。要启用会话缓存命中率，请提供可选的 `usageSample` 计数。将 `scope` 设为 `request`、`turn` 或 `session`，并为该计量单元使用稳定的 `id`。一个运行时会话内只使用一种范围；不要同时上报单次请求及包含该请求的轮次或会话总量。同一标识的重复上报会替换之前的计数；请求或轮次的最终结果可以修正早先的计数。会话计数在同一标识内必须保持累计。只有开始新的计数周期且与旧计数没有重叠时，才更换标识。若计数减少但标识不变，daemon 无法区分计数重置和历史记录缩减，会将整个会话的缓存命中率标为不可用。
+`providerOptions` 是 Provider 自己的配置：一个由 JSON 值组成的记录，Paseo 按 Agent 保存它，并在 `session.open` 中交给你。它包含用户在 `config.json` 中为你的 Provider 设置的默认值。请校验你读取的每个键。
 
-`inputTokens` 对每个提示词 token 只计一次，包括缓存读取和写入。`cachedInputTokens` 只统计缓存读取。`outputTokens` 是 Provider 生成的 token 数。未知计数请省略，不要用零代替；确实测得为零时应上报零。即使所有计数都未知，也保留范围和标识，让 daemon 清除过期的命中率。这些样本只用于 Provider 内部计量，不会作为原始计数发送给客户端。
-
-要提供 TPS，还需在 `session.usage` 中提供可选的 `generationSample: { id, outputTokens?, durationMs?, completedAt? }`。为每个已完成的模型响应使用一个稳定标识，上报输出总数和以毫秒为单位的活动请求耗时。输出总数应包含推理 token，且不能重复计数。排除模型调用之间的空闲时间和本地工具执行时间。原生请求耗时可能包含提示词处理和网络延迟；不要发送整个 Agent 轮次的总耗时。`completedAt` 是以 Unix 毫秒时间戳表示的响应完成时间；若只知道耗时，请省略它，daemon 会使用第一次实时接收样本的时间。同一响应的重复样本会替换其数据，但不会刷新接收时间。保留标识并省略未知字段，让最近未测得的响应清除过期 TPS。daemon 对最近五分钟内完成的响应求输出 token 总数与耗时总数之比；空闲时的显示行为遵循[会话指标约定](https://github.com/derrickzhde/paseo/blob/main/docs/agent-stream-performance.md#session-metrics-in-the-context-details)。生成样本与缓存样本分开，也不会转发给客户端。
-
-## 添加会话专属的 Composer 控件 {#add-session-specific-composer-controls}
-
-只有当原生 Agent 有用户在打开会话后需要修改的设置时，才添加 `session.configure`。在 `session.config` 中以开关或选择控件的形式发布它们：
+只有当用户需要在 Composer 中查看并修改其中一部分选项时，才添加 `controls`。一个控件把 `providerOptions` 的一个顶层键绘制为开关或选择器。控件本身不保存值：Paseo 从 `providerOptions` 读取值。在 `session.config` 中发布控件，以及你正在使用的值：
 
 ```ts
 emit({
@@ -228,31 +223,32 @@ emit({
     models: [{ id: "agent-large", label: "Agent Large" }],
     modes: [],
     thinkingOptions: [],
-    settings: [
-      {
-        type: "toggle",
-        id: "fast",
-        label: "Fast mode",
-        value: nativeSession.fast,
-      },
+    controls: [
+      { type: "toggle", key: "fast", label: "Fast mode", icon: "Zap", defaultValue: false },
       {
         type: "select",
-        id: "approval",
+        key: "approval",
         label: "Approvals",
-        value: nativeSession.approval,
-        options: [
-          { label: "Ask", value: "ask" },
-          { label: "Auto accept", value: "auto" },
+        icon: "Shield",
+        defaultValue: "ask",
+        choices: [
+          { value: "ask", label: "Ask" },
+          { value: "auto", label: "Auto accept" },
         ],
       },
     ],
+    providerOptions: { fast: nativeSession.fast, approval: nativeSession.approval },
   },
 });
 ```
 
-Paseo 会在 Composer 中渲染这些控件。用户的修改会以 `session.configure` 的形式到达；应用它，并在 `request.completed` 之前发布已确定的 `session.config`。Provider 可以在运行时改变可用的控件，包括在模型变化之后。
+`icon` 是 Lucide 图标名称。`defaultValue` 是控件在键没有值时显示的值。会话打开或应用修改时，你报告的每个值（包括处于默认值的值和无人设置过的值）Paseo 都会保存。相同的控件会出现在“新建工作区”界面、草稿标签页和运行中的 Agent 上。只为你能在运行中的会话里修改的键提供控件。Provider 可以在运行时改变控件，包括在模型变化之后。
 
-`settings` 是面向用户的控件。`providerOptions` 是在创建会话时提供的不透明 JSON，用于 Paseo 不会渲染的 Provider 专属配置。Provider 专属的 token 预算应放在这两处之一；它不是一个专门的提示词字段。
+修改会以 `session.configure` 的形式到达，`changes.providerOptions` 只包含发生变化的键，无论这些键是否有控件。应用每一个键，并在 `request.completed` 之前发布已确定的 `session.config`。如果无法应用其中某个键（例如只在会话打开时读取的键），用 `request.failed` 使请求失败，并让每个键保持原样。值为 `null` 表示把该键恢复为 Provider 的默认值。请发布会话最终实际使用的值，而不是请求的副本：Paseo 会保存你发布的值，使保存的选项与实际运行的一致。
+
+如果 Provider 自行改变了某个选项（例如切换模型后关闭了 Fast），请发布带有新值的 `session.config`。Paseo 会保存它们，不会把旧值设置回去。
+
+并非每个选项都需要控件。例如 Provider 专属的 token 预算应放在 `providerOptions` 中，它不是一个专门的提示词字段。它会在 `session.open` 中交付，调用方可以在运行中的 Agent 上修改它，由你的 `session.configure` 处理程序决定能否实时应用。请在 `providerOptions` 中报告它，使 Paseo 保存实际运行的值。
 
 ## 添加持久化与重放 {#add-persistence-and-replay}
 
@@ -413,7 +409,7 @@ export const vendorEdits: AcpTransformer = {
 用真实的 Agent 测试 Provider，而不只是模拟的数据帧：
 
 1. 以目录来源安装插件；
-2. 确认它的 SVG、模型、模式和设置都会显示；
+2. 确认它的 SVG、模型、模式和选项控件都会显示；
 3. 创建会话并完成一段真实的提示词；
 4. 在支持的情况下，试用权限、引导、取消、持久化和重放；
 5. 在桌面和移动端宽度的布局中渲染每一种自定义时间线条目；

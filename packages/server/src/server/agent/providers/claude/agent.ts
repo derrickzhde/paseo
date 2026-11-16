@@ -1,17 +1,20 @@
 import { setImmediate } from "node:timers/promises";
 import { ClaudeRuntimeSafety } from "./runtime-safety.js";
-import { validateProviderOptions } from "../../provider-options.js";
-import { EstimatedGenerationTimer } from "../generation-sample.js";
+import type { ProviderOptions } from "@getpaseo/protocol/agent-types";
+import { applyProviderOptionsPatch } from "../../option-controls.js";
+import { assertChangesAreLive, validateProviderOptions } from "../../provider-options.js";
 import type { ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import { promises } from "node:fs";
 import path from "node:path";
 import { LRUCache } from "lru-cache";
+import stripAnsi from "strip-ansi";
 import { createImportDescriptorScheduler } from "./import-descriptor-scheduler.js";
 import {
   type AgentDefinition,
   type CanUseTool,
+  type HookCallback,
   type McpServerConfig as ClaudeSdkMcpServerConfig,
   type PermissionMode,
   type PermissionResult,
@@ -66,7 +69,7 @@ import { foldSubagentObservations, type SubagentObservation } from "./subagents/
 import { observeReplayWorkflows } from "./subagents/workflow-replay-source.js";
 import { limitAgentTimelineItemContent } from "../../agent-timeline-content.js";
 import { readClaudeWorkflowResultFile } from "./subagents/workflow-output.js";
-import { buildClaudeFeatures, claudeModelSupportsFastMode } from "./feature-definitions.js";
+import { buildClaudeControls, claudeModelSupportsFastMode } from "./feature-definitions.js";
 import {
   buildBinaryDiagnosticRows,
   buildCommandResolutionDiagnosticRows,
@@ -105,7 +108,8 @@ import {
   type AgentCapabilityFlags,
   type AgentClient,
   type AgentCreateSessionOptions,
-  type AgentFeature,
+  type AgentDraftControls,
+  type AgentOptionControl,
   type AgentLaunchContext,
   type AgentMetadata,
   type AgentMode,
@@ -127,7 +131,6 @@ import {
   type AgentStreamEvent,
   type AgentTimelineItem,
   type AgentUsage,
-  type AgentUsageSample,
   type AgentRuntimeInfo,
   type FetchCatalogOptions,
   type ImportableProviderSession,
@@ -444,6 +447,12 @@ interface SlashCommandInvocation {
   rawInput: string;
 }
 
+// Claude Code reserves `__`-prefixed commands for its own server-launched sessions
+// (for example `/__remote-workflow`); a user cannot run them from a Paseo agent.
+function isClaudeInternalSlashCommand(commandName: string): boolean {
+  return commandName.startsWith("__");
+}
+
 function classifyClaudeSlashCommand(commandName: string): AgentSlashCommand["kind"] {
   // Claude exposes commands and skills as one flat SDK list, without structured source
   // metadata. Keep obvious root-only/session controls out of inline autocomplete and
@@ -475,11 +484,6 @@ interface ClaudeAgentClientOptions {
 type ClaudeImportDescriptorResult =
   | { type: "parsed"; descriptor: ImportableProviderSession | null }
   | { type: "unreadable"; error: Error };
-
-interface ClaudeImportDescriptorCacheEntry {
-  cacheKey: string;
-  descriptor: ImportableProviderSession;
-}
 
 interface ClaudeAgentSessionOptions {
   defaults?: { agents?: Record<string, AgentDefinition> };
@@ -1617,11 +1621,11 @@ export class ClaudeAgentClient implements AgentClient {
   private readonly scheduleImportDescriptors = createImportDescriptorScheduler(
     (candidate: ClaudeSessionCandidate, signal) => this.readImportDescriptor(candidate, signal),
   );
-  // Retain one observed version per file; reused metadata must not resurrect an older entry.
-  private readonly importDescriptorCache = new LRUCache<string, ClaudeImportDescriptorCacheEntry>({
+  private readonly importDescriptorCache = new LRUCache<string, ImportableProviderSession>({
     max: 500,
     maxSize: 8 * 1024 * 1024,
-    sizeCalculation: (entry, key) => 128 + 2 * (JSON.stringify(entry).length + key.length),
+    sizeCalculation: (descriptor, key) =>
+      128 + 2 * (JSON.stringify(descriptor).length + key.length),
   });
 
   constructor(options: ClaudeAgentClientOptions) {
@@ -1759,12 +1763,11 @@ export class ClaudeAgentClient implements AgentClient {
     });
   }
 
-  async listFeatures(config: AgentSessionConfig): Promise<AgentFeature[]> {
-    const claudeConfig = this.assertConfig(config);
-    return buildClaudeFeatures({
-      modelId: claudeConfig.model,
-      fastModeEnabled: claudeConfig.featureValues?.fast_mode === true,
-    });
+  async listControls(config: AgentSessionConfig): Promise<AgentDraftControls> {
+    return {
+      controls: buildClaudeControls(this.assertConfig(config).model),
+      options: config.providerOptions ?? {},
+    };
   }
 
   async listImportableSessions(
@@ -1809,11 +1812,8 @@ export class ClaudeAgentClient implements AgentClient {
     signal: AbortSignal,
   ): Promise<ClaudeImportDescriptorResult> {
     signal.throwIfAborted();
-    const cached = this.importDescriptorCache.get(candidate.path);
-    if (cached?.cacheKey === candidate.cacheKey) {
-      return { type: "parsed", descriptor: structuredClone(cached.descriptor) };
-    }
-    if (cached) this.importDescriptorCache.delete(candidate.path);
+    const cached = this.importDescriptorCache.get(candidate.cacheKey);
+    if (cached) return { type: "parsed", descriptor: structuredClone(cached) };
 
     let descriptor: ImportableProviderSession | null;
     try {
@@ -1834,10 +1834,7 @@ export class ClaudeAgentClient implements AgentClient {
       });
       signal.throwIfAborted();
       if (current && claudeSessionCacheKey(candidate.path, current) === candidate.cacheKey) {
-        this.importDescriptorCache.set(candidate.path, {
-          cacheKey: candidate.cacheKey,
-          descriptor: structuredClone(descriptor),
-        });
+        this.importDescriptorCache.set(candidate.cacheKey, structuredClone(descriptor));
       }
     }
     return { type: "parsed", descriptor: descriptor ? structuredClone(descriptor) : null };
@@ -2144,117 +2141,18 @@ function readClaudeParentToolUseId(message: SDKMessage): string | null {
   return typeof parentToolUseId === "string" && parentToolUseId.length > 0 ? parentToolUseId : null;
 }
 
-interface OpenTurnRequestUsage {
-  inputTokens?: number;
-  cacheCreationInputTokens?: number;
-  cacheReadInputTokens?: number;
-  outputTokens?: number;
-}
-
-function inclusiveKnownInput(request: OpenTurnRequestUsage): number | undefined {
-  if (
-    request.inputTokens === undefined ||
-    request.cacheCreationInputTokens === undefined ||
-    request.cacheReadInputTokens === undefined
-  ) {
-    return undefined;
-  }
-  return request.inputTokens + request.cacheCreationInputTokens + request.cacheReadInputTokens;
-}
-
-function readOpenTurnRequest(event: Record<string, unknown>): OpenTurnRequestUsage {
-  const rawUsage = toObjectRecord(toObjectRecord(event.message)?.usage);
-  return {
-    inputTokens: rawUsage ? readUsageCount(rawUsage, "input_tokens") : undefined,
-    cacheCreationInputTokens: rawUsage
-      ? readUsageCount(rawUsage, "cache_creation_input_tokens")
-      : undefined,
-    cacheReadInputTokens: rawUsage
-      ? readUsageCount(rawUsage, "cache_read_input_tokens")
-      : undefined,
-  };
-}
-
-function applyReportedUsageDelta(
-  request: OpenTurnRequestUsage,
-  event: Record<string, unknown>,
-  outputTokens: number,
-): void {
-  const deltaUsage = toObjectRecord(event.usage);
-  if (deltaUsage) {
-    const inputTokens = readUsageCount(deltaUsage, "input_tokens");
-    const cacheCreation = readUsageCount(deltaUsage, "cache_creation_input_tokens");
-    const cacheRead = readUsageCount(deltaUsage, "cache_read_input_tokens");
-    if (inputTokens !== undefined) {
-      request.inputTokens = inputTokens;
-    }
-    if (cacheCreation !== undefined) {
-      request.cacheCreationInputTokens = cacheCreation;
-    }
-    if (cacheRead !== undefined) {
-      request.cacheReadInputTokens = cacheRead;
-    }
-  }
-  request.outputTokens = outputTokens;
-}
-
-function cumulativeKnownCounter(params: {
-  turnValue: number;
-  turnKnown: boolean;
-  turnSeen: boolean;
-  hasOpen: boolean;
-  openValue: number | undefined;
-}): number | undefined {
-  const seen = params.turnSeen || params.hasOpen;
-  const known = params.turnKnown && (!params.hasOpen || params.openValue !== undefined);
-  if (!seen || !known) {
-    return undefined;
-  }
-  return params.turnValue + (params.openValue ?? 0);
-}
-
 class ClaudeContextUsageState {
-  private readonly estimatedGeneration = new EstimatedGenerationTimer();
-  private generationMessageId: string | undefined;
-  private generationOutputTokens: number | undefined;
-  private readonly generationMessageIds = new Set<string>();
   private contextWindowMaxTokens: number | undefined;
   private streamRequestInputUsage: StreamRequestInputUsage | undefined;
   private streamRequestOutputTokens: number | undefined;
   private compactedContextWindowUsedTokens: number | undefined;
   private completedResultTurns = 0;
-  private turnId: string | undefined;
-  private turnInput = 0;
-  private turnCached = 0;
-  private turnOutput = 0;
-  private turnInputSeen = false;
-  private turnCachedSeen = false;
-  private turnOutputSeen = false;
-  private turnInputKnown = true;
-  private turnCachedKnown = true;
-  private openRequest: OpenTurnRequestUsage | undefined;
-  private readonly countedMessageIds = new Set<string>();
 
   constructor(initialContextWindowMaxTokens?: number) {
     this.contextWindowMaxTokens = initialContextWindowMaxTokens;
   }
 
-  beginTurn(turnId: string): void {
-    this.estimatedGeneration.startTurn();
-    this.generationMessageId = undefined;
-    this.generationOutputTokens = undefined;
-    this.generationMessageIds.clear();
-    this.turnId = turnId;
-    this.turnInput = 0;
-    this.turnCached = 0;
-    this.turnOutput = 0;
-    this.turnInputSeen = false;
-    this.turnCachedSeen = false;
-    this.turnOutputSeen = false;
-    this.turnInputKnown = true;
-    this.turnCachedKnown = true;
-    this.openRequest = undefined;
-    this.countedMessageIds.clear();
+  beginTurn(): void {
     this.streamRequestInputUsage = undefined;
     this.streamRequestOutputTokens = undefined;
     this.compactedContextWindowUsedTokens = undefined;
@@ -2277,25 +2175,14 @@ class ClaudeContextUsageState {
     if (!streamEvent) {
       return null;
     }
-    const estimatedEvent = this.buildEstimatedGenerationEvent(streamEvent);
-    if (estimatedEvent) return estimatedEvent;
     const eventType = readTrimmedString(streamEvent.type);
     if (eventType === "message_start") {
       const inputUsage = readStreamRequestInputUsage(streamEvent);
       if (!inputUsage) {
         return null;
       }
-      const messageId = readTrimmedString(toObjectRecord(streamEvent.message)?.id);
-      if (messageId && this.countedMessageIds.has(messageId)) {
-        return null;
-      }
-      if (messageId) {
-        this.countedMessageIds.add(messageId);
-      }
-      this.finalizeOpenRequest();
       this.streamRequestInputUsage = inputUsage;
       this.streamRequestOutputTokens = 0;
-      this.openRequest = readOpenTurnRequest(streamEvent);
     } else if (eventType === "message_delta") {
       const outputTokens = readStreamRequestOutputTokens(streamEvent);
       if (typeof outputTokens !== "number") {
@@ -2308,9 +2195,6 @@ class ClaudeContextUsageState {
           streamEvent,
         );
       }
-      if (this.openRequest) {
-        applyReportedUsageDelta(this.openRequest, streamEvent, outputTokens);
-      }
     } else {
       return null;
     }
@@ -2320,41 +2204,6 @@ class ClaudeContextUsageState {
       return null;
     }
     return this.createUsageUpdatedEvent(usedTokens);
-  }
-
-  private buildEstimatedGenerationEvent(
-    streamEvent: Record<string, unknown>,
-  ): AgentStreamEvent | null {
-    const eventType = readTrimmedString(streamEvent.type);
-    if (eventType === "message_stop") {
-      const messageId = this.generationMessageId;
-      this.generationMessageId = undefined;
-      const generationSample = this.estimatedGeneration.finish(
-        `claude:${this.turnId}:${messageId}`,
-        messageId ? this.generationOutputTokens : undefined,
-      );
-      if (!generationSample) return null;
-      const usedTokens = this.streamUsedTokens();
-      const usageEvent =
-        usedTokens === undefined
-          ? this.withUsageSample({ type: "usage_updated", provider: "claude", usage: {} })
-          : this.createUsageUpdatedEvent(usedTokens);
-      return { ...usageEvent, generationSample };
-    }
-    if (eventType === "content_block_delta") this.estimatedGeneration.output();
-    if (eventType === "message_start") {
-      const generationId = readTrimmedString(toObjectRecord(streamEvent.message)?.id);
-      if (!generationId) this.generationMessageId = undefined;
-      if (generationId && !this.generationMessageIds.has(generationId)) {
-        this.generationMessageIds.add(generationId);
-        this.generationMessageId = generationId;
-        this.generationOutputTokens = undefined;
-        this.estimatedGeneration.output();
-      }
-    } else if (eventType === "message_delta") {
-      this.generationOutputTokens = readStreamRequestOutputTokens(streamEvent);
-    }
-    return null;
   }
 
   buildResultUsage(
@@ -2387,7 +2236,6 @@ class ClaudeContextUsageState {
       if (usedTokens !== undefined) {
         usage.contextWindowUsedTokens = usedTokens;
       }
-      this.reconcileResultSample(message.usage);
       return usage;
     } finally {
       this.compactedContextWindowUsedTokens = undefined;
@@ -2408,120 +2256,21 @@ class ClaudeContextUsageState {
     return usedTokens > 0 ? usedTokens : undefined;
   }
 
-  usageSample(): AgentUsageSample | undefined {
-    if (!this.turnId) {
-      return undefined;
-    }
-    const open = this.openRequest;
-    const hasOpen = open !== undefined;
-    const inputTokens = cumulativeKnownCounter({
-      turnValue: this.turnInput,
-      turnKnown: this.turnInputKnown,
-      turnSeen: this.turnInputSeen,
-      hasOpen,
-      openValue: open ? inclusiveKnownInput(open) : undefined,
-    });
-    const cachedInputTokens = cumulativeKnownCounter({
-      turnValue: this.turnCached,
-      turnKnown: this.turnCachedKnown,
-      turnSeen: this.turnCachedSeen,
-      hasOpen,
-      openValue: open?.cacheReadInputTokens,
-    });
-    const outputTokens = this.currentOutputTokens(open);
-    // Keep the turn identity when counts are not yet reported, so a new
-    // unmeasured request invalidates the session's previous cache percentage.
-    return {
-      scope: "turn",
-      id: this.turnId,
-      ...(inputTokens !== undefined ? { inputTokens } : {}),
-      ...(cachedInputTokens !== undefined ? { cachedInputTokens } : {}),
-      ...(outputTokens !== undefined ? { outputTokens } : {}),
-    };
-  }
-
-  private currentOutputTokens(open: OpenTurnRequestUsage | undefined): number | undefined {
-    const openOutput = open?.outputTokens;
-    if (!this.turnOutputSeen && typeof openOutput !== "number") {
-      return undefined;
-    }
-    return this.turnOutput + (openOutput ?? 0);
-  }
-
-  private finalizeOpenRequest(): void {
-    const open = this.openRequest;
-    if (!open) {
-      return;
-    }
-    const inclusive = inclusiveKnownInput(open);
-    if (inclusive === undefined) {
-      this.turnInputKnown = false;
-    } else {
-      this.turnInput += inclusive;
-    }
-    this.turnInputSeen = true;
-    if (open.cacheReadInputTokens === undefined) {
-      this.turnCachedKnown = false;
-    } else {
-      this.turnCached += open.cacheReadInputTokens;
-    }
-    this.turnCachedSeen = true;
-    if (typeof open.outputTokens === "number") {
-      this.turnOutput += open.outputTokens;
-      this.turnOutputSeen = true;
-    }
-    this.openRequest = undefined;
-  }
-
-  private reconcileResultSample(usage: unknown): void {
-    this.finalizeOpenRequest();
-    const record = toObjectRecord(usage);
-    if (!record) {
-      return;
-    }
-    const inputTokens = readUsageCount(record, "input_tokens");
-    const cacheCreation = readUsageCount(record, "cache_creation_input_tokens");
-    const cacheRead = readUsageCount(record, "cache_read_input_tokens");
-    const outputTokens = readUsageCount(record, "output_tokens");
-    if (inputTokens !== undefined && cacheCreation !== undefined && cacheRead !== undefined) {
-      const inclusive = inputTokens + cacheCreation + cacheRead;
-      // SDK result usage is the authoritative main-loop total for this turn,
-      // unlike cumulative modelUsage (which also includes subagents).
-      this.turnInput = inclusive;
-      this.turnInputKnown = true;
-      this.turnInputSeen = true;
-    }
-    if (cacheRead !== undefined) {
-      this.turnCached = cacheRead;
-      this.turnCachedKnown = true;
-      this.turnCachedSeen = true;
-    }
-    if (outputTokens !== undefined) {
-      this.turnOutput = outputTokens;
-      this.turnOutputSeen = true;
-    }
-  }
-
-  private createUsageUpdatedEvent(
-    contextWindowUsedTokens: number,
-  ): Extract<AgentStreamEvent, { type: "usage_updated" }> {
+  private createUsageUpdatedEvent(contextWindowUsedTokens: number): AgentStreamEvent {
     const usage: AgentUsage = {
       contextWindowUsedTokens,
     };
     if (this.contextWindowMaxTokens !== undefined) {
       usage.contextWindowMaxTokens = this.contextWindowMaxTokens;
     }
-    return this.withUsageSample({
+    return {
       type: "usage_updated",
       provider: "claude",
       usage,
-    });
+    };
   }
 
   buildCompactionUsageEvent(postTokens: number | undefined): AgentStreamEvent {
-    this.estimatedGeneration.startTurn();
-    this.generationMessageId = undefined;
-    this.finalizeOpenRequest();
     this.streamRequestInputUsage = undefined;
     this.streamRequestOutputTokens = undefined;
     this.compactedContextWindowUsedTokens = postTokens;
@@ -2532,25 +2281,11 @@ class ClaudeContextUsageState {
     if (postTokens !== undefined) {
       usage.contextWindowUsedTokens = postTokens;
     }
-    return this.withUsageSample({
+    return {
       type: "usage_updated",
       provider: "claude",
       usage,
-    });
-  }
-
-  recordToolResultBoundary(): void {
-    this.estimatedGeneration.boundary();
-  }
-
-  private withUsageSample(
-    event: Extract<AgentStreamEvent, { type: "usage_updated" }>,
-  ): Extract<AgentStreamEvent, { type: "usage_updated" }> {
-    const usageSample = this.usageSample();
-    if (!usageSample) {
-      return event;
-    }
-    return { ...event, usageSample };
+    };
   }
 }
 
@@ -2569,6 +2304,7 @@ class ClaudeAgentSession implements AgentSession {
   private readonly resolveBinary: () => Promise<string>;
   private query: Query | null = null;
   private readonly runtimeSafety = new ClaudeRuntimeSafety();
+  private readonly backgroundStops = new Map<string, (outcome: string) => void>();
   private processingSdkMessages = 0;
   private readonly harnessEnvironment: Record<string, string>;
   private readonly usageSessionKey = randomUUID();
@@ -2646,6 +2382,7 @@ class ClaudeAgentSession implements AgentSession {
   private historySessionId: string | null = null;
   private replayingHistory = false;
   private turnState: TurnState = "idle";
+  private readonly turnNamespace = randomUUID();
   private nextTurnOrdinal = 1;
   private cancelCurrentTurn: (() => void) | null = null;
   private cachedRuntimeInfo: AgentRuntimeInfo | null = null;
@@ -2655,6 +2392,8 @@ class ClaudeAgentSession implements AgentSession {
   private compactionMarkerOpen = false;
   private queryPumpPromise: Promise<void> | null = null;
   private queryRestartNeeded = false;
+  /** True from the moment a query's launch options are copied until the query exists. */
+  private queryStarting = false;
   private pendingInterruptAbort = false;
   /**
    * Whether Claude's main session is inside one of its own turns: set by system/init and by a
@@ -2664,6 +2403,12 @@ class ClaudeAgentSession implements AgentSession {
   private mainTurnInFlight = false;
   private foregroundHasVisibleActivity = false;
   private activeTurnHasAssistantText = false;
+  /**
+   * The reply Claude Code writes when a turn stops on an API error ("You've hit your session
+   * limit", "API Error: 529 ..."), held back until the result says whether the turn failed: a
+   * failed turn shows the same text as its error, so showing both would repeat it.
+   */
+  private withheldErrorReply: AgentTimelineItem[] = [];
   private readonly contextUsage: ClaudeContextUsageState;
   private userMessageIds: string[] = [];
   private readonly emittedUserMessageIds = new Set<string>();
@@ -2672,6 +2417,7 @@ class ClaudeAgentSession implements AgentSession {
   private pendingFreshSessionId: string | null = null;
   private recentStderr = "";
   private closed = false;
+  readonly openOptionsPatch: Record<string, unknown> = {};
 
   constructor(config: ClaudeAgentConfig, options: ClaudeAgentSessionOptions) {
     this.config = config;
@@ -2715,17 +2461,21 @@ class ClaudeAgentSession implements AgentSession {
     if (this.currentMode !== "plan") {
       this.planResumeMode = this.currentMode;
     }
+
+    // Fast cannot run on this model, so the session opens with it off. Off rather than removed
+    // keeps a `config.json` default of `fast_mode: true` from filling it back in.
+    if (config.providerOptions.fast_mode === true && !claudeModelSupportsFastMode(config.model)) {
+      this.config.providerOptions = { ...config.providerOptions, fast_mode: false };
+      this.openOptionsPatch = { fast_mode: false };
+    }
   }
 
   get id(): string | null {
     return this.claudeSessionId;
   }
 
-  get features(): AgentFeature[] {
-    return buildClaudeFeatures({
-      modelId: this.config.model,
-      fastModeEnabled: this.config.featureValues?.fast_mode === true,
-    });
+  get controls(): AgentOptionControl[] {
+    return buildClaudeControls(this.config.model);
   }
 
   async getRuntimeInfo(): Promise<AgentRuntimeInfo> {
@@ -2735,7 +2485,7 @@ class ClaudeAgentSession implements AgentSession {
     const info: AgentRuntimeInfo = {
       provider: "claude",
       sessionId: this.claudeSessionId,
-      model: this.lastOptionsModel,
+      model: this.lastOptionsModel ?? this.config.model ?? null,
       modeId: this.currentMode ?? null,
       ...(this.lastRuntimeModel
         ? {
@@ -2806,7 +2556,8 @@ class ClaudeAgentSession implements AgentSession {
     this.activeForegroundTurnId = turnId;
     this.foregroundHasVisibleActivity = false;
     this.activeTurnHasAssistantText = false;
-    this.contextUsage.beginTurn(turnId);
+    this.withheldErrorReply = [];
+    this.contextUsage.beginTurn();
     this.transitionTurnState("foreground", "foreground turn started");
     this.clearRecentStderr();
     if (sdkUserMessageId) this.unstartedMessageUuids.add(sdkUserMessageId);
@@ -2852,6 +2603,7 @@ class ClaudeAgentSession implements AgentSession {
       this.activeForegroundQuery = this.query;
       this.activeForegroundInput = this.input;
       this.startQueryPump();
+      this.runtimeSafety.notePromptSent();
       this.input.push(sdkMessage);
       setTimeout(() => {
         if (this.activeForegroundTurnId === turnId) {
@@ -2937,6 +2689,33 @@ class ClaudeAgentSession implements AgentSession {
     };
   }
 
+  async stopBackgroundWork(id: string): Promise<void> {
+    const query = this.query;
+    if (!query || !this.runtimeSafety.canStop(id))
+      throw new Error("Background work is no longer available");
+    if (this.backgroundStops.has(id)) throw new Error("Stop is already pending");
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let finish!: (outcome: string) => void;
+    const outcome = new Promise<string>((resolve) => {
+      finish = resolve;
+      this.backgroundStops.set(id, resolve);
+    });
+    try {
+      const result = await Promise.race([
+        Promise.all([query.stopTask(id), outcome]).then(([, value]) => value),
+        outcome.then((value) => (value === "stopped" ? new Promise<string>(() => {}) : value)),
+        new Promise<string>((resolve) => {
+          timer = setTimeout(() => resolve("timeout"), 15000);
+        }),
+      ]);
+      if (result !== "stopped") throw new Error(`Background work stop: ${result}`);
+      if (this.query !== query) throw new Error("Background work connection changed");
+    } finally {
+      clearTimeout(timer);
+      if (this.backgroundStops.get(id) === finish) this.backgroundStops.delete(id);
+    }
+  }
+
   async interrupt(): Promise<void> {
     if (this.cancelCurrentTurn) {
       this.cancelCurrentTurn();
@@ -3016,15 +2795,27 @@ class ClaudeAgentSession implements AgentSession {
     this.currentMode = normalized;
   }
 
-  async setModel(modelId: string | null): Promise<void> {
+  async setModel(modelId: string | null): Promise<{ model: string | null }> {
     const normalizedModelId =
       typeof modelId === "string" && modelId.trim().length > 0 ? modelId.trim() : null;
     const activeQuery = await this.ensureQuery();
     await activeQuery.setModel(normalizedModelId ?? undefined);
     this.config.model = normalizedModelId ?? undefined;
     this.reconcileThinkingOptionForModel(normalizedModelId);
-    if (!claudeModelSupportsFastMode(this.config.model) && this.config.featureValues?.fast_mode) {
-      await this.applyFastModeFeature(false, activeQuery);
+    if (this.config.providerOptions.fast_mode) {
+      const supported = claudeModelSupportsFastMode(this.config.model);
+      await activeQuery.applyFlagSettings({ fastMode: supported });
+      if (!supported) {
+        // Fast cannot run on this model. Reporting it off rather than removed keeps a
+        // `config.json` default of `fast_mode: true` from filling it back in.
+        this.config.providerOptions = { ...this.config.providerOptions, fast_mode: false };
+        this.pushEvent({
+          type: "options_changed",
+          provider: "claude",
+          patch: { fast_mode: false },
+        });
+      }
+      this.cachedRuntimeInfo = null;
     }
     this.contextUsage.setInitialContextWindowMaxTokens(
       getClaudeContextWindowMaxTokens(this.config.model),
@@ -3034,6 +2825,7 @@ class ClaudeAgentSession implements AgentSession {
     this.cachedRuntimeInfo = null;
     // Model change affects persistence metadata, so invalidate cached handle.
     this.persistence = null;
+    return { model: this.lastOptionsModel ?? this.config.model ?? null };
   }
 
   private reconcileThinkingOptionForModel(modelId: string | null): void {
@@ -3076,31 +2868,36 @@ class ClaudeAgentSession implements AgentSession {
     }
   }
 
-  async setFeature(featureId: string, value: unknown): Promise<void> {
-    if (featureId !== "fast_mode") {
-      throw new Error(`Unknown Claude feature: ${featureId}`);
+  async applyOptions(options: ProviderOptions): Promise<void> {
+    // Every option but Fast is read when the query is built, and replacing a started query would
+    // end its background work, so once it exists only Fast can change.
+    if (this.query || this.queryStarting) {
+      assertChangesAreLive({
+        provider: "claude",
+        patch: options,
+        current: this.config.providerOptions,
+        live: ["fast_mode"],
+      });
     }
-
-    const enabled = Boolean(value);
-    if (enabled && !claudeModelSupportsFastMode(this.config.model)) {
+    const providerOptions =
+      validateProviderOptions(
+        "claude",
+        ClaudeProviderOptionsSchema,
+        applyProviderOptionsPatch({ options: this.config.providerOptions, patch: options }),
+      ) ?? {};
+    if (providerOptions.fast_mode === true && !claudeModelSupportsFastMode(this.config.model)) {
       throw new Error(
         `Claude fast mode is not available for model '${this.config.model ?? "default"}'`,
       );
     }
-
-    await this.applyFastModeFeature(enabled);
-  }
-
-  private async applyFastModeFeature(enabled: boolean, query?: Query): Promise<void> {
-    this.config.featureValues = {
-      ...this.config.featureValues,
-      fast_mode: enabled,
-    };
-    const activeQuery = query ?? this.query;
-    if (activeQuery) {
-      await activeQuery.applyFlagSettings({ fastMode: enabled });
+    const fastModeChanged =
+      (providerOptions.fast_mode === true) !== (this.config.providerOptions.fast_mode === true);
+    if (fastModeChanged) {
+      await this.query?.applyFlagSettings({ fastMode: providerOptions.fast_mode === true });
+      this.cachedRuntimeInfo = null;
     }
-    this.cachedRuntimeInfo = null;
+    // Held until the runtime accepts, so a rejected change is retried instead of skipped.
+    this.config.providerOptions = providerOptions;
   }
 
   getPendingPermissions(): AgentPermissionRequest[] {
@@ -3286,7 +3083,9 @@ class ClaudeAgentSession implements AgentSession {
     this.closed = true;
     await this.ensureHistoryReady();
     this.rejectAllPendingPermissions(new Error("Claude session closed"));
-    this.cancelCurrentTurn?.();
+    // AgentManager settles the run after runtime release. Preserve cleanup records
+    // without reporting this closure as an explicit turn cancellation.
+    this.flushPendingToolCalls();
     this.subscribers.clear();
     this.activeForegroundTurnId = null;
     this.activeForegroundQuery = null;
@@ -3353,6 +3152,7 @@ class ClaudeAgentSession implements AgentSession {
     const commands = await q.supportedCommands();
     const commandMap = new Map<string, AgentSlashCommand>();
     for (const cmd of commands) {
+      if (isClaudeInternalSlashCommand(cmd.name)) continue;
       if (!commandMap.has(cmd.name)) {
         commandMap.set(cmd.name, {
           name: cmd.name,
@@ -3744,6 +3544,7 @@ class ClaudeAgentSession implements AgentSession {
     const oldQuery = this.query;
     if (!oldQuery) return;
     const oldInput = this.input;
+    for (const finish of this.backgroundStops.values()) finish("connection lost");
     // Null out query/input BEFORE awaiting the old iterator's return so the
     // old pump sees this.query !== activeQuery and skips failActiveTurns.
     this.query = null;
@@ -3792,10 +3593,21 @@ class ClaudeAgentSession implements AgentSession {
     this.persistence = null;
 
     const input = createAsyncMessageInput<SDKUserMessage>();
-    const options = await this.buildOptions(launchMode);
+    // buildOptions copies the launch options before it waits, so from here they are fixed.
+    this.queryStarting = true;
+    let options: ClaudeOptions;
+    try {
+      options = await this.buildOptions(launchMode);
+      // Closure can finish while launch options are being prepared.
+      if (this.closed) throw new Error("Claude session is closed");
+    } catch (error) {
+      this.queryStarting = false;
+      throw error;
+    }
     this.logger.debug({ options: summarizeClaudeOptionsForLog(options) }, "claude query");
     this.input = input;
     this.runtimeSafety.reset();
+    this.dispatchEvents([{ type: "background_work", provider: "claude", items: null }]);
     // A fresh Claude process has no turn of its own in flight.
     this.mainTurnInFlight = false;
     this.query = claudeQuery(
@@ -3810,6 +3622,7 @@ class ClaudeAgentSession implements AgentSession {
         },
       },
     );
+    this.queryStarting = false;
     const fastMode = this.resolveFastModeSetting();
     if (fastMode !== null) {
       await this.query.applyFlagSettings({ fastMode });
@@ -3929,10 +3742,9 @@ class ClaudeAgentSession implements AgentSession {
   private async buildOptions(permissionMode: PermissionMode): Promise<ClaudeOptions> {
     const { thinking, effort, ultracode } = this.resolveThinkingConfig();
     const appendedSystemPrompt = this.buildAppendedSystemPrompt();
-    const providerOptions = applyClaudeToolPolicy(
-      this.config.providerOptions,
-      this.config.toolPolicy,
-    );
+    // `fast_mode` is a composer control the provider applies through flag settings.
+    const { fast_mode: _fastMode, ...sdkProviderOptions } = this.config.providerOptions;
+    const providerOptions = applyClaudeToolPolicy(sdkProviderOptions, this.config.toolPolicy);
     const settingsOptions = await this.buildSettingsOptions(providerOptions, { ultracode });
     const sdkEnv = this.harnessEnvironment;
     assertClaudeModeCanRun(permissionMode, sdkEnv);
@@ -3993,7 +3805,7 @@ class ClaudeAgentSession implements AgentSession {
       // subagents keep running. Without this declaration an interrupt kills every one of them.
       // Claude stops a helper itself with its TaskStop tool.
       perTaskStopAffordance: true,
-      hooks: this.buildSubagentEffortHooks(),
+      hooks: { ...this.buildSubagentEffortHooks(), Stop: [{ hooks: [this.observeStopHook] }] },
       ...(this.persistSession === undefined ? {} : { persistSession: this.persistSession }),
       env: sdkEnv,
     };
@@ -4051,7 +3863,7 @@ class ClaudeAgentSession implements AgentSession {
     if (!claudeModelSupportsFastMode(this.config.model)) {
       return null;
     }
-    return this.config.featureValues?.fast_mode === true;
+    return this.config.providerOptions.fast_mode === true;
   }
 
   private normalizeMcpServers(
@@ -4208,7 +4020,7 @@ class ClaudeAgentSession implements AgentSession {
   }
 
   private createTurnId(owner: "foreground" | "autonomous"): string {
-    return `${owner}-turn-${this.nextTurnOrdinal++}`;
+    return `${owner}-turn-${this.turnNamespace}-${this.nextTurnOrdinal++}`;
   }
 
   private isTerminalTurnEvent(event: AgentStreamEvent): boolean {
@@ -4324,7 +4136,7 @@ class ClaudeAgentSession implements AgentSession {
     this.activeForegroundQuery = this.query;
     this.activeForegroundInput = this.input;
     this.activeTurnHasAssistantText = false;
-    this.contextUsage.beginTurn(this.autonomousTurn.id);
+    this.contextUsage.beginTurn();
     this.notifySubscribers({ type: "turn_started", provider: "claude" });
     this.syncTurnState("autonomous turn started");
   }
@@ -4391,11 +4203,15 @@ class ClaudeAgentSession implements AgentSession {
   }
 
   private failRunningRuntimeTasks(): void {
-    this.dispatchEvents(
-      foldSubagentObservations(this.taskProtocolSource.failRunningTasks()).map(
+    for (const finish of this.backgroundStops.values()) finish("connection lost");
+    this.runtimeSafety.retire();
+    this.dispatchEvents([
+      ...foldSubagentObservations(this.taskProtocolSource.failRunningTasks()).map(
         (event): AgentStreamEvent => ({ type: "provider_subagent", provider: "claude", event }),
       ),
-    );
+      // The SDK resets its background task set when the CLI process (re)starts.
+      { type: "background_work", provider: "claude", items: null },
+    ]);
   }
 
   private startQueryPump(): void {
@@ -4463,12 +4279,19 @@ class ClaudeAgentSession implements AgentSession {
       if (!this.ownsQuery(activeQuery)) return true;
       this.processingSdkMessages++;
       try {
-        this.runtimeSafety.observe(message);
+        const backgroundWork = this.runtimeSafety.observe(message);
+        if (message.type === "system" && message.subtype === "task_notification")
+          this.backgroundStops.get(message.task_id)?.(message.status);
         logRawMessage(message);
         consecutiveInterruptAbortRecoveries = 0;
         if (await this.handleMissingResumedConversation(message, activeQuery)) return true;
         if (!this.ownsQuery(activeQuery)) return true;
         await this.routeSdkMessageFromPump(message);
+        if (!this.ownsQuery(activeQuery)) return true;
+        if (backgroundWork && this.runtimeSafety.isCurrentInventory(backgroundWork))
+          this.dispatchEvents([
+            { type: "background_work", provider: "claude", items: backgroundWork },
+          ]);
         return false;
       } finally {
         this.processingSdkMessages--;
@@ -4694,6 +4517,21 @@ class ClaudeAgentSession implements AgentSession {
               }) satisfies AgentStreamEvent,
           );
 
+    if (!readClaudeParentToolUseId(message)) {
+      if (message.type === "assistant" && message.error) {
+        this.withheldErrorReply.push(...assistantTimelineEvents.map((event) => event.item));
+        return messageEvents;
+      }
+      if (
+        message.type === "assistant" ||
+        message.type === "user" ||
+        message.type === "stream_event"
+      ) {
+        const released: AgentStreamEvent[] = [];
+        this.releaseWithheldErrorReply(released);
+        return [...released, ...messageEvents, ...assistantTimelineEvents];
+      }
+    }
     return [...messageEvents, ...assistantTimelineEvents];
   }
 
@@ -5090,6 +4928,13 @@ class ClaudeAgentSession implements AgentSession {
       this.appendTaskNotificationEvents(message, events);
       return;
     }
+    if (message.subtype === "background_tasks_changed") {
+      this.logger.debug(
+        { tasks: message.tasks.map(({ task_id, task_type }) => ({ task_id, task_type })) },
+        "claude.background_tasks_changed",
+      );
+      return;
+    }
     if (message.subtype === "task_progress") {
       return;
     }
@@ -5133,7 +4978,6 @@ class ClaudeAgentSession implements AgentSession {
     message: Extract<SDKMessage, { type: "user" }>,
     events: AgentStreamEvent[],
   ): Promise<void> {
-    if (isToolResultUserEntry(message)) this.contextUsage.recordToolResultBoundary();
     if (isSyntheticUserEntry(message)) {
       return;
     }
@@ -5242,7 +5086,23 @@ class ClaudeAgentSession implements AgentSession {
     events: AgentStreamEvent[],
   ): void {
     const usage = this.convertUsage(message);
-    const usageSample = this.contextUsage.usageSample();
+    // Claude Code reports a turn that stopped on an API error (a usage limit, an overloaded or
+    // rejected request) as `success` with `is_error`, carrying the error text in `result`.
+    if (message.subtype === "success" && message.is_error) {
+      const withheld = this.withheldErrorReply;
+      this.withheldErrorReply = [];
+      const resultText = typeof message.result === "string" ? message.result.trim() : "";
+      const withheldText = withheld
+        .map((item) => (item.type === "assistant_message" ? item.text : ""))
+        .join("\n")
+        .trim();
+      if (usage) events.push({ type: "usage_updated", provider: "claude", usage });
+      events.push(...this.sidechainTracker.finishAll("failed"));
+      events.push(this.buildTurnFailedEvent(resultText || withheldText || "Claude run failed"));
+      return;
+    }
+    const releasedErrorReply = this.withheldErrorReply.length > 0;
+    this.releaseWithheldErrorReply(events);
     if (message.subtype === "success") {
       events.push(...this.sidechainTracker.finishAll("completed"));
       // Built-in slash commands (e.g. /voice, /usage, "Unknown command: …")
@@ -5252,7 +5112,12 @@ class ClaudeAgentSession implements AgentSession {
       // accounting from provider gateways does not duplicate streamed output.
       const resultText = typeof message.result === "string" ? message.result.trim() : "";
       const outputTokens = message.usage?.output_tokens;
-      if (resultText.length > 0 && outputTokens === 0 && !this.activeTurnHasAssistantText) {
+      if (
+        resultText.length > 0 &&
+        outputTokens === 0 &&
+        !this.activeTurnHasAssistantText &&
+        !releasedErrorReply
+      ) {
         events.push({
           type: "timeline",
           provider: "claude",
@@ -5263,28 +5128,24 @@ class ClaudeAgentSession implements AgentSession {
           },
         });
       }
-      events.push({
-        type: "turn_completed",
-        provider: "claude",
-        usage,
-        ...(usageSample ? { usageSample } : {}),
-      });
+      events.push({ type: "turn_completed", provider: "claude", usage });
       return;
     }
     const errorMessage =
       "errors" in message && Array.isArray(message.errors) && message.errors.length > 0
         ? message.errors.join("\n")
         : "Claude run failed";
+    if (usage) events.push({ type: "usage_updated", provider: "claude", usage });
     events.push(...this.sidechainTracker.finishAll("failed"));
-    if (usage && usageSample) {
-      events.push({
-        type: "usage_updated",
-        provider: "claude",
-        usage,
-        usageSample,
-      });
-    }
     events.push(this.buildTurnFailedEvent(errorMessage));
+  }
+
+  private releaseWithheldErrorReply(events: AgentStreamEvent[]): void {
+    if (this.withheldErrorReply.length === 0) return;
+    for (const item of this.withheldErrorReply) {
+      events.push({ type: "timeline", item, provider: "claude" });
+    }
+    this.withheldErrorReply = [];
   }
 
   private createClaudeSessionChangedNotice(
@@ -5446,6 +5307,13 @@ class ClaudeAgentSession implements AgentSession {
     input,
     options,
   ): Promise<PermissionResult> => {
+    // Decide before publishing anything: bypassed tools never enter the permission UI.
+    // Claude also routes questions and plan review through this callback.
+    const needsUserAnswer = toolName === "AskUserQuestion" || toolName === "ExitPlanMode";
+    if (this.currentMode === "bypassPermissions" && !needsUserAnswer) {
+      return { behavior: "allow", updatedInput: input, toolUseID: options.toolUseID };
+    }
+
     const requestId = `permission-${randomUUID()}`;
     const kind = resolvePermissionKind(toolName, input);
     const requestInput = normalizeClaudeAskUserQuestionRequestInput(toolName, input);
@@ -5471,6 +5339,7 @@ class ClaudeAgentSession implements AgentSession {
       provider: "claude",
       name: toolName,
       kind,
+      description: readNonEmptyString(stripAnsi(options.decisionReason ?? ""))?.trim(),
       ...buildClaudeQuestionPermissionSummary(toolName, input),
       input: requestInput,
       detail: toolDetail,
@@ -5618,6 +5487,12 @@ class ClaudeAgentSession implements AgentSession {
       SubagentStop: [{ hooks: [observe] }],
     };
   }
+
+  // Observation-only, like the effort hooks: it never alters turn control.
+  private readonly observeStopHook: HookCallback = async (input) => {
+    if (input.hook_event_name === "Stop") this.runtimeSafety.observeStop(input.session_crons);
+    return {};
+  };
 
   private notifySubscribers(event: AgentStreamEvent): void {
     const turnId =
@@ -7143,40 +7018,79 @@ function normalizeClaudeSessionTitle(title: string | null): string | null {
 }
 
 const CLAUDE_CUSTOM_TITLE_TYPE = "custom-title";
+const CLAUDE_CUSTOM_TITLE_NEEDLE = Buffer.from(`"${CLAUDE_CUSTOM_TITLE_TYPE}"`);
+const CLAUDE_TITLE_SCAN_CHUNK_BYTES = 64 * 1024;
+
+function readClaudeCustomTitleFromRecord(record: Buffer): string | null {
+  // The needle also matches a prompt that quotes it, so a record still has to
+  // parse as a `custom-title` entry carrying a usable name. Records without the
+  // needle are never decoded, so a long one costs a byte search and nothing more.
+  if (!record.includes(CLAUDE_CUSTOM_TITLE_NEEDLE)) {
+    return null;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(record.toString("utf8").trim());
+  } catch {
+    return null;
+  }
+  const entry = toObjectRecord(parsed);
+  if (!entry || entry.isSidechain || entry.type !== CLAUDE_CUSTOM_TITLE_TYPE) {
+    return null;
+  }
+  return normalizeClaudeSessionTitle(
+    typeof entry.customTitle === "string" ? entry.customTitle : null,
+  );
+}
 
 /**
  * The `custom-title` record is re-emitted every time the session is saved, so
- * the current name is the last usable one in the file. Searching backwards finds it without
- * walking the transcript, which matters because sessions reach tens of
- * megabytes.
+ * the current name is the last usable one in the file. Reading backwards a chunk
+ * at a time finds it without walking the transcript, which matters because
+ * sessions reach tens of megabytes, and never holds the file as one string, so a
+ * transcript past V8's maximum string length still imports.
  */
-function readLastClaudeCustomTitle(content: string): string | null {
-  const needle = `"${CLAUDE_CUSTOM_TITLE_TYPE}"`;
-  let at = content.lastIndexOf(needle);
-  while (at >= 0) {
-    const lineStart = content.lastIndexOf("\n", at) + 1;
-    const lineEnd = content.indexOf("\n", at);
-    const line = lineEnd === -1 ? content.slice(lineStart) : content.slice(lineStart, lineEnd);
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(line.trim());
-    } catch {
-      parsed = undefined;
-    }
-    const entry = toObjectRecord(parsed);
-    if (entry && !entry.isSidechain && entry.type === CLAUDE_CUSTOM_TITLE_TYPE) {
-      const title = normalizeClaudeSessionTitle(
-        typeof entry.customTitle === "string" ? entry.customTitle : null,
+async function readLastClaudeCustomTitle(filePath: string): Promise<string | null> {
+  const handle = await fsPromises.open(filePath, "r");
+  try {
+    const stats = await handle.stat();
+    if (!stats.isFile()) {
+      // Opening a directory succeeds on Windows even though reading it does not,
+      // so reject the way reading the transcript as a file would.
+      throw Object.assign(
+        new Error(`EISDIR: illegal operation on a directory, read '${filePath}'`),
+        { code: "EISDIR", path: filePath },
       );
-      if (title) {
-        return title;
-      }
     }
-    // The needle also matches a prompt that quotes it, and a record can carry no
-    // usable name, so keep looking backwards for one that does.
-    at = at <= 0 ? -1 : content.lastIndexOf(needle, at - 1);
+    let end = stats.size;
+    // Retain unfinished record pieces in reverse file order. Assemble each
+    // complete record once, so a large tool/image record costs linear work.
+    let pieces: Buffer[] = [];
+    while (end > 0) {
+      const length = Math.min(CLAUDE_TITLE_SCAN_CHUNK_BYTES, end);
+      const chunk = Buffer.alloc(length);
+      await handle.read(chunk, 0, length, end - length);
+      let recordEnd = chunk.length;
+      for (
+        let at = chunk.lastIndexOf(10);
+        at >= 0;
+        at = at === 0 ? -1 : chunk.lastIndexOf(10, at - 1)
+      ) {
+        pieces.push(chunk.subarray(at + 1, recordEnd));
+        const record = Buffer.concat(pieces.toReversed());
+        const title = readClaudeCustomTitleFromRecord(record);
+        if (title) return title;
+        pieces = [];
+        recordEnd = at;
+      }
+      if (recordEnd > 0) pieces.push(chunk.subarray(0, recordEnd));
+      end -= length;
+    }
+    // The first record in the file has no newline in front of it.
+    return readClaudeCustomTitleFromRecord(Buffer.concat(pieces.toReversed()));
+  } finally {
+    await handle.close();
   }
-  return null;
 }
 
 function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
@@ -7188,9 +7102,8 @@ async function readClaudeRenamedSessionTitle(input: {
   sessionId: string;
   configDir: string;
 }): Promise<string | null> {
-  let content: string;
   try {
-    content = await fsPromises.readFile(await claudeTranscriptPath(input), "utf8");
+    return await readLastClaudeCustomTitle(await claudeTranscriptPath(input));
   } catch (error) {
     // A session with no transcript on disk has no rename to carry over. Every
     // other read failure is a real fault and stays explicit.
@@ -7199,7 +7112,6 @@ async function readClaudeRenamedSessionTitle(input: {
     }
     throw error;
   }
-  return readLastClaudeCustomTitle(content);
 }
 
 function normalizeImportablePromptPreview(text: string): string | null {

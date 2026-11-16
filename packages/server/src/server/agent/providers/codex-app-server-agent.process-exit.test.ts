@@ -40,7 +40,7 @@ async function withPendingPlan(
     cwd: workdir,
     modeId: "auto",
     model: "gpt-5.4",
-    featureValues: { plan_mode: true },
+    providerOptions: { plan_mode: true },
   });
   const events: AgentStreamEvent[] = [];
   session.subscribe((event) => events.push(event));
@@ -603,7 +603,7 @@ test("idle provider exit preserves a synthetic plan approval across reconnect", 
         cwd: workdir,
         modeId: "auto",
         model: "gpt-5.4",
-        featureValues: { plan_mode: true },
+        providerOptions: { plan_mode: true },
       },
       undefined,
       { workspaceId: undefined },
@@ -664,6 +664,10 @@ test("concurrent session APIs share one reconnect after an idle provider exit", 
     createFakeCodexAppServer(),
   ];
   let spawnCount = 0;
+  let markReconnectStarted!: () => void;
+  const reconnectStarted = new Promise<void>((resolve) => {
+    markReconnectStarted = resolve;
+  });
   let releaseReconnect: (() => void) | undefined;
   const reconnectGate = new Promise<void>((resolve) => {
     releaseReconnect = resolve;
@@ -679,6 +683,7 @@ test("concurrent session APIs share one reconnect after an idle provider exit", 
       }
       spawnCount += 1;
       if (spawnCount > 1) {
+        markReconnectStarted();
         await reconnectGate;
       }
       return appServer.child;
@@ -691,12 +696,14 @@ test("concurrent session APIs share one reconnect after an idle provider exit", 
 
     const runtimeInfo = session.getRuntimeInfo();
     const turnStart = session.startTurn("continue after reconnect");
+    await reconnectStarted;
     const reconnectSpawnCount = spawnCount - 1;
     releaseReconnect?.();
 
     await expect(runtimeInfo).resolves.toMatchObject({ provider: "codex" });
     await expect(turnStart).resolves.toMatchObject({ turnId: expect.any(String) });
     expect(reconnectSpawnCount).toBe(1);
+    expect(spawnCount).toBe(2);
   } finally {
     releaseReconnect?.();
     await session.close();

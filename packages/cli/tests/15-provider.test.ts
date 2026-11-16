@@ -141,21 +141,6 @@ const EXPECTED_CLAUDE_MODELS = [
 
 const EXPECTED_CLAUDE_CONTEXT_MODELS = [
   {
-    id: "claude-opus-5[1m]",
-    model: "Opus 5 1M",
-    descriptionFragment: "1M context window",
-  },
-  {
-    id: "claude-fable-5-1[1m]",
-    model: "Fable 5.1 1M",
-    descriptionFragment: "1M context window",
-  },
-  {
-    id: "claude-fable-5[1m]",
-    model: "Fable 5 1M",
-    descriptionFragment: "1M context window",
-  },
-  {
     id: "claude-sonnet-5[1m]",
     model: "Sonnet 5 1M",
     descriptionFragment: "1M context window",
@@ -174,12 +159,7 @@ const EXPECTED_CLAUDE_CATALOG_MODELS = [
 let claudeModelIdsFromJson: string[] = [];
 let claudeModelsFromJson: ProviderModel[] = [];
 
-const ctx = await createE2ETestContext({
-  timeout: 120000,
-  env: {
-    CLAUDE_CONFIG_DIR: join(import.meta.dirname, "fixtures", "empty-claude-config"),
-  },
-});
+const ctx = await createE2ETestContext({ timeout: 120000 });
 
 async function runProviderModelsJson(provider: string): Promise<ProviderModel[]> {
   const transientNeedles = ["transport closed", "timed out", "timeout", "socket", "econn"];
@@ -224,26 +204,16 @@ function assertClaudeModels(data: ProviderModel[]): void {
     );
   }
 
-  const fable52OneMillionIndex = data.findIndex((model) => model.id === "claude-fable-5-2[1m]");
-  const fable5Index = data.findIndex((model) => model.id === "claude-fable-5");
+  const fable52Index = data.findIndex((model) => model.id === "claude-fable-5-2");
   assert.deepStrictEqual(
-    data.slice(fable52OneMillionIndex, fable5Index + 1).map((model) => model.id),
-    [
-      "claude-fable-5-2[1m]",
-      "claude-fable-5-2",
-      "claude-fable-5-1[1m]",
-      "claude-fable-5-1",
-      "claude-fable-5[1m]",
-      "claude-fable-5",
-    ],
-    "Fable models should stay adjacent and newest-first with [1m] variant before base variant",
+    data.slice(fable52Index, fable52Index + 3).map((model) => model.id),
+    ["claude-fable-5-2", "claude-fable-5-1", "claude-fable-5"],
+    "Fable models should stay adjacent and newest-first",
   );
-  for (const id of ["claude-opus-5[1m]", "claude-fable-5-1[1m]", "claude-fable-5[1m]"]) {
-    assert(
-      byId.has(id),
-      `${id} must appear in CLI output — [1m] entries must be selectable or 1M context is unreachable`,
-    );
-  }
+  assert(
+    !byId.has("claude-fable-5[1m]"),
+    "compatibility-only Fable aliases should not appear in CLI output",
+  );
 }
 
 try {

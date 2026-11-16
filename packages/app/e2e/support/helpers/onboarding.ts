@@ -170,10 +170,7 @@ export async function openTailscaleDocsFromSetup(page: Page): Promise<string> {
   const popup = page.waitForEvent("popup");
   await setupModal(page).getByRole("link", { name: "Tailscale, Docs", exact: true }).click();
   const docs = await popup;
-  // DOMContentLoaded can belong to the popup's initial blank document.
-  await docs.waitForURL((url) => url.href !== "about:blank" && url.href !== "", {
-    waitUntil: "domcontentloaded",
-  });
+  await docs.waitForLoadState("domcontentloaded");
   const url = docs.url();
   await docs.close();
   return url;
