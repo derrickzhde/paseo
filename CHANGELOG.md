@@ -6,6 +6,10 @@
 - **Preserved fork behavior:** Math rendering and copy, phone 12/24-hour clock preferences, Claude 200K and `[1m]` variants, session usage metrics, GitHub Desktop/Android updater targets, and the remote-host CLI archive upgrade path.
 - **Downloads:** Release packages are published at [derrickzhde/paseo](https://github.com/derrickzhde/paseo/releases).
 
+### Notes
+
+- This is a fork-channel release on [derrickzhde/paseo](https://github.com/derrickzhde/paseo/releases); upstream 0.16.0 remains on [getpaseo/paseo](https://github.com/getpaseo/paseo/releases/tag/v0.16.0).
+
 ## 0.16.0 - 2026-11-16
 
 - **Background tasks:** See and stop background tasks above the composer for Claude Code, Codex and OpenCode v2. ([#6220](https://github.com/getpaseo/paseo/pull/6220), [#9162](https://github.com/getpaseo/paseo/pull/9162), [#9635](https://github.com/getpaseo/paseo/pull/9635) by [@fxlelouarn](https://github.com/fxlelouarn))

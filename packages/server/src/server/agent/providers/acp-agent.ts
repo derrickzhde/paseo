@@ -1330,7 +1330,7 @@ export class ACPAgentClient implements AgentClient {
 
   private async runListControls(config: AgentSessionConfig): Promise<AgentDraftControls> {
     const options = config.providerOptions ?? {};
-    if (this.configFeatureOptions.length === 0) {
+    if (!config.model && this.configFeatureOptions.length === 0) {
       return { controls: [ACP_AUTO_ACCEPT_CONTROL], options };
     }
 

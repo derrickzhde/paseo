@@ -6,6 +6,10 @@
 - **保留的 fork 能力：** 数学公式渲染与复制、手机 12/24 小时制时钟偏好、Claude 200K 与 `[1m]` 模型变体、会话用量指标、GitHub Desktop/Android 更新目标，以及远程主机 CLI 归档自更新路径。
 - **下载地址：** 发布包见 [derrickzhde/paseo](https://github.com/derrickzhde/paseo/releases)。
 
+### 说明
+
+- 本 fork 渠道发布于 [derrickzhde/paseo](https://github.com/derrickzhde/paseo/releases)；上游 0.16.0 仍在 [getpaseo/paseo](https://github.com/getpaseo/paseo/releases/tag/v0.16.0)。
+
 ## 0.16.0 - 2026-11-16
 
 - **后台任务**：在 Composer 上方查看并停止 Claude Code、Codex 和 OpenCode v2 的后台任务。 ([#6220](https://github.com/getpaseo/paseo/pull/6220), [#9162](https://github.com/getpaseo/paseo/pull/9162), [#9635](https://github.com/getpaseo/paseo/pull/9635)，贡献者：[@fxlelouarn](https://github.com/fxlelouarn))
