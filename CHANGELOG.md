@@ -1,6 +1,18 @@
 # Changelog
 
+## 0.16.2 - 2026-11-16
+
+- **Desktop release fix:** Drop the obsolete `app-builder-lib` macOS signing backport now that electron-builder 26.18.0 ships [electron-builder#10172](https://github.com/electron-userland/electron-builder/pull/10172). Restores macOS desktop packages and `latest-mac.yml` in fork releases.
+- **Same fork payload as 0.16.1:** Integrates upstream 0.16.0 with this fork's preserved behavior (math rendering, clock preferences, Claude variants, usage metrics, updater targets, remote-host CLI archive, Vitest browser CI fixes). Tag `v0.16.1` did not complete publication; **use v0.16.2** for downloads and updates.
+- **Downloads:** [derrickzhde/paseo releases](https://github.com/derrickzhde/paseo/releases).
+
+### Notes
+
+- Fork-channel release on [derrickzhde/paseo](https://github.com/derrickzhde/paseo/releases); upstream 0.16.0 remains on [getpaseo/paseo](https://github.com/getpaseo/paseo/releases/tag/v0.16.0).
+
 ## 0.16.1 - 2026-11-16
+
+- **Unpublished:** Desktop Release failed during macOS signing preparation; do not use this tag for updates.
 
 - **Upstream 0.16.0 on the fork channel:** Integrates [upstream 0.16.0](https://github.com/getpaseo/paseo/releases/tag/v0.16.0) — provider draft controls, built-in plugin gallery, command center tabs, and the rest of that release — while keeping this fork's custom behavior.
 - **Preserved fork behavior:** Math rendering and copy, phone 12/24-hour clock preferences, Claude 200K and `[1m]` variants, session usage metrics, GitHub Desktop/Android updater targets, and the remote-host CLI archive upgrade path.

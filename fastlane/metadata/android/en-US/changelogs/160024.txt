@@ -1,0 +1,3 @@
+- Desktop release fix: Drop the obsolete app-builder-lib macOS signing backport now that electron-builder 26.18.0 ships electron-builder#10172. Restores macOS desktop packages and latest-mac.yml in fork releases.
+
+Full notes: https://paseo.sh/changelog

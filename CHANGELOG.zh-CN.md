@@ -1,6 +1,18 @@
 # Changelog
 
+## 0.16.2 - 2026-11-16
+
+- **桌面发布修复：** 移除已过时的 `app-builder-lib` macOS 签名 backport；electron-builder 26.18.0 已包含 [electron-builder#10172](https://github.com/electron-userland/electron-builder/pull/10172)。恢复 fork 发布中的 macOS 安装包与 `latest-mac.yml`。
+- **与 0.16.1 相同的 fork 内容：** 整合上游 0.16.0 并保留本 fork 定制（数学渲染、时钟偏好、Claude 变体、用量指标、更新通道、远程主机 CLI 归档、Vitest browser CI 修复）。`v0.16.1` 未完成正式发布；**请使用 v0.16.2** 下载与更新。
+- **下载：** [derrickzhde/paseo releases](https://github.com/derrickzhde/paseo/releases)。
+
+### 说明
+
+- 本 fork 渠道发布于 [derrickzhde/paseo](https://github.com/derrickzhde/paseo/releases)；上游 0.16.0 仍在 [getpaseo/paseo](https://github.com/getpaseo/paseo/releases/tag/v0.16.0)。
+
 ## 0.16.1 - 2026-11-16
+
+- **未正式发布：** Desktop Release 在 macOS 签名准备阶段失败；请勿用此标签更新。
 
 - **Fork 渠道整合上游 0.16.0：** 合并 [上游 0.16.0](https://github.com/getpaseo/paseo/releases/tag/v0.16.0) 的草稿控件、内置插件库、命令中心标签页等能力，同时保留本 fork 的定制行为。
 - **保留的 fork 能力：** 数学公式渲染与复制、手机 12/24 小时制时钟偏好、Claude 200K 与 `[1m]` 模型变体、会话用量指标、GitHub Desktop/Android 更新目标，以及远程主机 CLI 归档自更新路径。
