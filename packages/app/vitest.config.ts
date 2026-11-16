@@ -185,6 +185,9 @@ export default defineConfig({
   // so it scans the native files and dies on imports react-native-web has no answer for.
   // Unbundled, the same imports go through the resolver below and land on the web files.
   optimizeDeps: {
+    // Browser tests run a long suite; discovering xterm or dnd-kit mid-run reloads Vite and
+    // fails unrelated suites with "Failed to fetch dynamically imported module".
+    holdUntilCrawlEnd: true,
     // Expo's public navigation barrel also loads screens. Match Metro's web-first resolution
     // while optimizing its CJS dependencies, including DebugContainer.web.js.
     esbuildOptions: {
@@ -203,6 +206,8 @@ export default defineConfig({
     // Bundle the CJS dependencies of the excluded gesture-handler package for the browser.
     include: [
       "react/jsx-runtime",
+      "react-dom/client",
+      "@xterm/addon-serialize",
       "react/compiler-runtime",
       "expo-router/react-navigation",
       "@testing-library/react",
