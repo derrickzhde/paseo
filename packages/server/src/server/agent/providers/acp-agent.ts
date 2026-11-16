@@ -1651,10 +1651,10 @@ export class ACPAgentClient implements AgentClient {
         Promise.race([
           transport.connection.initialize({
             protocolVersion: PROTOCOL_VERSION,
-            clientCapabilities: buildACPClientCapabilities(
-              this.clientCapabilityMeta,
-              clientCapabilities ?? this.clientCapabilities,
-            ),
+            clientCapabilities: buildACPClientCapabilities(this.clientCapabilityMeta, {
+              ...(clientCapabilities ?? this.clientCapabilities),
+              terminal: false,
+            }),
             clientInfo: { name: "Paseo", version: "dev" },
           }),
           transport.processError,

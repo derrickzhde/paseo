@@ -3358,7 +3358,7 @@ export class AgentManager {
         };
         yield acceptedTurnStartedEvent;
         for await (const event of turnStream.events(isTurnTerminalEvent)) {
-          yield event;
+          yield publicStreamEvent(event);
         }
       } finally {
         if (turnStream) {
