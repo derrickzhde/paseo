@@ -137,6 +137,7 @@ export default defineConfig({
         test: {
           name: "browser",
           fileParallelism: false,
+          setupFiles: [path.resolve(__dirname, "vitest.setup.ts")],
           include: ["src/**/*.browser.{test,spec}.{ts,tsx}"],
           browser: {
             enabled: true,
@@ -160,6 +161,9 @@ export default defineConfig({
      * keeps `process.send` intact so the app tests can boot before hitting the intentional failures.
      */
     pool: "forks",
+    // Unit and browser suites each boot Vite; running both projects at once races the
+    // browser dev server and surfaces as random "Failed to fetch dynamically imported module".
+    sequence: { concurrent: false },
     maxWorkers: 2,
     server: {
       deps: {
