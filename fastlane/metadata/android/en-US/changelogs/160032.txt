@@ -1,0 +1,4 @@
+- Upstream 0.16.1 on the fork channel: Integrates upstream 0.16.1 while keeping this fork's custom behavior.
+- Preserved fork behavior: Math rendering and copy, phone 12/24-hour clock preferences, Claude 200K and [1m] variants, per-model controls, Codex follow-ups during /goal turns, session usage metrics, shared-login account reconciliation, GitHub Desktop/Android updater targets, the remote-host CLI archive, and Vitest browser CI fixes.
+
+Full notes: https://paseo.sh/changelog

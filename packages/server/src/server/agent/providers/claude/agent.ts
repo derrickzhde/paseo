@@ -12,6 +12,7 @@ import path from "node:path";
 import { LRUCache } from "lru-cache";
 import stripAnsi from "strip-ansi";
 import { createImportDescriptorScheduler } from "./import-descriptor-scheduler.js";
+import { bypassApprovesAsk } from "./bypass-approval.js";
 import {
   type AgentDefinition,
   type CanUseTool,
@@ -84,7 +85,7 @@ import {
   type ClaudeProviderOptions,
 } from "./options.js";
 import { renderPromptAttachmentAsText } from "../../prompt-attachments.js";
-import { discoverClaudeModels } from "./model-discovery.js";
+import { discoverClaudeModels, killExitingClaudeModelDiscoveries } from "./model-discovery.js";
 import { claudeQuery, type ClaudeOptions, type ClaudeQueryFactory } from "./query.js";
 import {
   findSteeredMessageParent,
@@ -1756,6 +1757,10 @@ export class ClaudeAgentClient implements AgentClient {
       models,
       ...modeCatalog,
     };
+  }
+
+  async shutdown(): Promise<void> {
+    await killExitingClaudeModelDiscoveries();
   }
 
   async resolveDefaultModeId({ env: launchEnv }: ResolveAgentDefaultModeInput): Promise<string> {
@@ -5595,10 +5600,8 @@ class ClaudeAgentSession implements AgentSession {
     input,
     options,
   ): Promise<PermissionResult> => {
-    // Decide before publishing anything: bypassed tools never enter the permission UI.
-    // Claude also routes questions and plan review through this callback.
-    const needsUserAnswer = toolName === "AskUserQuestion" || toolName === "ExitPlanMode";
-    if (this.currentMode === "bypassPermissions" && !needsUserAnswer) {
+    // Decide before publishing anything: bypassed asks never enter the permission UI.
+    if (this.currentMode === "bypassPermissions" && bypassApprovesAsk(toolName, options)) {
       return { behavior: "allow", updatedInput: input, toolUseID: options.toolUseID };
     }
 
