@@ -1,10 +1,45 @@
 # Changelog
 
-## 0.16.3 - 2026-11-17
+## 0.16.4 - 2026-11-18
 
-- **Fork 渠道整合上游 0.16.1：** 合并 [上游 0.16.1](https://github.com/getpaseo/paseo/releases/tag/v0.16.1)，同时保留本 fork 的定制行为。
-- **保留的 fork 能力：** 数学公式渲染与复制、手机 12/24 小时制时钟偏好、Claude 200K 与 `[1m]` 变体、按模型的思考与功能控件、`/goal` 回合中的 Codex 后续消息、会话用量指标、共享登录账户对账、GitHub Desktop/Android 更新目标、远程主机 CLI 归档，以及 Vitest browser CI 修复。
+- **Fork 渠道整合上游 0.16.2：** 合并 [上游 0.16.2](https://github.com/getpaseo/paseo/releases/tag/v0.16.2)，同时保留本 fork 的定制行为。
+- **保留的 fork 能力：** 数学公式渲染与复制、手机 12/24 小时制时钟偏好、Claude 200K 与 `[1m]` 变体、按模型的思考与功能控件、`/goal` 回合中的 Codex 后续消息、Expo push 恢复、会话用量指标、共享登录账户对账、GitHub Desktop/Android 更新目标、远程主机 CLI 归档，以及 Vitest browser CI 修复。
 - **下载：** [derrickzhde/paseo releases](https://github.com/derrickzhde/paseo/releases)。
+
+## 0.16.2 - 2026-11-18
+
+### 修复
+
+- 修复启用"折叠轮次"时，Claude 回复后续后台任务通知导致上一条已完成的回复被折叠的问题 ([#10092](https://github.com/getpaseo/paseo/pull/10092))
+- 修复归档工作区时丢失分离 HEAD 的 worktree 提交的问题 ([#10009](https://github.com/getpaseo/paseo/pull/10009)，贡献者：[@ragokan](https://github.com/ragokan))
+- 修复 Desktop 更新后，由上一次 Desktop 会话启动的旧版 daemon 仍在运行的问题 ([#10067](https://github.com/getpaseo/paseo/pull/10067))
+- 修复更改执行权限后 daemon 与 Hub 断开连接的问题 ([#10113](https://github.com/getpaseo/paseo/pull/10113))
+- 修复一条已保存的主机记录无法读取时，其他主机也消失的问题 ([#9847](https://github.com/getpaseo/paseo/pull/9847)，贡献者：[@ragokan](https://github.com/ragokan))
+- 修复创建 worktree 时，扫描 `.worktreeinclude` 未指定的大型忽略目录导致超时的问题 ([#10020](https://github.com/getpaseo/paseo/pull/10020)，贡献者：[@mgranderath](https://github.com/mgranderath))
+- 修复发送引导消息时取消 Claude 正在进行的上下文压缩的问题 ([#10028](https://github.com/getpaseo/paseo/pull/10028)，贡献者：[@NightMachinery](https://github.com/NightMachinery))
+- 修复 Provider 重用已取消的轮次 ID 时，再次停止导致 Agent 卡住的问题 ([#9774](https://github.com/getpaseo/paseo/pull/9774)，贡献者：[@DAnaeto](https://github.com/DAnaeto))
+- 修复 Desktop 渲染进程意外退出后窗口一直空白的问题 ([#10035](https://github.com/getpaseo/paseo/pull/10035))
+- 修复 Web 和 Desktop 上文件下载失败时，错误页面占据应用窗口的问题 ([#9937](https://github.com/getpaseo/paseo/pull/9937)，贡献者：[@panta82](https://github.com/panta82))
+- 修复在"导入会话"中选择"加载更多"时丢失滚动位置的问题 ([#9974](https://github.com/getpaseo/paseo/pull/9974))
+- 修复主目录所在的文件系统拒绝 Unix 套接字时无法打开终端的问题，例如 AFS ([#9214](https://github.com/getpaseo/paseo/pull/9214)，贡献者：[@bendavid](https://github.com/bendavid))
+- 修复 Git 监视器设置超时后反复扫描大型仓库的问题 ([#9828](https://github.com/getpaseo/paseo/pull/9828)，贡献者：[@Spshulem](https://github.com/Spshulem))
+- 修复 `paseo workspace create --path .` 使用本地 daemon 的目录而非命令所在目录的问题 ([#10010](https://github.com/getpaseo/paseo/pull/10010))
+- 修复针对空闲 Agent 查询 MCP 状态或列表时漏报后台任务的问题 ([#10022](https://github.com/getpaseo/paseo/pull/10022)，贡献者：[@ortschun](https://github.com/ortschun))
+- 修复 OMP 更改思考级别后，选择器仍显示旧级别的问题 ([#9841](https://github.com/getpaseo/paseo/pull/9841)，贡献者：[@dsingal0](https://github.com/dsingal0))
+- 修复一条已保存的主机记录无法读取时，其他主机也消失的问题 ([#9847](https://github.com/getpaseo/paseo/pull/9847)，贡献者：[@ragokan](https://github.com/ragokan))
+- 修复创建 worktree 时，扫描 `.worktreeinclude` 未指定的大型忽略目录导致超时的问题 ([#10020](https://github.com/getpaseo/paseo/pull/10020)，贡献者：[@mgranderath](https://github.com/mgranderath))
+- 修复发送引导消息时取消 Claude 正在进行的上下文压缩的问题 ([#10028](https://github.com/getpaseo/paseo/pull/10028)，贡献者：[@NightMachinery](https://github.com/NightMachinery))
+- 修复 Provider 重用已取消的轮次 ID 时，再次停止导致 Agent 卡住的问题 ([#9774](https://github.com/getpaseo/paseo/pull/9774)，贡献者：[@DAnaeto](https://github.com/DAnaeto))
+- 修复 Desktop 渲染进程意外退出后窗口一直空白的问题 ([#10035](https://github.com/getpaseo/paseo/pull/10035))
+- 修复 Web 和 Desktop 上文件下载失败时，错误页面占据应用窗口的问题 ([#9937](https://github.com/getpaseo/paseo/pull/9937)，贡献者：[@panta82](https://github.com/panta82))
+- 修复在“导入会话”中选择“加载更多”时丢失滚动位置的问题 ([#9974](https://github.com/getpaseo/paseo/pull/9974))
+- 修复主目录所在的文件系统拒绝 Unix 套接字时无法打开终端的问题，例如 AFS ([#9214](https://github.com/getpaseo/paseo/pull/9214)，贡献者：[@bendavid](https://github.com/bendavid))
+- 修复 Git 监视器设置超时后反复扫描大型仓库的问题 ([#9828](https://github.com/getpaseo/paseo/pull/9828)，贡献者：[@Spshulem](https://github.com/Spshulem))
+- 修复 `paseo workspace create --path .` 使用本地 daemon 的目录而非命令所在目录的问题 ([#10010](https://github.com/getpaseo/paseo/pull/10010))
+- 修复针对空闲 Agent 查询 MCP 状态或列表时漏报后台任务的问题 ([#10022](https://github.com/getpaseo/paseo/pull/10022)，贡献者：[@ortschun](https://github.com/ortschun))
+- 修复 OMP 更改思考级别后，选择器仍显示旧级别的问题 ([#9841](https://github.com/getpaseo/paseo/pull/9841)，贡献者：[@dsingal0](https://github.com/dsingal0))
+
+## 0.16.1 - 2026-11-17
 
 ### 修复
 
@@ -18,32 +53,6 @@
 - 修复将对话标记为已读失败后，错误提示一直不关闭的问题 ([#9837](https://github.com/getpaseo/paseo/pull/9837))
 - 修复 daemon 重启后，等待结果和完成通知把 Agent 自行开始的回复与上一条回复拼接在一起的问题 ([#9846](https://github.com/getpaseo/paseo/pull/9846))
 - 修复客户端仅为读取历史而打开的 Codex 对话一直加载在 daemon 中直到重启的问题 ([#9859](https://github.com/getpaseo/paseo/pull/9859)，贡献者：[@Spshulem](https://github.com/Spshulem))
-
-### 说明
-
-- 本 fork 渠道发布于 [derrickzhde/paseo](https://github.com/derrickzhde/paseo/releases)；上游 0.16.1 仍在 [getpaseo/paseo](https://github.com/getpaseo/paseo/releases/tag/v0.16.1)。
-
-## 0.16.2 - 2026-11-16
-
-- **桌面发布修复：** 移除已过时的 `app-builder-lib` macOS 签名 backport；electron-builder 26.18.0 已包含 [electron-builder#10172](https://github.com/electron-userland/electron-builder/pull/10172)。恢复 fork 发布中的 macOS 安装包与 `latest-mac.yml`。
-- **与 0.16.1 相同的 fork 内容：** 整合上游 0.16.0 并保留本 fork 定制（数学渲染、时钟偏好、Claude 变体、用量指标、更新通道、远程主机 CLI 归档、Vitest browser CI 修复）。`v0.16.1` 未完成正式发布；**请使用 v0.16.2** 下载与更新。
-- **下载：** [derrickzhde/paseo releases](https://github.com/derrickzhde/paseo/releases)。
-
-### 说明
-
-- 本 fork 渠道发布于 [derrickzhde/paseo](https://github.com/derrickzhde/paseo/releases)；上游 0.16.0 仍在 [getpaseo/paseo](https://github.com/getpaseo/paseo/releases/tag/v0.16.0)。
-
-## 0.16.1 - 2026-11-16
-
-- **未正式发布：** Desktop Release 在 macOS 签名准备阶段失败；请勿用此标签更新。
-
-- **Fork 渠道整合上游 0.16.0：** 合并 [上游 0.16.0](https://github.com/getpaseo/paseo/releases/tag/v0.16.0) 的草稿控件、内置插件库、命令中心标签页等能力，同时保留本 fork 的定制行为。
-- **保留的 fork 能力：** 数学公式渲染与复制、手机 12/24 小时制时钟偏好、Claude 200K 与 `[1m]` 模型变体、会话用量指标、GitHub Desktop/Android 更新目标，以及远程主机 CLI 归档自更新路径。
-- **下载地址：** 发布包见 [derrickzhde/paseo](https://github.com/derrickzhde/paseo/releases)。
-
-### 说明
-
-- 本 fork 渠道发布于 [derrickzhde/paseo](https://github.com/derrickzhde/paseo/releases)；上游 0.16.0 仍在 [getpaseo/paseo](https://github.com/getpaseo/paseo/releases/tag/v0.16.0)。
 
 ## 0.16.0 - 2026-11-16
 
