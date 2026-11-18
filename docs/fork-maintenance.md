@@ -18,17 +18,21 @@ Follow the active agent/session instructions and the task principal's authorizat
 
 ## Starting point
 
-`main` integrates upstream **v0.16.1** (`c09a3d81e772a747dd11bca43d860f3518f07c2d`). The prepared fork version is **v0.16.3** at `23d80c0d18699593b7a814d6b999f4d36f7c7eaa`. Do not push the `v0.16.3` tag. macOS notarization fails with HTTP 403 because a required Apple agreement is missing or has expired. Signing already succeeds with `Developer ID Application: Changsha Huanhui Yingchen Network Technology Co., Ltd`. The same failure left the [v0.16.2 Desktop Release](https://github.com/derrickzhde/paseo/actions/runs/43890662182) as a draft. Do not restore the removed `app-builder-lib` 26.8.1 signing backport; electron-builder 26.18.0 includes [electron-builder#10172](https://github.com/electron-userland/electron-builder/pull/10172).
+`main` integrates upstream **v0.16.2** (`2ee30f4164af42ba209236ab3a31bf9532592fc3`). The prepared fork version is **v0.16.4** at `a738d46f3a67a5f69e4b22963c4abb0fc6a77249`. Do not push the `v0.16.4` tag until macOS publication is unblocked. macOS notarization still fails with HTTP 403 because a required Apple agreement is missing or has expired. Signing already succeeds with `Developer ID Application: Changsha Huanhui Yingchen Network Technology Co., Ltd`. The same failure left the [v0.16.2 Desktop Release](https://github.com/derrickzhde/paseo/actions/runs/43890662182) as a draft. Do not restore the removed `app-builder-lib` 26.8.1 signing backport; electron-builder 26.18.0 includes [electron-builder#10172](https://github.com/electron-userland/electron-builder/pull/10172).
 
-**v0.16.2** (`5243017109ee5047e803d865ab810172edd7744b`) and **v0.16.1** (`31cf57712f863f6e13d41a55c3a93dd8faf32567`) are unpublished tags. Tag lookup does not find a published v0.16.2 release; GitHub still has an untagged draft. The latest public fork release is v0.15.5. v0.16.2 contains upstream v0.16.0 (`c54bc39e7997c03a07402c09df2e825889432557`).
+The earlier prepared **v0.16.3** candidate at `23d80c0d18699593b7a814d6b999f4d36f7c7eaa` was never tagged and is superseded by v0.16.4.
+
+**v0.16.2** (`5243017109ee5047e803d865ab810172edd7744b`) and **v0.16.1** (`31cf57712f863f6e13d41a55c3a93dd8faf32567`) remain unpublished historical fork tags on upstream v0.16.0/v0.16.0-era integration; do not move, delete, or retag them. `CHANGELOG.md` keeps upstream-style **0.16.2** and **0.16.1** headings from the merged release notes; fork-only changelog sections that duplicated those version numbers with different dates were removed so the website parser and F-Droid checks stay valid.
 
 | Reference             | Commit                                                      |
 | --------------------- | ----------------------------------------------------------- |
+| Upstream v0.16.2      | `2ee30f4164af42ba209236ab3a31bf9532592fc3`                  |
+| Prepared fork v0.16.4 | `a738d46f3a67a5f69e4b22963c4abb0fc6a77249` (tag not pushed) |
 | Upstream v0.16.1      | `c09a3d81e772a747dd11bca43d860f3518f07c2d`                  |
-| Prepared fork v0.16.3 | `23d80c0d18699593b7a814d6b999f4d36f7c7eaa` (tag not pushed) |
 | Upstream v0.16.0      | `c54bc39e7997c03a07402c09df2e825889432557`                  |
-| Fork v0.16.2          | `5243017109ee5047e803d865ab810172edd7744b` (unpublished)    |
-| Fork v0.16.1          | `31cf57712f863f6e13d41a55c3a93dd8faf32567` (unpublished)    |
+| Fork v0.16.2 (tag)    | `5243017109ee5047e803d865ab810172edd7744b` (unpublished)    |
+| Fork v0.16.1 (tag)    | `31cf57712f863f6e13d41a55c3a93dd8faf32567` (unpublished)    |
+| Superseded fork v0.16.3 (never tagged) | `23d80c0d18699593b7a814d6b999f4d36f7c7eaa`          |
 
 The integrated fork lives on `main`; `origin` points to `derrickzhde/paseo`. Older history mentions an upstream-mirror `main` and a rebased `mine` branch. Derive the next integration from the actual current refs; do not restore that older arrangement or rewrite published history.
 
@@ -57,6 +61,8 @@ Compare both changesets from that common ancestor. Read the overlapping hunks an
 Report each customization as **replace with upstream**, **retain unchanged**, or **retain and adapt**, with supporting source/test evidence and any verification gap. Keep the upstream tag, both heads, common ancestor and decision list in the task record. Report the comparison before editing; continue authorized integration without another routine confirmation.
 
 The v0.16.1 comparison, from ancestor `c54bc39e7997c03a07402c09df2e825889432557`, found no named fork behavior with a complete upstream replacement. Shared-login reconciliation from [PR #6460](https://github.com/getpaseo/paseo/pull/6460) was still open. Pi and OMP display labels now use upstream `modelDisplayLabel`. Claude model discovery waits for a token refresh to finish, and Bypass uses `bypassApprovesAsk`; the `[1m]` catalog entries stayed. Codex idle cleanup releases `history-ready` sessions; `/goal` steering stayed on the interactive connection. Wait results use upstream `continuesAssistantMessage`. Math rendering, the enriched-markdown patch, the phone clock, Expo push recovery, the imported-session cache, session metrics, and Vitest browser CI stayed.
+
+The v0.16.2 comparison, from ancestor `c09a3d81e772a747dd11bca43d860f3518f07c2d`, kept every inventory item below. Upstream absorbed Hub reconnect on permission changes, desktop daemon replacement on update, renderer recovery, Claude steer-during-compaction behavior, notification-turn isolation ([#10092](https://github.com/getpaseo/paseo/pull/10092)), worktree create/archive fixes, and related fixes. None of those removed a fork-only delta: pre-merge fork commit `5a1532f7d4ef8b973e71cd3baa5a6b5a98132d58` still matches `main` on patches, fork updater IDs, Nix/CI guards, and the Enriched Markdown patch. Integration dropped `mathjax-full` from `packages/app/package.json` once; `e7a7264ab043782ca740c8caf3e98bae8dcced91` restored it and the browser math pipeline. Claude `agent.ts` gained upstream notification-turn and compaction-steer logic on top of the fork import-descriptor cache.
 
 ## Current customization inventory
 
