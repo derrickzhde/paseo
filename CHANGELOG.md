@@ -6,6 +6,10 @@
 - **Preserved fork behavior:** Math rendering and copy, phone 12/24-hour clock preferences, Claude 200K and `[1m]` variants, per-model controls, Codex follow-ups during `/goal` turns, Expo push recovery, session usage metrics, shared-login account reconciliation, GitHub Desktop/Android updater targets, the remote-host CLI archive, and Vitest browser CI fixes.
 - **Downloads:** [derrickzhde/paseo releases](https://github.com/derrickzhde/paseo/releases).
 
+### Notes
+
+- Fork-channel release on [derrickzhde/paseo](https://github.com/derrickzhde/paseo/releases); upstream 0.16.2 remains on [getpaseo/paseo](https://github.com/getpaseo/paseo/releases/tag/v0.16.2). The `v0.16.4` tag is not pushed until macOS notarization is unblocked.
+
 ## 0.16.2 - 2026-11-18
 
 ### Fixed

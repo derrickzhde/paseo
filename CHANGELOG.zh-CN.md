@@ -6,6 +6,10 @@
 - **保留的 fork 能力：** 数学公式渲染与复制、手机 12/24 小时制时钟偏好、Claude 200K 与 `[1m]` 变体、按模型的思考与功能控件、`/goal` 回合中的 Codex 后续消息、Expo push 恢复、会话用量指标、共享登录账户对账、GitHub Desktop/Android 更新目标、远程主机 CLI 归档，以及 Vitest browser CI 修复。
 - **下载：** [derrickzhde/paseo releases](https://github.com/derrickzhde/paseo/releases)。
 
+### 说明
+
+- 此为 [derrickzhde/paseo](https://github.com/derrickzhde/paseo/releases) 的 fork 渠道版本；上游 0.16.2 仍在 [getpaseo/paseo](https://github.com/getpaseo/paseo/releases/tag/v0.16.2)。在 macOS 公证解除阻塞前不会推送 `v0.16.4` 标签。
+
 ## 0.16.2 - 2026-11-18
 
 ### 修复
