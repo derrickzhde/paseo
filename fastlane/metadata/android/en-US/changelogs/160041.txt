@@ -1,0 +1,3 @@
+- Upstream 0.16.2 on the fork channel: Integrates upstream 0.16.2 while keeping this fork's custom behavior.
+
+Full notes: https://paseo.sh/changelog
