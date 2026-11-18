@@ -27,7 +27,7 @@ The earlier prepared **v0.16.3** candidate at `23d80c0d18699593b7a814d6b999f4d36
 | Reference             | Commit                                                      |
 | --------------------- | ----------------------------------------------------------- |
 | Upstream v0.16.2      | `2ee30f4164af42ba209236ab3a31bf9532592fc3`                  |
-| Prepared fork v0.16.4 | `bbc6b953207fe30b48dd80540b426dd5d09b1baf` (tag not pushed) |
+| Prepared fork v0.16.4 | `d57ed77c32d7fdd511f439c991fe916f621ff26f` (tag not pushed) |
 | Upstream v0.16.1      | `c09a3d81e772a747dd11bca43d860f3518f07c2d`                  |
 | Upstream v0.16.0      | `c54bc39e7997c03a07402c09df2e825889432557`                  |
 | Fork v0.16.2 (tag)    | `5243017109ee5047e803d865ab810172edd7744b` (unpublished)    |
