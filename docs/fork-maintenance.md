@@ -18,21 +18,21 @@ Follow the active agent/session instructions and the task principal's authorizat
 
 ## Starting point
 
-`main` integrates upstream **v0.16.2** (`2ee30f4164af42ba209236ab3a31bf9532592fc3`). The prepared fork version is **v0.16.4** at `d57ed77c32d7fdd511f439c991fe916f621ff26f` (tag not pushed). Do not push the `v0.16.4` tag until macOS publication is unblocked. macOS notarization still fails with HTTP 403 because a required Apple agreement is missing or has expired. Signing already succeeds with `Developer ID Application: Changsha Huanhui Yingchen Network Technology Co., Ltd`. The same failure left the [v0.16.2 Desktop Release](https://github.com/derrickzhde/paseo/actions/runs/43890662182) as a draft. Do not restore the removed `app-builder-lib` 26.8.1 signing backport; electron-builder 26.18.0 includes [electron-builder#10172](https://github.com/electron-userland/electron-builder/pull/10172).
+`main` integrates upstream **v0.16.2** (`2ee30f4164af42ba209236ab3a31bf9532592fc3`). The prepared fork version is **v0.16.4** at `26e837cdf450cb20286799b5637e80bc2b81624e` (tag not pushed). Do not push the `v0.16.4` tag until macOS publication is unblocked. macOS notarization still fails with HTTP 403 because a required Apple agreement is missing or has expired. Signing already succeeds with `Developer ID Application: Changsha Huanhui Yingchen Network Technology Co., Ltd`. The same failure left the [v0.16.2 Desktop Release](https://github.com/derrickzhde/paseo/actions/runs/43890662182) as a draft. Do not restore the removed `app-builder-lib` 26.8.1 signing backport; electron-builder 26.18.0 includes [electron-builder#10172](https://github.com/electron-userland/electron-builder/pull/10172).
 
 The earlier prepared **v0.16.3** candidate at `23d80c0d18699593b7a814d6b999f4d36f7c7eaa` was never tagged and is superseded by v0.16.4.
 
 **v0.16.2** (`5243017109ee5047e803d865ab810172edd7744b`) and **v0.16.1** (`31cf57712f863f6e13d41a55c3a93dd8faf32567`) remain unpublished historical fork tags on upstream v0.16.0/v0.16.0-era integration; do not move, delete, or retag them. `CHANGELOG.md` keeps upstream-style **0.16.2** and **0.16.1** headings from the merged release notes; fork-only changelog sections that duplicated those version numbers with different dates were removed so the website parser and F-Droid checks stay valid.
 
-| Reference             | Commit                                                      |
-| --------------------- | ----------------------------------------------------------- |
-| Upstream v0.16.2      | `2ee30f4164af42ba209236ab3a31bf9532592fc3`                  |
-| Prepared fork v0.16.4 | `d57ed77c32d7fdd511f439c991fe916f621ff26f` (tag not pushed) |
-| Upstream v0.16.1      | `c09a3d81e772a747dd11bca43d860f3518f07c2d`                  |
-| Upstream v0.16.0      | `c54bc39e7997c03a07402c09df2e825889432557`                  |
-| Fork v0.16.2 (tag)    | `5243017109ee5047e803d865ab810172edd7744b` (unpublished)    |
-| Fork v0.16.1 (tag)    | `31cf57712f863f6e13d41a55c3a93dd8faf32567` (unpublished)    |
-| Superseded fork v0.16.3 (never tagged) | `23d80c0d18699593b7a814d6b999f4d36f7c7eaa`          |
+| Reference                              | Commit                                                      |
+| -------------------------------------- | ----------------------------------------------------------- |
+| Upstream v0.16.2                       | `2ee30f4164af42ba209236ab3a31bf9532592fc3`                  |
+| Prepared fork v0.16.4                  | `26e837cdf450cb20286799b5637e80bc2b81624e` (tag not pushed) |
+| Upstream v0.16.1                       | `c09a3d81e772a747dd11bca43d860f3518f07c2d`                  |
+| Upstream v0.16.0                       | `c54bc39e7997c03a07402c09df2e825889432557`                  |
+| Fork v0.16.2 (tag)                     | `5243017109ee5047e803d865ab810172edd7744b` (unpublished)    |
+| Fork v0.16.1 (tag)                     | `31cf57712f863f6e13d41a55c3a93dd8faf32567` (unpublished)    |
+| Superseded fork v0.16.3 (never tagged) | `23d80c0d18699593b7a814d6b999f4d36f7c7eaa`                  |
 
 The integrated fork lives on `main`; `origin` points to `derrickzhde/paseo`. Older history mentions an upstream-mirror `main` and a rebased `mine` branch. Derive the next integration from the actual current refs; do not restore that older arrangement or rewrite published history.
 
