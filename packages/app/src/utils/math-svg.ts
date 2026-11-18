@@ -43,17 +43,11 @@ async function createMathEngine(): Promise<MathEngine> {
     liteAdaptorModule,
     htmlHandlerModule,
   ] = await Promise.all([
-    // @ts-expect-error mathjax-full has no type declarations
     import("mathjax-full/js/mathjax.js"),
-    // @ts-expect-error mathjax-full has no type declarations
     import("mathjax-full/js/input/tex.js"),
-    // @ts-expect-error mathjax-full has no type declarations
     import("mathjax-full/js/input/tex/ams/AmsConfiguration.js"),
-    // @ts-expect-error mathjax-full has no type declarations
     import("mathjax-full/js/output/svg.js"),
-    // @ts-expect-error mathjax-full has no type declarations
     import("mathjax-full/js/adaptors/liteAdaptor.js"),
-    // @ts-expect-error mathjax-full has no type declarations
     import("mathjax-full/js/handlers/html.js"),
   ]);
   void _amsConfigurationModule;
