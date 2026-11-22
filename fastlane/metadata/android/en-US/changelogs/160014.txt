@@ -1,4 +1,6 @@
-- Upstream 0.16.0 on the fork channel: Integrates upstream 0.16.0 — provider draft controls, built-in plugin gallery, command center tabs, and the rest of that release — while keeping this fork's custom behavior.
-- Preserved fork behavior: Math rendering and copy, phone 12/24-hour clock preferences, Claude 200K and [1m] variants, session usage metrics, GitHub Desktop/Android updater targets, and the remote-host CLI archive upgrade path.
+Fixed
+- Fixed Claude Bypass approving actions without a permission card when a permissions.ask rule or a hook that returns ask required one
+- Fixed controls being touch-sized on a touch-screen laptop when a trackpad or mouse is its primary input
+- Fixed Claude sessions failing until /login when Paseo refreshed the Claude model list while Claude Code was renewing an expired access token
 
 Full notes: https://paseo.sh/changelog

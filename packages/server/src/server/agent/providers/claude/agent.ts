@@ -51,8 +51,10 @@ import {
 import {
   CLAUDE_DISABLED_THINKING_OPTION_ID,
   CLAUDE_ULTRACODE_THINKING_OPTION_ID,
+  claudeManifestModelSupportsUltracode,
   parseClaudeCodeVersion,
   resolveClaudeDisabledThinkingForModel,
+  supportsIndependentClaudeUltracode,
 } from "./model-manifest.js";
 import { expandTilde } from "../../../../utils/path.js";
 import { parsePartialJsonObject } from "./partial-json.js";
@@ -96,6 +98,15 @@ import {
 } from "./rewind.js";
 import { normalizeProviderReplayTimestamp } from "../../provider-history-timestamps.js";
 import { claudeConfigDir, claudeProjectDirSync, claudeTranscriptPath } from "./project-dir.js";
+import {
+  compareWithLatestRelease,
+  fetchHomebrewCaskVersion,
+  fetchReleaseText,
+  homebrewCaskOf,
+  resolveExecutablePath,
+  type LatestReleaseLookup,
+} from "../release-check.js";
+import { runUpdateCommand, updatedForNewAgents } from "../update-command.js";
 import { THINKING_APPLIES_NEXT_TURN_NOTICE } from "../../provider-notices.js";
 import {
   isProviderImageMarkdown,
@@ -135,6 +146,7 @@ import {
   type AgentUsage,
   type AgentUsageSample,
   type AgentRuntimeInfo,
+  type AgentClientInstallation,
   type FetchCatalogOptions,
   type ImportableProviderSession,
   type ImportProviderSessionContext,
@@ -481,6 +493,8 @@ interface ClaudeAgentClientOptions {
   queryFactory?: ClaudeQueryFactory;
   resolveBinary?: () => Promise<string>;
   resolveVersion?: (signal?: AbortSignal) => Promise<string>;
+  /** Where update checks learn the newest release; defaults to Claude Code's release channel. */
+  lookupLatestRelease?: LatestReleaseLookup;
   rewindSdk?: ClaudeRewindSdk;
 }
 
@@ -503,6 +517,7 @@ interface ClaudeAgentSessionOptions {
   logger: Logger;
   queryFactory?: ClaudeQueryFactory;
   resolveBinary: () => Promise<string>;
+  independentUltracode: boolean;
   rewindSdk?: ClaudeRewindSdk;
 }
 
@@ -1618,6 +1633,43 @@ export class ClaudeAgentClient implements AgentClient {
   private readonly discoverModels: typeof discoverClaudeModels;
   readonly provider = "claude" as const;
   readonly capabilities = CLAUDE_CAPABILITIES;
+  readonly installation: AgentClientInstallation = {
+    installUrl: CLAUDE_INSTALL_URL,
+    updateUrl: CLAUDE_UPDATE_URL,
+    inspect: async ({ signal }) => {
+      const probe = await readClaudeCodeVersion(this.runtimeSettings, signal);
+      if (probe.status === "not_installed") return probe;
+      return probe.version
+        ? { status: "installed", version: probe.version }
+        : { status: "installed" };
+    },
+    checkForUpdates: async ({ installedVersion, signal }) => {
+      if (!installedVersion)
+        return { status: "unknown", message: "The configured command does not report its version" };
+      const installed = await resolveInstalledClaude(this.runtimeSettings);
+      if (!installed) return { status: "unknown", message: "Claude Code is not installed" };
+      const latest = await this.lookupLatestRelease({
+        executablePath: await resolveExecutablePath(installed.executable),
+        signal,
+      });
+      return compareWithLatestRelease({ installed: installedVersion, latest });
+    },
+    // `claude update` updates native installs itself and package-manager installs through the
+    // package manager.
+    update: async (context) => {
+      const installed = await resolveInstalledClaude(this.runtimeSettings);
+      if (!installed) return { status: "failed", message: "Claude Code is not installed" };
+      return runUpdateCommand(
+        {
+          command: installed.executable,
+          args: [...installed.args, "update"],
+          env: createProviderEnvSpec({ runtimeSettings: this.runtimeSettings }),
+          successMessage: updatedForNewAgents("Claude Code"),
+        },
+        context,
+      );
+    },
+  };
 
   private readonly defaults?: { agents?: Record<string, AgentDefinition> };
   private readonly logger: Logger;
@@ -1625,6 +1677,8 @@ export class ClaudeAgentClient implements AgentClient {
   private readonly queryFactory?: ClaudeQueryFactory;
   private readonly resolveBinary: () => Promise<string>;
   private readonly resolveVersion: (signal?: AbortSignal) => Promise<string>;
+  private version: Promise<string | undefined> | undefined;
+  private readonly lookupLatestRelease: LatestReleaseLookup;
   private readonly rewindSdk: ClaudeRewindSdk;
   private readonly scheduleImportDescriptors = createImportDescriptorScheduler(
     (candidate: ClaudeSessionCandidate, signal) => this.readImportDescriptor(candidate, signal),
@@ -1646,6 +1700,13 @@ export class ClaudeAgentClient implements AgentClient {
     this.resolveVersion =
       options.resolveVersion ??
       ((signal) => resolveClaudeCodeVersion(this.runtimeSettings, signal));
+    this.lookupLatestRelease =
+      options.lookupLatestRelease ??
+      ((input) =>
+        lookupLatestClaudeRelease({
+          ...input,
+          configDir: claudeConfigDir(this.buildProviderEnv()),
+        }));
     this.rewindSdk = options.rewindSdk ?? realClaudeRewindSdk;
   }
 
@@ -1668,6 +1729,7 @@ export class ClaudeAgentClient implements AgentClient {
       logger: this.logger,
       queryFactory: this.queryFactory,
       resolveBinary: this.resolveBinary,
+      independentUltracode: await this.supportsIndependentUltracode(),
       rewindSdk: this.rewindSdk,
     });
   }
@@ -1697,6 +1759,7 @@ export class ClaudeAgentClient implements AgentClient {
       logger: this.logger,
       queryFactory: this.queryFactory,
       resolveBinary: this.resolveBinary,
+      independentUltracode: await this.supportsIndependentUltracode(),
       rewindSdk: this.rewindSdk,
     });
     await session.ensureHistoryReady();
@@ -1721,6 +1784,7 @@ export class ClaudeAgentClient implements AgentClient {
     } catch (error) {
       this.logger.warn({ err: error }, "Failed to resolve Claude Code version for model catalog");
     }
+    this.version = Promise.resolve(claudeCodeVersion);
     const env = this.buildProviderEnv();
     let discoveredModelIds = new Set<string>();
     try {
@@ -1777,9 +1841,17 @@ export class ClaudeAgentClient implements AgentClient {
 
   async listControls(config: AgentSessionConfig): Promise<AgentDraftControls> {
     return {
-      controls: buildClaudeControls(this.assertConfig(config).model),
+      controls: buildClaudeControls(
+        this.assertConfig(config).model,
+        await this.supportsIndependentUltracode(),
+      ),
       options: config.providerOptions ?? {},
     };
+  }
+
+  private async supportsIndependentUltracode(): Promise<boolean> {
+    this.version ??= this.resolveVersion().catch(() => undefined);
+    return supportsIndependentClaudeUltracode(await this.version);
   }
 
   async listImportableSessions(
@@ -1943,20 +2015,85 @@ async function resolveClaudeBinary(runtimeSettings?: ProviderRuntimeSettings): P
   );
 }
 
+const CLAUDE_INSTALL_URL = "https://code.claude.com/docs/en/setup#install-claude-code";
+const CLAUDE_UPDATE_URL = "https://code.claude.com/docs/en/setup#update-claude-code";
+
+type ClaudeCodeVersionRead =
+  | { status: "not_installed" }
+  /** `version` is null when the configured command is a wrapper that does not report Claude Code's version. */
+  | { status: "installed"; version: string | null };
+
+const CLAUDE_UPDATE_CHANNELS = new Set(["latest", "stable", "rc"]);
+
+/** The `autoUpdatesChannel` Claude Code updates from, `latest` unless settings pick another. */
+async function readClaudeUpdateChannel(configDir: string): Promise<string> {
+  try {
+    const settings: unknown = JSON.parse(
+      await promises.readFile(path.join(configDir, "settings.json"), "utf8"),
+    );
+    const channel =
+      settings && typeof settings === "object"
+        ? (settings as Record<string, unknown>).autoUpdatesChannel
+        : undefined;
+    return typeof channel === "string" && CLAUDE_UPDATE_CHANNELS.has(channel) ? channel : "latest";
+  } catch {
+    return "latest";
+  }
+}
+
+/**
+ * The release Claude Code's own updater offers: the Homebrew cask for cask installs, otherwise
+ * the version published on the configured update channel.
+ */
+async function lookupLatestClaudeRelease(input: {
+  executablePath: string;
+  configDir: string;
+  signal: AbortSignal;
+}): Promise<string> {
+  const cask = homebrewCaskOf(input.executablePath);
+  if (cask) return fetchHomebrewCaskVersion(cask, input.signal);
+  const channel = await readClaudeUpdateChannel(input.configDir);
+  return fetchReleaseText(
+    `https://downloads.claude.ai/claude-code-releases/${channel}`,
+    input.signal,
+  );
+}
+
 export async function resolveClaudeCodeVersion(
   runtimeSettings?: ProviderRuntimeSettings,
   signal?: AbortSignal,
 ): Promise<string> {
+  const read = await readClaudeCodeVersion(runtimeSettings, signal);
+  if (read.status === "not_installed") {
+    throw new Error("Claude binary not found while resolving Claude Code version");
+  }
+  if (!read.version) {
+    throw new Error("Unable to parse Claude Code version from --version output");
+  }
+  return read.version;
+}
+
+/** The executable and arguments a session would launch, or null when Claude Code is missing. */
+async function resolveInstalledClaude(
+  runtimeSettings: ProviderRuntimeSettings | undefined,
+): Promise<{ executable: string; args: string[] } | null> {
   const launch = await resolveProviderLaunch({
     commandConfig: runtimeSettings?.command,
     defaultBinary: "claude",
   });
   const availability = await checkProviderLaunchAvailable(launch);
-  if (!availability.available) {
-    throw new Error("Claude binary not found while resolving Claude Code version");
-  }
-  const executable = availability.resolvedPath ?? launch.command;
-  const { stdout, stderr } = await execCommand(executable, [...launch.args, "--version"], {
+  if (!availability.available) return null;
+  return { executable: availability.resolvedPath ?? launch.command, args: [...launch.args] };
+}
+
+async function readClaudeCodeVersion(
+  runtimeSettings: ProviderRuntimeSettings | undefined,
+  signal: AbortSignal | undefined,
+): Promise<ClaudeCodeVersionRead> {
+  const installed = await resolveInstalledClaude(runtimeSettings);
+  if (!installed) return { status: "not_installed" };
+  const { executable } = installed;
+  const { stdout, stderr } = await execCommand(executable, [...installed.args, "--version"], {
     ...createProviderEnvSpec({ runtimeSettings }),
     timeout: 5_000,
     signal,
@@ -1968,10 +2105,10 @@ export async function resolveClaudeCodeVersion(
   const version = /\d+\.\d+\.\d+\s+\(Claude Code\)/i.test(rawVersionOutput)
     ? parseClaudeCodeVersion(rawVersionOutput)
     : null;
-  if (!version) {
-    throw new Error("Unable to parse Claude Code version from --version output");
-  }
-  return version.join(".");
+  return {
+    status: "installed",
+    version: version ? version.join(".") : null,
+  };
 }
 
 async function resolveClaudeAuth(
@@ -2581,6 +2718,7 @@ class ClaudeAgentSession implements AgentSession {
   private readonly logger: Logger;
   private readonly queryFactory?: ClaudeQueryFactory;
   private readonly resolveBinary: () => Promise<string>;
+  private readonly independentUltracode: boolean;
   private query: Query | null = null;
   private readonly runtimeSafety = new ClaudeRuntimeSafety();
   private readonly backgroundStops = new Map<string, (outcome: string) => void>();
@@ -2718,6 +2856,7 @@ class ClaudeAgentSession implements AgentSession {
     this.logger = options.logger.child({ agentId: this.agentId });
     this.queryFactory = options.queryFactory;
     this.resolveBinary = options.resolveBinary;
+    this.independentUltracode = options.independentUltracode;
     this.rewindSdk = options.rewindSdk ?? realClaudeRewindSdk;
     this.contextUsage = new ClaudeContextUsageState(
       getClaudeContextWindowMaxTokens(this.config.model),
@@ -2755,6 +2894,16 @@ class ClaudeAgentSession implements AgentSession {
       this.config.providerOptions = { ...config.providerOptions, fast_mode: false };
       this.openOptionsPatch = { fast_mode: false };
     }
+    // COMPAT(claudeUltracodeThinkingOption): added in v0.17.0, remove after 2027-05-18.
+    // Direct adapter callers can still pass the combined choice.
+    if (
+      this.independentUltracode &&
+      config.thinkingOptionId === CLAUDE_ULTRACODE_THINKING_OPTION_ID &&
+      config.providerOptions.ultracode === undefined
+    ) {
+      this.config.providerOptions = { ...config.providerOptions, ultracode: true };
+      this.openOptionsPatch.ultracode = true;
+    }
   }
 
   get id(): string | null {
@@ -2762,18 +2911,28 @@ class ClaudeAgentSession implements AgentSession {
   }
 
   get controls(): AgentOptionControl[] {
-    return buildClaudeControls(this.config.model);
+    return buildClaudeControls(this.config.model, this.independentUltracode);
   }
 
   async getRuntimeInfo(): Promise<AgentRuntimeInfo> {
     if (this.cachedRuntimeInfo) {
       return { ...this.cachedRuntimeInfo };
     }
+    // COMPAT(claudeUltracodeThinkingOption): added in v0.17.0, remove after 2027-05-18.
     const info: AgentRuntimeInfo = {
       provider: "claude",
       sessionId: this.claudeSessionId,
       model: this.lastOptionsModel ?? this.config.model ?? null,
       modeId: this.currentMode ?? null,
+      ...(this.independentUltracode &&
+      this.config.thinkingOptionId === CLAUDE_ULTRACODE_THINKING_OPTION_ID
+        ? { thinkingOptionId: "xhigh" }
+        : {}),
+      ...(!this.independentUltracode &&
+      this.config.thinkingOptionId === "xhigh" &&
+      this.config.providerOptions.ultracode === true
+        ? { thinkingOptionId: CLAUDE_ULTRACODE_THINKING_OPTION_ID }
+        : {}),
       ...(this.lastRuntimeModel
         ? {
             extra: {
@@ -2796,12 +2955,7 @@ class ClaudeAgentSession implements AgentSession {
       reduceFinalText: appendOrReplaceGrowingAssistantMessage,
     });
 
-    this.cachedRuntimeInfo = {
-      provider: "claude",
-      sessionId: this.claudeSessionId,
-      model: this.lastOptionsModel,
-      modeId: this.currentMode ?? null,
-    };
+    this.cachedRuntimeInfo = null;
 
     if (!this.claudeSessionId) {
       throw new Error("Session ID not set after run completed");
@@ -3090,9 +3244,14 @@ class ClaudeAgentSession implements AgentSession {
     const normalizedModelId =
       typeof modelId === "string" && modelId.trim().length > 0 ? modelId.trim() : null;
     const activeQuery = await this.ensureQuery();
+    const previousUltracode = this.resolveUltracodeSetting();
     await activeQuery.setModel(normalizedModelId ?? undefined);
     this.config.model = normalizedModelId ?? undefined;
     this.reconcileThinkingOptionForModel(normalizedModelId);
+    const ultracode = this.resolveUltracodeSetting();
+    if (previousUltracode !== ultracode && this.config.providerOptions.ultracode !== undefined) {
+      await activeQuery.applyFlagSettings({ ultracode: ultracode ?? false });
+    }
     if (this.config.providerOptions.fast_mode) {
       const supported = claudeModelSupportsFastMode(this.config.model);
       await activeQuery.applyFlagSettings({ fastMode: supported });
@@ -3145,29 +3304,77 @@ class ClaudeAgentSession implements AgentSession {
         ? thinkingOptionId
         : null;
 
+    const previousThinkingOptionId = this.config.thinkingOptionId;
     if (!normalizedThinkingOptionId || normalizedThinkingOptionId === "default") {
       this.config.thinkingOptionId = undefined;
     } else if (isClaudeThinkingOption(normalizedThinkingOptionId)) {
       assertClaudeThinkingOptionSupported(this.config.model, normalizedThinkingOptionId);
       this.config.thinkingOptionId = normalizedThinkingOptionId;
+      if (
+        normalizedThinkingOptionId === CLAUDE_ULTRACODE_THINKING_OPTION_ID &&
+        this.config.providerOptions.ultracode !== true
+      ) {
+        this.config.providerOptions = { ...this.config.providerOptions, ultracode: true };
+        this.pushEvent({ type: "options_changed", provider: "claude", patch: { ultracode: true } });
+      }
     } else {
       throw new Error(`Unknown thinking option: ${normalizedThinkingOptionId}`);
     }
-    this.queryRestartNeeded = true;
+    this.cachedRuntimeInfo = null;
+    if (
+      !this.independentUltracode &&
+      normalizedThinkingOptionId !== CLAUDE_ULTRACODE_THINKING_OPTION_ID &&
+      this.config.providerOptions.ultracode === true
+    ) {
+      this.config.providerOptions = { ...this.config.providerOptions, ultracode: false };
+      this.pushEvent({ type: "options_changed", provider: "claude", patch: { ultracode: false } });
+      this.queryRestartNeeded = true;
+    }
+    if (!(await this.applyEffortToRunningQuery(previousThinkingOptionId))) {
+      this.queryRestartNeeded = true;
+    }
     if (this.activeForegroundTurnId || this.autonomousTurn) {
       return THINKING_APPLIES_NEXT_TURN_NOTICE;
     }
   }
 
+  // A move between two effort levels changes only the effort, which a running Claude process
+  // takes through flag settings, so the process and its background work stay. Switching thinking
+  // off, to ultracode or back to the default changes how the query is launched, so it still
+  // restarts the query. The recorded option feeds every later launch either way.
+  private async applyEffortToRunningQuery(
+    previousThinkingOptionId: string | undefined,
+  ): Promise<boolean> {
+    const effort = this.config.thinkingOptionId;
+    const previousEffort =
+      this.independentUltracode && previousThinkingOptionId === CLAUDE_ULTRACODE_THINKING_OPTION_ID
+        ? "xhigh"
+        : previousThinkingOptionId;
+    if (!this.query || this.queryRestartNeeded) return false;
+    if (!isClaudeThinkingEffort(previousEffort) || !isClaudeThinkingEffort(effort)) {
+      return false;
+    }
+    try {
+      const ultracode = this.resolveUltracodeSetting();
+      await this.query.applyFlagSettings({
+        effortLevel: effort,
+        ...(ultracode === undefined ? {} : { ultracode }),
+      });
+      return true;
+    } catch (error) {
+      this.logger.warn({ err: error, effort }, "Claude did not take a live effort change");
+      return false;
+    }
+  }
+
   async applyOptions(options: ProviderOptions): Promise<void> {
-    // Every option but Fast is read when the query is built, and replacing a started query would
-    // end its background work, so once it exists only Fast can change.
+    // Replacing a started query ends background work, so only flag settings can change live.
     if (this.query || this.queryStarting) {
       assertChangesAreLive({
         provider: "claude",
         patch: options,
         current: this.config.providerOptions,
-        live: ["fast_mode"],
+        live: ["fast_mode", "ultracode"],
       });
     }
     const providerOptions =
@@ -3183,12 +3390,32 @@ class ClaudeAgentSession implements AgentSession {
     }
     const fastModeChanged =
       (providerOptions.fast_mode === true) !== (this.config.providerOptions.fast_mode === true);
-    if (fastModeChanged) {
-      await this.query?.applyFlagSettings({ fastMode: providerOptions.fast_mode === true });
+    const ultracodeChanged = providerOptions.ultracode !== this.config.providerOptions.ultracode;
+    if (ultracodeChanged) this.assertUltracodeChangeSupported(providerOptions.ultracode);
+    if (fastModeChanged || ultracodeChanged) {
+      await this.query?.applyFlagSettings({
+        ...(fastModeChanged ? { fastMode: providerOptions.fast_mode === true } : {}),
+        ...(ultracodeChanged ? { ultracode: providerOptions.ultracode ?? false } : {}),
+      });
       this.cachedRuntimeInfo = null;
     }
     // Held until the runtime accepts, so a rejected change is retried instead of skipped.
     this.config.providerOptions = providerOptions;
+  }
+
+  private assertUltracodeChangeSupported(value: boolean | undefined): void {
+    if (!this.independentUltracode) {
+      throw new Error("The Ultracode toggle requires Claude Code 2.1.284 or later");
+    }
+    if (this.query && value === undefined) {
+      // The SDK treats null as Off, so a running process cannot restore inherited settings.
+      throw new Error("Close the agent to reset Ultracode to Claude's default");
+    }
+    if (value === true && !claudeManifestModelSupportsUltracode(this.config.model)) {
+      throw new Error(
+        `Claude Ultracode is not available for model '${this.config.model ?? "default"}'`,
+      );
+    }
   }
 
   getPendingPermissions(): AgentPermissionRequest[] {
@@ -3335,7 +3562,11 @@ class ClaudeAgentSession implements AgentSession {
     if (!this.claudeSessionId) {
       return null;
     }
-    const { providerOptions: _providerOptions, ...persistedConfig } = this.config;
+    const {
+      providerOptions: _providerOptions,
+      pluginAppendSystemPrompt: _pluginAppendSystemPrompt,
+      ...persistedConfig
+    } = this.config;
     this.persistence = {
       provider: "claude",
       sessionId: this.claudeSessionId,
@@ -3916,8 +4147,12 @@ class ClaudeAgentSession implements AgentSession {
     );
     this.queryStarting = false;
     const fastMode = this.resolveFastModeSetting();
-    if (fastMode !== null) {
-      await this.query.applyFlagSettings({ fastMode });
+    const ultracode = this.independentUltracode ? this.resolveUltracodeSetting() : undefined;
+    if (fastMode !== null || ultracode !== undefined) {
+      await this.query.applyFlagSettings({
+        ...(fastMode === null ? {} : { fastMode }),
+        ...(ultracode === undefined ? {} : { ultracode }),
+      });
     }
     // Do not kick off background control-plane queries here. Methods like
     // supportedCommands()/setPermissionMode() may execute immediately after
@@ -3975,7 +4210,6 @@ class ClaudeAgentSession implements AgentSession {
   private resolveThinkingConfig(): {
     thinking: ClaudeOptions["thinking"];
     effort: ClaudeOptions["effort"];
-    ultracode: boolean;
   } {
     const thinkingOptionId =
       this.config.thinkingOptionId && this.config.thinkingOptionId !== "default"
@@ -3983,28 +4217,30 @@ class ClaudeAgentSession implements AgentSession {
         : undefined;
     assertClaudeThinkingOptionSupported(this.config.model, thinkingOptionId);
     if (thinkingOptionId === CLAUDE_DISABLED_THINKING_OPTION_ID) {
-      return { thinking: { type: "disabled" }, effort: undefined, ultracode: false };
+      return { thinking: { type: "disabled" }, effort: undefined };
     }
     if (thinkingOptionId === CLAUDE_ULTRACODE_THINKING_OPTION_ID) {
       return {
         thinking: { type: "adaptive", display: "summarized" },
         effort: "xhigh",
-        ultracode: true,
       };
     }
     if (thinkingOptionId && isClaudeThinkingEffort(thinkingOptionId)) {
       return {
         thinking: { type: "adaptive", display: "summarized" },
         effort: thinkingOptionId,
-        ultracode: false,
       };
     }
-    return { thinking: undefined, effort: undefined, ultracode: false };
+    return { thinking: undefined, effort: undefined };
   }
 
   private buildAppendedSystemPrompt(): string {
     return (
-      composeSystemPromptParts(this.config.systemPrompt, this.config.daemonAppendSystemPrompt) ?? ""
+      composeSystemPromptParts(
+        this.config.systemPrompt,
+        this.config.daemonAppendSystemPrompt,
+        ...(this.config.pluginAppendSystemPrompt ?? []),
+      ) ?? ""
     );
   }
 
@@ -4032,12 +4268,15 @@ class ClaudeAgentSession implements AgentSession {
   }
 
   private async buildOptions(permissionMode: PermissionMode): Promise<ClaudeOptions> {
-    const { thinking, effort, ultracode } = this.resolveThinkingConfig();
+    const { thinking, effort } = this.resolveThinkingConfig();
     const appendedSystemPrompt = this.buildAppendedSystemPrompt();
-    // `fast_mode` is a composer control the provider applies through flag settings.
-    const { fast_mode: _fastMode, ...sdkProviderOptions } = this.config.providerOptions;
+    const {
+      fast_mode: _fastMode,
+      ultracode: _ultracode,
+      ...sdkProviderOptions
+    } = this.config.providerOptions;
     const providerOptions = applyClaudeToolPolicy(sdkProviderOptions, this.config.toolPolicy);
-    const settingsOptions = await this.buildSettingsOptions(providerOptions, { ultracode });
+    const settingsOptions = await this.buildSettingsOptions(providerOptions);
     const sdkEnv = this.harnessEnvironment;
     assertClaudeModeCanRun(permissionMode, sdkEnv);
 
@@ -4124,18 +4363,18 @@ class ClaudeAgentSession implements AgentSession {
 
   private async buildSettingsOptions(
     providerOptions: ClaudeProviderOptions,
-    input: { ultracode: boolean },
   ): Promise<Pick<ClaudeOptions, "settings" | "extraArgs"> | Record<string, never>> {
     const fastMode = this.resolveFastModeSetting();
+    const ultracode = this.resolveUltracodeSetting();
     // Internal agents do daemon work such as naming a branch, so the user's and
     // project's hooks must not run for them.
     const disableAllHooks = this.config.internal === true;
-    if (fastMode === null && !input.ultracode && !disableAllHooks) {
+    if (fastMode === null && ultracode === undefined && !disableAllHooks) {
       return {};
     }
     const updates = {
       ...(fastMode === null ? {} : { fastMode }),
-      ...(input.ultracode ? { ultracode: true } : {}),
+      ...(ultracode === undefined ? {} : { ultracode }),
       ...(disableAllHooks ? { disableAllHooks: true } : {}),
     };
     // The SDK replaces extraArgs.settings with Options.settings, so a user's
@@ -4149,6 +4388,18 @@ class ClaudeAgentSession implements AgentSession {
       extraArgs,
       settings: { ...cliSettings, ...providerOptions.settings, ...updates },
     };
+  }
+
+  private resolveUltracodeSetting(): boolean | undefined {
+    const ultracode = this.config.providerOptions.ultracode;
+    if (!this.independentUltracode) {
+      return this.config.thinkingOptionId === CLAUDE_ULTRACODE_THINKING_OPTION_ID
+        ? true
+        : ultracode && this.config.thinkingOptionId === "xhigh";
+    }
+    if (ultracode === undefined) return undefined;
+    if (this.config.thinkingOptionId === CLAUDE_ULTRACODE_THINKING_OPTION_ID) return ultracode;
+    return ultracode && claudeManifestModelSupportsUltracode(this.config.model);
   }
 
   private resolveFastModeSetting(): boolean | null {

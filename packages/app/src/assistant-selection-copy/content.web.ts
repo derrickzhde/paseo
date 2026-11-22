@@ -2,7 +2,7 @@ import TurndownService from "turndown";
 import { gfm } from "turndown-plugin-gfm";
 import {
   createCodeClipboardContent,
-  createMarkdownClipboardContent,
+  createSelectionClipboardContent,
   type MarkdownClipboardContent,
 } from "@/utils/rich-clipboard";
 import {
@@ -11,11 +11,11 @@ import {
   MARKDOWN_COPY_ALT_ATTRIBUTE,
   MARKDOWN_COPY_IGNORE_ATTRIBUTE,
   MARKDOWN_COPY_LANGUAGE_ATTRIBUTE,
-  MARKDOWN_COPY_MATH_SOURCE_ATTRIBUTE,
   MARKDOWN_COPY_LIST_MARKER_ATTRIBUTE,
   MARKDOWN_COPY_LIST_START_ATTRIBUTE,
   MARKDOWN_COPY_SRC_ATTRIBUTE,
   MARKDOWN_COPY_TAG_ATTRIBUTE,
+  MARKDOWN_COPY_RECOGNIZED_LINK_ATTRIBUTE,
   MARKDOWN_COPY_UNWRAP_ATTRIBUTE,
   TRAILING_CODE_LINE_BREAKS,
 } from "./markup";
@@ -27,7 +27,6 @@ const messageRowSelector = (messageId: string) => `[data-message-id="${CSS.escap
 const CODE_BLOCK_SELECTOR = `pre, [${MARKDOWN_COPY_TAG_ATTRIBUTE}="pre"]`;
 const CODE_REGION_SELECTOR = `${CODE_BLOCK_SELECTOR}, code, [${MARKDOWN_COPY_TAG_ATTRIBUTE}="code"]`;
 const IMAGE_FRAME_SELECTOR = `img, [${MARKDOWN_COPY_TAG_ATTRIBUTE}="img"]`;
-const MATH_FORMULA_SELECTOR = `[${MARKDOWN_COPY_MATH_SOURCE_ATTRIBUTE}]`;
 
 const SEMANTIC_TAGS =
   "p,blockquote,br,code,pre,h1,h2,h3,h4,h5,h6,hr,img,li,ol,ul,strong,em,s,del,table,thead,tbody,tr,th,td";
@@ -58,44 +57,72 @@ function copySemanticAttributes(original: Element, copy: Element): void {
   }
 }
 
-const turndown = new TurndownService({
-  bulletListMarker: "-",
-  codeBlockStyle: "fenced",
-  emDelimiter: "_",
-  strongDelimiter: "**",
-});
-turndown.use(gfm);
-turndown.addRule("escapedGfmTableCell", {
-  filter: ["th", "td"],
-  replacement: (content, node) => {
-    const index = node.parentNode ? Array.from(node.parentNode.childNodes).indexOf(node) : 0;
-    const prefix = index === 0 ? "| " : " ";
-    return `${prefix}${content.replace(/\|/g, "\\|")} |`;
-  },
-});
-turndown.addRule("gfmStrikethrough", {
-  filter: ["del", "s"],
-  replacement: (content) => `~~${content}~~`,
-});
-turndown.addRule("mathFormulaCopy", {
-  filter: (node) => node.getAttribute(MARKDOWN_COPY_MATH_SOURCE_ATTRIBUTE) !== null,
-  replacement: (_content, node) => node.getAttribute(MARKDOWN_COPY_MATH_SOURCE_ATTRIBUTE) ?? "",
-});
-turndown.addRule("compactListItem", {
-  filter: "li",
-  replacement: (content, node, options) => {
-    const item = content
-      .replace(/^\n+/, "")
-      .replace(/\n+$/, "\n")
-      // Every non-empty line, so indented code lines stay inside the item.
-      .replace(/\n(?=[^\n])/g, "\n    ");
-    const parent = node.parentElement;
-    if (parent?.nodeName !== "OL") {
-      return `${options.bulletListMarker} ${item}\n`;
-    }
-    return `${node.getAttribute("value")}. ${item}\n`;
-  },
-});
+function createTurndown(flavor: "markdown" | "plain"): TurndownService {
+  const turndown = new TurndownService({
+    bulletListMarker: "-",
+    codeBlockStyle: "fenced",
+    emDelimiter: "_",
+    strongDelimiter: "**",
+  });
+  turndown.use(gfm);
+  // text/plain still carries tables as GFM syntax, so a cell's pipe stays escaped there.
+  turndown.addRule("escapedGfmTableCell", {
+    filter: ["th", "td"],
+    replacement: (content, node) => {
+      const index = node.parentNode ? Array.from(node.parentNode.childNodes).indexOf(node) : 0;
+      const prefix = index === 0 ? "| " : " ";
+      return `${prefix}${content.replace(/\|/g, "\\|")} |`;
+    },
+  });
+  // A link Paseo recognized pastes as the text the reply showed. Rich paste keeps it as a
+  // link when it points to a web page, such as a forge reference.
+  turndown.addRule("recognizedLink", {
+    filter: (node) =>
+      node.nodeName === "A" &&
+      node.hasAttribute(MARKDOWN_COPY_RECOGNIZED_LINK_ATTRIBUTE) &&
+      (flavor === "plain" || !isWebUrl(node.getAttribute("href") ?? "")),
+    replacement: (content) => content,
+  });
+  if (flavor === "markdown") {
+    // Turndown leaves `<` unescaped, so displayed text such as `<http://localhost>`
+    // would render back into text/html as an autolink.
+    const escapeMarkdown = turndown.escape.bind(turndown);
+    turndown.escape = (text) => escapeMarkdown(text).replace(/</g, "\\<");
+  } else {
+    turndown.escape = (text) => text;
+  }
+  turndown.addRule("mathFormulaCopy", {
+    filter: (node) => node.getAttribute(MARKDOWN_COPY_MATH_SOURCE_ATTRIBUTE) !== null,
+    replacement: (_content, node) => node.getAttribute(MARKDOWN_COPY_MATH_SOURCE_ATTRIBUTE) ?? "",
+  });
+  turndown.addRule("gfmStrikethrough", {
+    filter: ["del", "s"],
+    replacement: (content) => `~~${content}~~`,
+  });
+  turndown.addRule("compactListItem", {
+    filter: "li",
+    replacement: (content, node, options) => {
+      const item = content
+        .replace(/^\n+/, "")
+        .replace(/\n+$/, "\n")
+        // Every non-empty line, so indented code lines stay inside the item.
+        .replace(/\n(?=[^\n])/g, "\n    ");
+      const parent = node.parentElement;
+      if (parent?.nodeName !== "OL") {
+        return `${options.bulletListMarker} ${item}\n`;
+      }
+      return `${node.getAttribute("value")}. ${item}\n`;
+    },
+  });
+  return turndown;
+}
+
+function isWebUrl(href: string): boolean {
+  return /^https?:\/\//i.test(href);
+}
+
+const markdownTurndown = createTurndown("markdown");
+const plainTurndown = createTurndown("plain");
 
 export function createAssistantSelectionClipboardContent(
   selection: Selection | null,
@@ -123,11 +150,15 @@ export function createAssistantSelectionClipboardContent(
   }
   restoreMarkdownElements(container);
 
-  const markdown = turndown.turndown(container.innerHTML).trim();
+  const markdown = markdownTurndown.turndown(container).trim();
   if (!markdown) {
     return null;
   }
-  const content = createMarkdownClipboardContent(markdown);
+  // text/plain carries unescaped Markdown: a plain target shows backslashes literally.
+  // text/html is rendered from escaped Markdown, so literal Markdown characters stay
+  // literal in a rich target.
+  const plainText = plainTurndown.turndown(container).trim();
+  const content = createSelectionClipboardContent(markdown, plainText);
   return { ...content, html: flattenClipboardListMarkup(content.html) };
 }
 
@@ -485,14 +516,7 @@ function hasSelectedAllContents(range: Range, element: Element, includeIgnored =
 }
 
 function selectsContent(range: Range): boolean {
-  return hasMarkdownContent(range.cloneContents(), true) || isInsideMathFormula(range);
-}
-
-/** SVG formula glyphs carry no text; the wrapper holds the delimiter-inclusive source. */
-function isInsideMathFormula(range: Range): boolean {
-  const ancestor = range.commonAncestorContainer;
-  const element = ancestor instanceof Element ? ancestor : ancestor.parentElement;
-  return !range.collapsed && element?.closest(MATH_FORMULA_SELECTOR) != null;
+  return hasMarkdownContent(range.cloneContents(), true);
 }
 
 function selectsNothingOutside(range: Range, element: Element): boolean {
@@ -527,7 +551,7 @@ function hasMarkdownContent(fragment: DocumentFragment, includeIgnored: boolean)
   }
   const visibleVoidSelector = ["br", "hr", "img"]
     .map((tag) => `[${MARKDOWN_COPY_TAG_ATTRIBUTE}="${tag}"]`)
-    .concat("img", MATH_FORMULA_SELECTOR)
+    .concat("img")
     .join(",");
   return Boolean(fragment.querySelector(visibleVoidSelector));
 }
@@ -610,8 +634,6 @@ function selectedMessageParts(range: Range): SelectedMessagePart[] | null {
 }
 
 function restoreMarkdownElements(container: HTMLElement): void {
-  restoreMathFormulaSources(container);
-
   for (const ignored of container.querySelectorAll(`[${MARKDOWN_COPY_IGNORE_ATTRIBUTE}]`)) {
     ignored.remove();
   }
@@ -662,30 +684,19 @@ function restoreMarkdownElements(container: HTMLElement): void {
     element.replaceWith(...element.childNodes);
   }
 
-  const presentational = Array.from(
-    container.querySelectorAll(
-      `div:not(${MATH_FORMULA_SELECTOR}), span:not(${MATH_FORMULA_SELECTOR})`,
-    ),
-  );
+  const presentational = Array.from(container.querySelectorAll("div, span"));
   for (const element of presentational.toReversed()) {
     element.replaceWith(...element.childNodes);
   }
-}
-
-function restoreMathFormulaSources(container: HTMLElement): void {
-  for (const element of Array.from(
-    container.querySelectorAll(MATH_FORMULA_SELECTOR),
-  ).toReversed()) {
-    const source = element.getAttribute(MARKDOWN_COPY_MATH_SOURCE_ATTRIBUTE);
-    if (source) element.textContent = source;
-  }
+  // Turndown escapes line-start Markdown per text node, so text split by an unwrapped
+  // element, such as `#` and ` for`, has to be one node to keep `# for` literal.
+  container.normalize();
 }
 
 /**
- * Each item carries its number before Turndown re-parses the HTML. Until then every
- * child of the list is one item, including a partly selected item demoted to a `p`.
- * The parser splits a `p` that holds a code block into several siblings, so counting
- * siblings afterwards numbers the next item too high.
+ * Assign item numbers before passing the DOM to Turndown. A partly selected item
+ * still takes its original list position when copied as a paragraph, so the following
+ * items keep their numbers.
  */
 function numberOrderedListItems(list: Element, start: number): void {
   Array.from(list.children).forEach((child, index) => {

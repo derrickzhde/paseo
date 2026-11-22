@@ -1,5 +1,4 @@
 import { execFile } from "node:child_process";
-import { promises as fsPromises } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -456,13 +455,11 @@ describe("ClaudeAgentClient.fetchCatalog", () => {
       });
 
       expect(models.map((m) => m.id)).toEqual([
-        "claude-opus-5[1m]",
         "claude-opus-5",
         "claude-mythos-5-1",
-        "claude-fable-5-1[1m]",
         "claude-fable-5-1",
-        "claude-fable-5[1m]",
         "claude-fable-5",
+        "claude-fable-5[1m]",
         "claude-opus-4-8[1m]",
         "claude-opus-4-8",
         "claude-sonnet-5",
@@ -483,7 +480,7 @@ describe("ClaudeAgentClient.fetchCatalog", () => {
       }
 
       const defaultModel = models.find((m) => m.isDefault);
-      expect(defaultModel?.id).toBe("claude-opus-5[1m]");
+      expect(defaultModel?.id).toBe("claude-opus-5");
     } finally {
       await fs.rm(emptyConfigDir, { recursive: true, force: true });
     }
@@ -513,7 +510,7 @@ describe("ClaudeAgentClient.fetchCatalog", () => {
         force: false,
       });
 
-      expect(models.find((model) => model.isDefault)?.id).toBe("claude-opus-5-5[1m]");
+      expect(models.find((model) => model.isDefault)?.id).toBe("claude-opus-5-5");
       expect(models.map((model) => model.id)).toContain("claude-fable-5");
     } finally {
       await fs.rm(emptyConfigDir, { recursive: true, force: true });
@@ -546,22 +543,20 @@ describe("ClaudeAgentClient.fetchCatalog", () => {
         return models.find((model) => model.id === modelId)?.thinkingOptions?.map(({ id }) => id);
       };
 
-      expect(getThinkingIds("claude-opus-5")).toContain("ultracode");
-      expect(getThinkingIds("claude-fable-5-1[1m]")).toContain("ultracode");
+      expect(getThinkingIds("claude-opus-5")).not.toContain("ultracode");
       expect(getThinkingIds("claude-mythos-5-1")).toEqual([
         "low",
         "medium",
         "high",
         "xhigh",
         "max",
-        "ultracode",
       ]);
-      expect(getThinkingIds("claude-fable-5-1")).toContain("ultracode");
-      expect(getThinkingIds("claude-fable-5")).toContain("ultracode");
-      expect(getThinkingIds("claude-opus-4-8[1m]")).toContain("ultracode");
-      expect(getThinkingIds("claude-opus-4-8")).toContain("ultracode");
+      expect(getThinkingIds("claude-fable-5-1")).not.toContain("ultracode");
+      expect(getThinkingIds("claude-fable-5")).not.toContain("ultracode");
+      expect(getThinkingIds("claude-opus-4-8[1m]")).not.toContain("ultracode");
+      expect(getThinkingIds("claude-opus-4-8")).not.toContain("ultracode");
       expect(getThinkingIds("claude-sonnet-5")).toContain("xhigh");
-      expect(getThinkingIds("claude-sonnet-5")).toContain("ultracode");
+      expect(getThinkingIds("claude-sonnet-5")).not.toContain("ultracode");
       expect(getThinkingIds("claude-haiku-5-5")).toEqual([
         "off",
         "low",
@@ -569,12 +564,11 @@ describe("ClaudeAgentClient.fetchCatalog", () => {
         "high",
         "xhigh",
         "max",
-        "ultracode",
       ]);
       expect(getThinkingIds("claude-sonnet-5-5")).toContain("xhigh");
       expect(getThinkingIds("claude-sonnet-5-5")).not.toContain("off");
-      expect(getThinkingIds("claude-opus-4-7[1m]")).toContain("ultracode");
-      expect(getThinkingIds("claude-opus-4-7")).toContain("ultracode");
+      expect(getThinkingIds("claude-opus-4-7[1m]")).not.toContain("ultracode");
+      expect(getThinkingIds("claude-opus-4-7")).not.toContain("ultracode");
       expect(getThinkingIds("claude-sonnet-4-6")).not.toContain("ultracode");
     } finally {
       await fs.rm(emptyConfigDir, { recursive: true, force: true });
@@ -1185,8 +1179,8 @@ describe("ClaudeAgentSession features", () => {
     await session.close();
   });
 
-  test("lists fast mode only for supported Opus models", async () => {
-    const client = new ClaudeAgentClient({ logger, resolveBinary: async () => "/test/claude/bin" });
+  test("lists Claude controls by model capability", async () => {
+    const client = new ClaudeAgentClient({ logger, resolveVersion: async () => "2.1.284" });
 
     await expect(
       client.listControls({
@@ -1195,7 +1189,10 @@ describe("ClaudeAgentSession features", () => {
         model: "claude-opus-4-8",
       }),
     ).resolves.toEqual({
-      controls: [expect.objectContaining({ key: "fast_mode", type: "toggle" })],
+      controls: [
+        expect.objectContaining({ key: "fast_mode", type: "toggle" }),
+        expect.objectContaining({ key: "ultracode", type: "toggle" }),
+      ],
       options: {},
     });
 
@@ -1206,7 +1203,10 @@ describe("ClaudeAgentSession features", () => {
         model: "claude-opus-4-8[1m]",
       }),
     ).resolves.toEqual({
-      controls: [expect.objectContaining({ key: "fast_mode", type: "toggle" })],
+      controls: [
+        expect.objectContaining({ key: "fast_mode", type: "toggle" }),
+        expect.objectContaining({ key: "ultracode", type: "toggle" }),
+      ],
       options: {},
     });
 
@@ -1217,7 +1217,10 @@ describe("ClaudeAgentSession features", () => {
         model: "claude-opus-4-8-20260101",
       }),
     ).resolves.toEqual({
-      controls: [expect.objectContaining({ key: "fast_mode", type: "toggle" })],
+      controls: [
+        expect.objectContaining({ key: "fast_mode", type: "toggle" }),
+        expect.objectContaining({ key: "ultracode", type: "toggle" }),
+      ],
       options: {},
     });
 
@@ -1228,7 +1231,10 @@ describe("ClaudeAgentSession features", () => {
         model: "claude-opus-5",
       }),
     ).resolves.toEqual({
-      controls: [expect.objectContaining({ key: "fast_mode", type: "toggle" })],
+      controls: [
+        expect.objectContaining({ key: "fast_mode", type: "toggle" }),
+        expect.objectContaining({ key: "ultracode", type: "toggle" }),
+      ],
       options: {},
     });
 
@@ -1238,7 +1244,10 @@ describe("ClaudeAgentSession features", () => {
         cwd: process.cwd(),
         model: "openrouter/anthropic/claude-opus-4-8",
       }),
-    ).resolves.toEqual({ controls: [], options: {} });
+    ).resolves.toEqual({
+      controls: [expect.objectContaining({ key: "ultracode", type: "toggle" })],
+      options: {},
+    });
 
     await expect(
       client.listControls({
@@ -1246,7 +1255,10 @@ describe("ClaudeAgentSession features", () => {
         cwd: process.cwd(),
         model: "claude-sonnet-5",
       }),
-    ).resolves.toEqual({ controls: [], options: {} });
+    ).resolves.toEqual({
+      controls: [expect.objectContaining({ key: "ultracode", type: "toggle" })],
+      options: {},
+    });
 
     await expect(
       client.listControls({
@@ -2583,12 +2595,6 @@ describe("ClaudeAgentClient.listImportableSessions", () => {
       const projectDir = path.join(configDir, "projects", "changing-transcript");
       await fs.mkdir(projectDir, { recursive: true });
       const sessionFile = path.join(projectDir, "changing.jsonl");
-      // A coarse filesystem clock can repeat ctime as size and mtime cycle back.
-      const stat = fsPromises.stat;
-      vi.spyOn(fsPromises, "stat").mockImplementation(async (...args) => {
-        const result = await stat(...args);
-        return args[0] === sessionFile ? Object.assign(result, { ctimeMs: 0 }) : result;
-      });
       const initial = `${JSON.stringify({
         type: "user",
         sessionId: "changing-session",
@@ -3792,431 +3798,6 @@ describe("ClaudeAgentSession context window usage", () => {
         contextWindowMaxTokens: 200_000,
         contextWindowUsedTokens: 17_261,
       });
-    } finally {
-      await session.close();
-    }
-  });
-
-  test("emits an estimated generation sample at root message stop using input and tool-result boundaries", async () => {
-    let now = 1000;
-    vi.spyOn(Date, "now").mockImplementation(() => now);
-    const session = await createSessionForTurns([[]]);
-    const internal = session as unknown as TestClaudeSession & {
-      contextUsage: { beginTurn(id: string): void };
-    };
-    internal.contextUsage.beginTurn("estimated-turn");
-    const frame = (event: Record<string, unknown>, parent: string | null = null) =>
-      internal.translateMessageToEvents({
-        type: "stream_event",
-        session_id: "session-1",
-        uuid: "frame",
-        parent_tool_use_id: parent,
-        event,
-      } as unknown as SDKMessage);
-    try {
-      now = 5000;
-      await frame({
-        type: "message_start",
-        message: {
-          id: "root-1",
-          usage: { input_tokens: 100, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
-        },
-      });
-      now = 13_000;
-      await frame({ type: "message_delta", usage: { output_tokens: 600 } });
-      const first = await frame({ type: "message_stop" });
-      expect(first).toContainEqual(
-        expect.objectContaining({
-          type: "usage_updated",
-          generationSample: {
-            id: "claude:estimated-turn:root-1",
-            outputTokens: 600,
-            durationMs: 12_000,
-            completedAt: 13_000,
-            estimated: true,
-          },
-        }),
-      );
-      now = 91_000;
-      await internal.translateMessageToEvents({
-        type: "user",
-        uuid: "tool-result",
-        session_id: "session-1",
-        message: {
-          role: "user",
-          content: [{ type: "tool_result", tool_use_id: "tool-1", content: "done" }],
-        },
-      } as unknown as SDKMessage);
-      now = 95_000;
-      await frame(
-        { type: "message_start", message: { id: "child", usage: { input_tokens: 100 } } },
-        "tool-child",
-      );
-      await frame({ type: "message_delta", usage: { output_tokens: 9000 } }, "tool-child");
-      expect(
-        (await frame({ type: "message_stop" }, "tool-child")).some(
-          (event) => event.type === "usage_updated" && event.generationSample,
-        ),
-      ).toBe(false);
-      now = 101_000;
-      await frame({
-        type: "message_start",
-        message: {
-          id: "root-2",
-          usage: { input_tokens: 100, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
-        },
-      });
-      now = 111_000;
-      await frame({ type: "message_delta", usage: { output_tokens: 400 } });
-      expect(await frame({ type: "message_stop" })).toContainEqual(
-        expect.objectContaining({
-          type: "usage_updated",
-          generationSample: {
-            id: "claude:estimated-turn:root-2",
-            outputTokens: 400,
-            durationMs: 20_000,
-            completedAt: 111_000,
-            estimated: true,
-          },
-        }),
-      );
-      expect(
-        (await frame({ type: "message_stop" })).some(
-          (event) => event.type === "usage_updated" && event.generationSample,
-        ),
-      ).toBe(false);
-      now = 115_000;
-      await frame({ type: "message_start", message: { id: "unknown-output" } });
-      now = 125_000;
-      expect(
-        (await frame({ type: "message_stop" })).some(
-          (event) => event.type === "usage_updated" && event.generationSample,
-        ),
-      ).toBe(false);
-    } finally {
-      await session.close();
-    }
-  });
-
-  test("normalizes root requests and reconciles the authoritative per-turn result", async () => {
-    const session = await createSessionForTurns([
-      [
-        createInitMessage(),
-        {
-          type: "stream_event",
-          event: {
-            type: "message_start",
-            message: {
-              id: "msg-1",
-              usage: {
-                input_tokens: 100,
-                cache_creation_input_tokens: 20,
-                cache_read_input_tokens: 30,
-              },
-            },
-          },
-          session_id: "session-1",
-        },
-        createMessageDeltaUsageEvent({
-          output_tokens: 10,
-          input_tokens: 110,
-          cache_creation_input_tokens: 20,
-          cache_read_input_tokens: 30,
-        }),
-        {
-          type: "stream_event",
-          event: {
-            type: "message_start",
-            message: {
-              id: "msg-1",
-              usage: {
-                input_tokens: 9_000,
-                cache_creation_input_tokens: 9_000,
-                cache_read_input_tokens: 9_000,
-              },
-            },
-          },
-          session_id: "session-1",
-        },
-        {
-          type: "stream_event",
-          event: {
-            type: "message_start",
-            message: {
-              id: "msg-2",
-              usage: {
-                input_tokens: 5,
-                cache_creation_input_tokens: 1,
-                cache_read_input_tokens: 4,
-              },
-            },
-          },
-          session_id: "session-1",
-        },
-        createMessageDeltaEvent(3),
-        {
-          type: "stream_event",
-          parent_tool_use_id: "toolu-agent-1",
-          event: {
-            type: "message_start",
-            message: {
-              id: "msg-sub",
-              usage: {
-                input_tokens: 9_000,
-                cache_creation_input_tokens: 9_000,
-                cache_read_input_tokens: 9_000,
-              },
-            },
-          },
-          session_id: "session-1",
-        },
-        createSuccessResult({
-          usage: {
-            input_tokens: 50,
-            cache_creation_input_tokens: 100,
-            cache_read_input_tokens: 20,
-            output_tokens: 9,
-          },
-        }),
-      ],
-      [
-        createInitMessage(),
-        createSuccessResult({
-          usage: {
-            input_tokens: 8,
-            cache_creation_input_tokens: 2,
-            output_tokens: 4,
-          },
-        }),
-      ],
-    ]);
-    const events: AgentStreamEvent[] = [];
-    session.subscribe((event) => events.push(event));
-
-    try {
-      const first = await session.run("turn");
-      const turnId = events.find((event) => event.type === "usage_updated")?.turnId;
-      const sampled = events.filter(
-        (event) => event.type === "usage_updated" || event.type === "turn_completed",
-      );
-      expect(turnId).toEqual(expect.any(String));
-      expect(sampled.map((event) => event.usageSample)).toEqual([
-        { scope: "turn", id: turnId, inputTokens: 150, cachedInputTokens: 30 },
-        { scope: "turn", id: turnId, inputTokens: 160, cachedInputTokens: 30, outputTokens: 10 },
-        { scope: "turn", id: turnId, inputTokens: 170, cachedInputTokens: 34, outputTokens: 10 },
-        { scope: "turn", id: turnId, inputTokens: 170, cachedInputTokens: 34, outputTokens: 13 },
-        { scope: "turn", id: turnId, inputTokens: 170, cachedInputTokens: 20, outputTokens: 9 },
-      ]);
-      expect(
-        events
-          .filter((event) => event.type === "usage_updated")
-          .map((event) => event.usage.contextWindowUsedTokens),
-      ).toEqual([150, 170, 10, 13]);
-      expect(first.usage).toEqual({
-        inputTokens: 50,
-        cachedInputTokens: 20,
-        outputTokens: 9,
-        totalCostUsd: 0.25,
-        contextWindowMaxTokens: 200_000,
-        contextWindowUsedTokens: 13,
-      });
-
-      events.length = 0;
-      const second = await session.run("turn");
-      const secondTurnId = events.find((event) => event.type === "turn_completed")?.turnId;
-      expect(secondTurnId).toEqual(expect.any(String));
-      expect(secondTurnId).not.toBe(turnId);
-      expect(events.find((event) => event.type === "turn_completed")?.usageSample).toEqual({
-        scope: "turn",
-        id: secondTurnId,
-        outputTokens: 4,
-      });
-      expect(second.usage).toEqual({
-        inputTokens: 8,
-        cachedInputTokens: undefined,
-        outputTokens: 4,
-        totalCostUsd: 0.25,
-        contextWindowMaxTokens: 200_000,
-      });
-    } finally {
-      await session.close();
-    }
-  });
-
-  test("keeps unreported stream cache unknown and publishes a failed result sample first", async () => {
-    const session = await createSessionForTurns([
-      [
-        createInitMessage(),
-        {
-          type: "stream_event",
-          event: {
-            type: "message_start",
-            message: { id: "msg-a", usage: { input_tokens: 100 } },
-          },
-          session_id: "session-1",
-        },
-        createMessageDeltaEvent(20),
-        createMessageDeltaUsageEvent({
-          output_tokens: 25,
-          cache_creation_input_tokens: 5,
-          cache_read_input_tokens: 0,
-        }),
-        {
-          type: "stream_event",
-          event: {
-            type: "message_start",
-            message: {
-              id: "msg-b",
-              usage: {
-                input_tokens: 10,
-                cache_creation_input_tokens: 1,
-                cache_read_input_tokens: 4,
-              },
-            },
-          },
-          session_id: "session-1",
-        },
-        createMessageDeltaEvent(2),
-        {
-          type: "stream_event",
-          event: {
-            type: "message_start",
-            message: { id: "msg-c", usage: { input_tokens: 50 } },
-          },
-          session_id: "session-1",
-        },
-        createSuccessResult({
-          usage: {
-            input_tokens: 40,
-            cache_creation_input_tokens: 6,
-            cache_read_input_tokens: 11,
-            output_tokens: 9,
-          },
-        }),
-      ],
-      [
-        createInitMessage(),
-        {
-          type: "stream_event",
-          event: {
-            type: "message_start",
-            message: { id: "msg-d", usage: { input_tokens: 3 } },
-          },
-          session_id: "session-1",
-        },
-        createMessageDeltaEvent(4),
-        {
-          type: "result",
-          subtype: "error",
-          duration_ms: 10,
-          duration_api_ms: 8,
-          is_error: true,
-          num_turns: 1,
-          stop_reason: null,
-          total_cost_usd: 0.1,
-          errors: ["model failed"],
-          usage: {
-            input_tokens: 12,
-            cache_creation_input_tokens: 3,
-            cache_read_input_tokens: 8,
-            output_tokens: 6,
-          },
-          modelUsage: {
-            "claude-sonnet-4-6": { contextWindow: 200_000 },
-          },
-          permission_denials: [],
-          uuid: "result-error",
-          session_id: "session-1",
-        },
-      ],
-    ]);
-    const events: AgentStreamEvent[] = [];
-    session.subscribe((event) => events.push(event));
-
-    try {
-      const first = await session.run("turn");
-      const turnId = events.find((event) => event.type === "usage_updated")?.turnId;
-      const samples = events
-        .filter((event) => event.type === "usage_updated" || event.type === "turn_completed")
-        .map((event) => event.usageSample);
-      expect(samples).toEqual([
-        { scope: "turn", id: turnId },
-        { scope: "turn", id: turnId, outputTokens: 20 },
-        {
-          scope: "turn",
-          id: turnId,
-          inputTokens: 105,
-          cachedInputTokens: 0,
-          outputTokens: 25,
-        },
-        {
-          scope: "turn",
-          id: turnId,
-          inputTokens: 120,
-          cachedInputTokens: 4,
-          outputTokens: 25,
-        },
-        {
-          scope: "turn",
-          id: turnId,
-          inputTokens: 120,
-          cachedInputTokens: 4,
-          outputTokens: 27,
-        },
-        { scope: "turn", id: turnId, outputTokens: 27 },
-        {
-          scope: "turn",
-          id: turnId,
-          inputTokens: 57,
-          cachedInputTokens: 11,
-          outputTokens: 9,
-        },
-      ]);
-      expect(
-        events
-          .filter((event) => event.type === "usage_updated")
-          .map((event) => event.usage.contextWindowUsedTokens),
-      ).toEqual([100, 120, 130, 15, 17, 50]);
-      expect(first.usage).toEqual({
-        inputTokens: 40,
-        cachedInputTokens: 11,
-        outputTokens: 9,
-        totalCostUsd: 0.25,
-        contextWindowMaxTokens: 200_000,
-        contextWindowUsedTokens: 50,
-      });
-
-      events.length = 0;
-      await expect(session.run("turn")).rejects.toThrow("model failed");
-      const failedTurnId = events.find((event) => event.type === "turn_failed")?.turnId;
-      const failureIndex = events.findIndex((event) => event.type === "turn_failed");
-      expect(events[failureIndex - 1]).toEqual({
-        type: "usage_updated",
-        provider: "claude",
-        turnId: failedTurnId,
-        usage: {
-          inputTokens: 12,
-          cachedInputTokens: 8,
-          outputTokens: 6,
-          totalCostUsd: 0.1,
-          contextWindowMaxTokens: 200_000,
-          contextWindowUsedTokens: 7,
-        },
-        usageSample: {
-          scope: "turn",
-          id: failedTurnId,
-          inputTokens: 23,
-          cachedInputTokens: 8,
-          outputTokens: 6,
-        },
-      });
-      expect(events[failureIndex]).toMatchObject({
-        type: "turn_failed",
-        provider: "claude",
-        error: "model failed",
-        turnId: failedTurnId,
-      });
-      expect(events[failureIndex]).not.toHaveProperty("usageSample");
     } finally {
       await session.close();
     }
