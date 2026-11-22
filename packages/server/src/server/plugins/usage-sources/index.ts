@@ -30,11 +30,6 @@ interface KnownReport {
   label?: string;
 }
 
-interface LoginIdentity {
-  accounts: Array<{ id: string; label: string }>;
-  generation: number;
-}
-
 export interface AgentUsageLookup {
   hasAgent(id: string): boolean;
   usageSession(id: string): AgentUsageSession | null;
@@ -59,8 +54,6 @@ export class UsageSourceRegistry {
   private readonly cache = new Map<string, { at: number; entry: UsageReportEntry }>();
   private readonly successful = new Map<string, NonNullable<UsageReportEntry["lastSuccessful"]>>();
   private readonly pending = new Map<string, Promise<UsageReportEntry>>();
-  private readonly identities = new Map<string, LoginIdentity>();
-  private discoveries = 0;
 
   constructor(
     private readonly now: () => number = Date.now,
@@ -86,8 +79,6 @@ export class UsageSourceRegistry {
     for (const key of this.successful.keys())
       if (key.startsWith(`${id}:`)) this.successful.delete(key);
     for (const key of this.pending.keys()) if (key.startsWith(`${id}:`)) this.pending.delete(key);
-    for (const key of this.identities.keys())
-      if (key.startsWith(`${id}:`)) this.identities.delete(key);
   }
 
   async listReports(options: ListUsageReportsOptions = {}): Promise<UsageReportEntry[]> {
@@ -99,20 +90,17 @@ export class UsageSourceRegistry {
     if (options.agentId !== undefined) {
       if (!this.agents.hasAgent(options.agentId))
         throw new Error(`Unknown agent: ${options.agentId}`);
-      await this.discoverAgent(options.agentId);
+      reports = await this.discoverAgent(options.agentId);
       this.mergeKnown();
-      reports = this.byAgent.get(options.agentId) ?? new Map();
       ids = [...reports.keys()];
     } else if (options.reportIds !== undefined) {
       ids = options.reportIds;
     } else {
-      const generation = ++this.discoveries;
       const [defaults] = await Promise.all([
         this.discover({ kind: "global" }, this.defaults),
-        ...[...this.byAgent.keys()].map((agentId) => this.discoverAgentWithoutRebind(agentId)),
+        ...[...this.byAgent.keys()].map((agentId) => this.discoverAgent(agentId)),
       ]);
       this.defaults = defaults;
-      this.rebindLogins(this.defaults, generation);
       this.mergeKnown();
       ids = [...this.known.keys()];
     }
@@ -144,36 +132,6 @@ export class UsageSourceRegistry {
       return new Map();
     }
     const previous = this.byAgent.get(agentId);
-    const generation = ++this.discoveries;
-    const reports = await this.discover({
-      kind: "session",
-      provider: session.provider,
-      model: session.model,
-      env: session.env,
-      launch: session.launch,
-    });
-    const current = this.agents.usageSession(agentId);
-    if (
-      current?.sessionKey !== session.sessionKey ||
-      current.provider !== session.provider ||
-      current.model !== session.model
-    ) {
-      if (this.byAgent.get(agentId) === previous) this.byAgent.delete(agentId);
-      return new Map();
-    }
-
-    this.byAgent.set(agentId, reports);
-    this.rebindLogins(reports, generation);
-    return reports;
-  }
-
-  private async discoverAgentWithoutRebind(agentId: string): Promise<Map<string, KnownReport>> {
-    const session = this.agents.usageSession(agentId);
-    if (!session) {
-      this.byAgent.delete(agentId);
-      return new Map();
-    }
-    const previous = this.byAgent.get(agentId);
     const reports = await this.discover({
       kind: "session",
       provider: session.provider,
@@ -193,85 +151,6 @@ export class UsageSourceRegistry {
 
     this.byAgent.set(agentId, reports);
     return reports;
-  }
-
-  private rebindLogins(fresh: Map<string, KnownReport>, generation: number): void {
-    // Update identities mapping: record all labeled accounts from authoritative (global) discoveries.
-    // Multiple accounts with the same login in one discovery coexist in the set.
-    if (fresh === this.defaults) {
-      // This is a global/host discovery - update identities with all labeled accounts
-      const loginAccounts = new Map<string, Array<{ id: string; label: string }>>();
-      for (const [id, report] of fresh) {
-        if (report.label === undefined) continue;
-        for (const login of report.logins) {
-          const key = `${report.source.id}:${loginKey(login)}`;
-          const accounts = loginAccounts.get(key) ?? [];
-          accounts.push({ id, label: report.label });
-          loginAccounts.set(key, accounts);
-        }
-      }
-      // Update identities if this discovery has current or newer generation
-      for (const [key, accounts] of loginAccounts) {
-        if ((this.identities.get(key)?.generation ?? 0) <= generation) {
-          this.identities.set(key, { accounts, generation });
-        }
-      }
-    }
-
-    // Rebind agent/session scope reports: translate fallback keys to real account keys
-    // A discovery that finishes after a newer one cannot rebind the login back.
-    for (const reports of [this.defaults, ...this.byAgent.values()]) {
-      // For global discoveries, check if this is an older discovery that should be discarded
-      if (reports === fresh && reports === this.defaults) {
-        // Check if any identity has a newer generation
-        let hasNewerIdentity = false;
-        for (const [id, report] of fresh) {
-          if (report.label === undefined) continue;
-          for (const login of report.logins) {
-            const key = `${report.source.id}:${loginKey(login)}`;
-            const identity = this.identities.get(key);
-            if (identity && identity.generation > generation) {
-              hasNewerIdentity = true;
-              break;
-            }
-          }
-          if (hasNewerIdentity) break;
-        }
-        // If a newer discovery already updated the identities, skip this older one
-        if (hasNewerIdentity) continue;
-      }
-
-      const rebound = new Map<string, KnownReport>();
-      const isAgentScope = reports !== this.defaults;
-
-      for (const [id, report] of reports) {
-        for (const login of report.logins) {
-          let currentId = id;
-          let currentLabel = report.label;
-
-          // Translation only applies to agent/session scope fallback keys
-          if (isAgentScope && report.label === undefined) {
-            const identity = this.identities.get(`${report.source.id}:${loginKey(login)}`);
-            // Translate only if exactly one labeled account exists for this login
-            if (identity && identity.accounts.length === 1) {
-              currentId = identity.accounts[0].id;
-              currentLabel = identity.accounts[0].label;
-            }
-          }
-
-          const current = rebound.get(currentId);
-          if (current) current.logins.push(login);
-          else
-            rebound.set(currentId, {
-              source: report.source,
-              label: currentLabel,
-              logins: [login],
-            });
-        }
-      }
-      reports.clear();
-      for (const [id, report] of rebound) reports.set(id, report);
-    }
   }
 
   private mergeKnown(): void {
