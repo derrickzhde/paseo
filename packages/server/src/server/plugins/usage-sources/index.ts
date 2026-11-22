@@ -219,7 +219,28 @@ export class UsageSourceRegistry {
     }
 
     // Rebind agent/session scope reports: translate fallback keys to real account keys
+    // A discovery that finishes after a newer one cannot rebind the login back.
     for (const reports of [this.defaults, ...this.byAgent.values()]) {
+      // For global discoveries, check if this is an older discovery that should be discarded
+      if (reports === fresh && reports === this.defaults) {
+        // Check if any identity has a newer generation
+        let hasNewerIdentity = false;
+        for (const [id, report] of fresh) {
+          if (report.label === undefined) continue;
+          for (const login of report.logins) {
+            const key = `${report.source.id}:${loginKey(login)}`;
+            const identity = this.identities.get(key);
+            if (identity && identity.generation > generation) {
+              hasNewerIdentity = true;
+              break;
+            }
+          }
+          if (hasNewerIdentity) break;
+        }
+        // If a newer discovery already updated the identities, skip this older one
+        if (hasNewerIdentity) continue;
+      }
+
       const rebound = new Map<string, KnownReport>();
       const isAgentScope = reports !== this.defaults;
 
