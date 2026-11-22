@@ -18,7 +18,7 @@ Follow the active agent/session instructions and the task principal's authorizat
 
 ## Starting point
 
-`main` integrates upstream **v0.17.1** (`043f0995d33333ac6dcec6cce60f21e5a9a7a0ea`). The published fork release is **v0.17.2** at `6bbd911ce147951aa7dfcbf88996381a113b9636` ([GitHub release](https://github.com/derrickzhde/paseo/releases/tag/v0.17.2), [Desktop Release](https://github.com/derrickzhde/paseo/actions/runs/44999460577)). Do not restore the removed `app-builder-lib` 26.8.1 signing backport; electron-builder 26.18.0 includes [electron-builder#10172](https://github.com/electron-userland/electron-builder/pull/10172).
+`main` integrates upstream **v0.17.1** (`043f0995d4d7e91ab12f3eecef1afce055a81972`). The published fork release is **v0.17.2** at `6bbd911ce147951aa7dfcbf88996381a113b9636` ([GitHub release](https://github.com/derrickzhde/paseo/releases/tag/v0.17.2), [Desktop Release](https://github.com/derrickzhde/paseo/actions/runs/44999460577)). Do not restore the removed `app-builder-lib` 26.8.1 signing backport; electron-builder 26.18.0 includes [electron-builder#10172](https://github.com/electron-userland/electron-builder/pull/10172).
 
 The earlier prepared **v0.16.3** candidate at `23d80c0d18699593b7a814d6b999f4d36f7c7eaa` was never tagged and is superseded by v0.16.4. The **v0.16.2** Desktop Release at tag `v0.16.2` (`5243017109ee5047e803d865ab810172edd7744b`) remains an unpublished draft from the earlier Apple notarytool agreement failure; do not publish or retag it.
 
@@ -26,7 +26,7 @@ The earlier prepared **v0.16.3** candidate at `23d80c0d18699593b7a814d6b999f4d36
 
 | Reference                              | Commit                                                     |
 | -------------------------------------- | ---------------------------------------------------------- |
-| Upstream v0.17.1                       | `043f0995d33333ac6dcec6cce60f21e5a9a7a0ea`                 |
+| Upstream v0.17.1                       | `043f0995d4d7e91ab12f3eecef1afce055a81972`                 |
 | Published fork v0.17.2                 | `6bbd911ce147951aa7dfcbf88996381a113b9636` (tag `v0.17.2`) |
 | Upstream v0.16.2                       | `2ee30f4164af42ba209236ab3a31bf9532592fc3`                 |
 | Fork v0.16.4                           | `3d443fda33c43a384d66b69bd9591d3ef809e6ec` (tag `v0.16.4`) |
