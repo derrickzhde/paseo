@@ -455,11 +455,13 @@ describe("ClaudeAgentClient.fetchCatalog", () => {
       });
 
       expect(models.map((m) => m.id)).toEqual([
+        "claude-opus-5[1m]",
         "claude-opus-5",
         "claude-mythos-5-1",
+        "claude-fable-5-1[1m]",
         "claude-fable-5-1",
-        "claude-fable-5",
         "claude-fable-5[1m]",
+        "claude-fable-5",
         "claude-opus-4-8[1m]",
         "claude-opus-4-8",
         "claude-sonnet-5",
@@ -480,7 +482,7 @@ describe("ClaudeAgentClient.fetchCatalog", () => {
       }
 
       const defaultModel = models.find((m) => m.isDefault);
-      expect(defaultModel?.id).toBe("claude-opus-5");
+      expect(defaultModel?.id).toBe("claude-opus-5[1m]");
     } finally {
       await fs.rm(emptyConfigDir, { recursive: true, force: true });
     }
@@ -510,7 +512,7 @@ describe("ClaudeAgentClient.fetchCatalog", () => {
         force: false,
       });
 
-      expect(models.find((model) => model.isDefault)?.id).toBe("claude-opus-5-5");
+      expect(models.find((model) => model.isDefault)?.id).toBe("claude-opus-5-5[1m]");
       expect(models.map((model) => model.id)).toContain("claude-fable-5");
     } finally {
       await fs.rm(emptyConfigDir, { recursive: true, force: true });
