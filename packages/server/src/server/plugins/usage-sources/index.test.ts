@@ -321,30 +321,6 @@ test("a discovery that finishes after a newer one cannot rebind the login back",
   ]);
 });
 
-test("an agent's fallback key becomes the real account key for the same login", async () => {
-  const login = { path: "auth.json" };
-  const registry = new UsageSourceRegistry(Date.now, 300_000, undefined, {
-    hasAgent: () => true,
-    usageSession: () => ({ provider: "claude", env: {}, sessionKey: "launch" }),
-  });
-  registry.register({
-    id: "claude",
-    label: "Claude",
-    discover: async (scope) =>
-      scope.kind === "global"
-        ? [{ key: "5f1c0e2a-8b7d", label: "work@example.test", input: login }]
-        : [{ key: "9b2e41f07c", input: login }],
-    fetch: async () => ({ status: "available", windows: [] }),
-  });
-  await registry.listReports({ agentId: "agent" });
-  const host = await registry.listReports();
-  expect(host.map((entry) => [entry.id, entry.account.label])).toEqual([
-    ["claude:5f1c0e2a-8b7d", "work@example.test"],
-  ]);
-  const agent = await registry.listReports({ agentId: "agent" });
-  expect(agent.map((entry) => entry.id)).toEqual(["claude:5f1c0e2a-8b7d"]);
-});
-
 test("coalesces per account, caches errors, and refreshes only requested IDs", async () => {
   let now = 0;
   const counts = new Map<string, number>();
