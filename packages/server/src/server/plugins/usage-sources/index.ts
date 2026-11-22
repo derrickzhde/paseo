@@ -212,9 +212,10 @@ export class UsageSourceRegistry {
       for (const [id, report] of reports) {
         for (const login of report.logins) {
           const owner = this.identities.get(`${report.source.id}:${loginKey(login)}`);
-          // Use identity mapping unless this is a fresh discovery with a more authoritative label
-          const identity =
-            reports === fresh && report.label !== undefined ? undefined : owner;
+          // Use identity mapping unless this is a fresh authoritative discovery with current generation
+          const isFreshAuthoritative =
+            reports === fresh && report.label !== undefined && (owner?.generation ?? 0) <= generation;
+          const identity = isFreshAuthoritative ? undefined : owner;
           const currentId = identity?.id ?? id;
           const current = rebound.get(currentId);
           if (current) current.logins.push(login);
