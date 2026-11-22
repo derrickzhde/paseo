@@ -113,6 +113,9 @@ import { OmpSubagentIndex } from "./subagent-index.js";
 import { OmpQuestionUi } from "./question-ui.js";
 import { mapOmpToolDetail } from "./tool-call-mapper.js";
 import { OmpUsagePoller, type OmpUsagePollScheduler } from "./usage-poller.js";
+import { ompReplyStep, ompSessionMetrics } from "./metrics.js";
+import { type MeasuredStep, measuredTurnMetrics, TurnMeter } from "../turn-metrics.js";
+import { createSessionMetricsReporter } from "../metrics.js";
 import {
   buildOmpRpcUiPermissionResponse,
   mapOmpRpcUiPermissionRequest,
@@ -706,6 +709,11 @@ export class OmpAgentSession implements AgentSession {
   private readonly providerIdleDeadlineMs: number;
   private readonly noTurnScheduler: OmpNoTurnScheduler;
   private readonly usagePoller: OmpUsagePoller;
+  private readonly turnMeter = new TurnMeter();
+  private lastReply: MeasuredStep | null = null;
+  private readonly reportSessionMetrics = createSessionMetricsReporter((metrics) =>
+    this.emit({ type: "session_metrics_updated", provider: this.provider, metrics }),
+  );
   private closed = false;
   private live: boolean;
   private readonly emittedUserMessageIds = new Set<string>();
@@ -742,7 +750,7 @@ export class OmpAgentSession implements AgentSession {
     this.usagePoller = new OmpUsagePoller({
       scheduler: options.usagePollScheduler,
       readStats: () => this.runtimeSession.getSessionStats(),
-      onUsage: (usage, turnId, usageSample) => {
+      onUsage: (usage, turnId, usageSample, stats) => {
         this.emit({
           type: "usage_updated",
           provider: this.provider,
@@ -750,6 +758,7 @@ export class OmpAgentSession implements AgentSession {
           ...(turnId === undefined ? {} : { turnId }),
           ...(usageSample ? { usageSample } : {}),
         });
+        if (stats) this.reportSessionMetrics(ompSessionMetrics(stats, this.lastReply));
       },
       onPollError: (error) => {
         this.logger.debug({ err: error }, "OMP context usage poll failed");
@@ -881,6 +890,7 @@ export class OmpAgentSession implements AgentSession {
     const turnId = randomUUID();
     this.live = true;
     this.activeTurnId = turnId;
+    this.turnMeter.begin(Date.now());
     this.activeAssistantMessageId = null;
     this.activeTurnTerminalAssistantMessage = null;
     this.activeTurnStarted = false;
@@ -1013,12 +1023,24 @@ export class OmpAgentSession implements AgentSession {
   }
 
   async *streamHistory(): AsyncGenerator<AgentStreamEvent> {
-    yield* streamOmpHistory({
+    const replay = yield* streamOmpHistory({
       sessionFile: this.state.sessionFile,
       runtimeSession: this.runtimeSession,
       provider: this.provider,
       bridgedTools: this.hostTools?.bridge?.toolIdentities(),
     });
+    this.lastReply ??= replay.lastReply;
+    const stats = await this.runtimeSession.getSessionStats().catch((error: unknown) => {
+      this.logger.debug({ err: error }, "OMP session stats unavailable for history");
+      return null;
+    });
+    if (stats) {
+      yield {
+        type: "session_metrics_updated",
+        provider: this.provider,
+        metrics: ompSessionMetrics(stats, this.lastReply),
+      };
+    }
     for (const item of mapOmpTodoState(this.state)) {
       yield {
         type: "timeline",
@@ -1253,6 +1275,7 @@ export class OmpAgentSession implements AgentSession {
     this.outOfBandTurnStartAnnounced = false;
     this.activeTurnHasUserMessage = false;
     this.pendingClientMessages.length = 0;
+    this.turnMeter.reset();
     this.clearNoTurnBuffers();
   }
 
@@ -1907,6 +1930,7 @@ export class OmpAgentSession implements AgentSession {
         this.handleMessageUpdate(event, turnId);
         return;
       case "tool_execution_start": {
+        this.turnMeter.toolStarted(event.toolCallId, Date.now());
         const toolCall = parseToolArgs(event.toolName, event.args);
         this.activeToolCalls.set(event.toolCallId, toolCall);
         this.questionUi.start(event.toolName, event.args);
@@ -1924,6 +1948,7 @@ export class OmpAgentSession implements AgentSession {
         return;
       }
       case "tool_execution_end": {
+        this.turnMeter.toolEnded(event.toolCallId, Date.now());
         this.handleToolExecutionEnd(event, turnId);
         return;
       }
@@ -2046,6 +2071,13 @@ export class OmpAgentSession implements AgentSession {
     }
   }
 
+  private observeReply(message: OmpAgentMessage): void {
+    const step = ompReplyStep(message);
+    if (!step) return;
+    this.turnMeter.step(step, Date.now());
+    this.lastReply = step;
+  }
+
   private handleMessageEnd(
     event: Extract<OmpAgentSessionEvent, { type: "message_end" }>,
     turnId: string | undefined,
@@ -2054,6 +2086,7 @@ export class OmpAgentSession implements AgentSession {
       const timelineId = this.activeAssistantMessageId;
       this.activeAssistantMessageId = null;
       this.questionUi.observeMessage(event.message);
+      this.observeReply(event.message);
       if (turnId) {
         this.activeTurnTerminalAssistantMessage = event.message;
       }
@@ -2249,11 +2282,13 @@ export class OmpAgentSession implements AgentSession {
       return;
     }
     const finalUsage = this.usagePoller.completeTurn(turnId);
+    const metrics = measuredTurnMetrics(this.turnMeter.finish(Date.now()));
     this.resetActiveTurn({ terminalizeWork: false });
     this.emit({
       type: "turn_completed",
       provider: this.provider,
       turnId,
+      metrics,
     });
     void this.refreshAfterTurn(finalUsage);
   }

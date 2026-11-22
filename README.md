@@ -109,7 +109,7 @@ To connect from your phone, open **Settings → your host → Pair Device**.
 For a server, a VM, or any machine without the desktop app. Install the CLI and start the daemon:
 
 ```bash
-npm install -g https://github.com/derrickzhde/paseo/releases/download/v0.15.3/paseo-cli-0.15.3.tgz
+npm install -g https://github.com/derrickzhde/paseo/releases/download/v0.17.4/paseo-cli-0.17.4.tgz
 paseo
 ```
 

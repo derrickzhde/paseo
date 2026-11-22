@@ -9,7 +9,12 @@ export interface OmpUsagePollScheduler {
 
 interface OmpUsagePollerOptions {
   readStats(): Promise<OmpSessionStats>;
-  onUsage(usage: AgentUsage, turnId?: string, usageSample?: AgentUsageSample): void;
+  onUsage(
+    usage: AgentUsage,
+    turnId?: string,
+    usageSample?: AgentUsageSample,
+    stats?: OmpSessionStats,
+  ): void;
   onPollError(error: unknown): void;
   scheduler?: OmpUsagePollScheduler;
 }
@@ -135,10 +140,11 @@ export class OmpUsagePoller {
     }
     this.active = false;
     const completionGeneration = this.invalidatePendingWork();
+    let stats: OmpSessionStats;
     let usage: AgentUsage | undefined;
     let sample: AgentUsageSample | undefined;
     try {
-      const stats = await this.options.readStats();
+      stats = await this.options.readStats();
       usage = toAgentUsage(stats);
       sample = toAgentUsageSample(stats, this.sampleId);
     } catch {
@@ -147,21 +153,22 @@ export class OmpUsagePoller {
     if (this.closed || this.generation !== completionGeneration) {
       return;
     }
-    this.publishUsage(usage, sample, turnId);
+    this.publishUsage(usage, sample, turnId, stats);
   }
 
   async refresh(): Promise<void> {
+    let stats: OmpSessionStats;
     let usage: AgentUsage | undefined;
     let sample: AgentUsageSample | undefined;
     try {
-      const stats = await this.options.readStats();
+      stats = await this.options.readStats();
       usage = toAgentUsage(stats);
       sample = toAgentUsageSample(stats, this.sampleId);
     } catch (error) {
       if (!this.closed) this.options.onPollError(error);
       return;
     }
-    if (!this.closed) this.publishUsage(usage, sample);
+    if (!this.closed) this.publishUsage(usage, sample, undefined, stats);
   }
 
   close(): void {
@@ -185,10 +192,11 @@ export class OmpUsagePoller {
   }
 
   private async poll(generation: number): Promise<void> {
+    let stats: OmpSessionStats;
     let usage: AgentUsage | undefined;
     let sample: AgentUsageSample | undefined;
     try {
-      const stats = await this.options.readStats();
+      stats = await this.options.readStats();
       usage = toAgentUsage(stats);
       sample = toAgentUsageSample(stats, this.sampleId);
     } catch (error) {
@@ -205,7 +213,7 @@ export class OmpUsagePoller {
     }
     try {
       if (this.active && !this.closed && this.generation === generation) {
-        this.publishUsage(usage, sample);
+        this.publishUsage(usage, sample, undefined, stats);
       }
     } finally {
       if (this.active && !this.closed && this.generation === generation) {
@@ -234,6 +242,7 @@ export class OmpUsagePoller {
     usage: AgentUsage | undefined,
     sample: AgentUsageSample | undefined,
     turnId?: string,
+    stats?: OmpSessionStats,
   ): void {
     const changedUsage = this.takeChangedUsage(usage);
     const changedSample = this.takeChangedSample(sample);
@@ -244,6 +253,6 @@ export class OmpUsagePoller {
     if (!deliveredUsage) {
       return;
     }
-    this.options.onUsage(deliveredUsage, turnId, changedSample ?? sample);
+    this.options.onUsage(deliveredUsage, turnId, changedSample ?? sample, stats);
   }
 }

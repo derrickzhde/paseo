@@ -9,7 +9,12 @@ export interface PiUsagePollScheduler {
 
 interface PiUsagePollerOptions {
   readStats(): Promise<PiSessionStats>;
-  onUsage(usage: AgentUsage, turnId?: string, usageSample?: AgentUsageSample): void;
+  onUsage(
+    usage: AgentUsage,
+    turnId?: string,
+    usageSample?: AgentUsageSample,
+    stats?: PiSessionStats,
+  ): void;
   onPollError(error: unknown): void;
   scheduler?: PiUsagePollScheduler;
 }
@@ -135,10 +140,11 @@ export class PiUsagePoller {
     }
     this.active = false;
     const completionGeneration = this.invalidatePendingWork();
+    let stats: PiSessionStats;
     let usage: AgentUsage | undefined;
     let sample: AgentUsageSample | undefined;
     try {
-      const stats = await this.options.readStats();
+      stats = await this.options.readStats();
       usage = toAgentUsage(stats);
       sample = toAgentUsageSample(stats, this.sampleId);
     } catch {
@@ -147,7 +153,7 @@ export class PiUsagePoller {
     if (this.closed || this.generation !== completionGeneration) {
       return;
     }
-    this.publishUsage(usage, sample, turnId);
+    this.publishUsage(usage, sample, turnId, stats);
   }
 
   close(): void {
@@ -171,10 +177,11 @@ export class PiUsagePoller {
   }
 
   private async poll(generation: number): Promise<void> {
+    let stats: PiSessionStats;
     let usage: AgentUsage | undefined;
     let sample: AgentUsageSample | undefined;
     try {
-      const stats = await this.options.readStats();
+      stats = await this.options.readStats();
       usage = toAgentUsage(stats);
       sample = toAgentUsageSample(stats, this.sampleId);
     } catch (error) {
@@ -191,7 +198,7 @@ export class PiUsagePoller {
     }
     try {
       if (this.active && !this.closed && this.generation === generation) {
-        this.publishUsage(usage, sample);
+        this.publishUsage(usage, sample, undefined, stats);
       }
     } finally {
       if (this.active && !this.closed && this.generation === generation) {
@@ -220,6 +227,7 @@ export class PiUsagePoller {
     usage: AgentUsage | undefined,
     sample: AgentUsageSample | undefined,
     turnId?: string,
+    stats?: PiSessionStats,
   ): void {
     const changedUsage = this.takeChangedUsage(usage);
     const changedSample = this.takeChangedSample(sample);
@@ -230,6 +238,6 @@ export class PiUsagePoller {
     if (!deliveredUsage) {
       return;
     }
-    this.options.onUsage(deliveredUsage, turnId, changedSample ?? sample);
+    this.options.onUsage(deliveredUsage, turnId, changedSample ?? sample, stats);
   }
 }

@@ -26,7 +26,7 @@ vi.mock("react-native-unistyles", () => ({
 const context = { percentage: 40, usedTokens: 4_000, maxTokens: 10_000 };
 
 function renderDetails(
-  sessionMetrics?:
+  usageSessionMetrics?:
     | {
         outputTokensPerSecond5m?: number;
         outputTokensPerSecond5mEstimated?: boolean;
@@ -40,9 +40,10 @@ function renderDetails(
       agentId="agt"
       context={context}
       sessionCost="$1.20"
+      sessionMetrics={[]}
       showTitle
       refreshable={false}
-      {...(sessionMetrics === "omit" ? {} : { sessionMetrics })}
+      {...(usageSessionMetrics === "omit" ? {} : { usageSessionMetrics })}
     />,
   );
 }

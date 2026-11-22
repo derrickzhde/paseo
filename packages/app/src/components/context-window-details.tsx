@@ -1,13 +1,14 @@
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
-import type { AgentSessionMetrics } from "@getpaseo/protocol/agent-types";
+import type { AgentMetric, AgentSessionMetrics } from "@getpaseo/protocol/agent-types";
 import { AgentUsage } from "@/usage";
 import {
   formatSessionCacheHitPercentage,
   formatSessionOutputTokensPerSecond,
   formatTokenCount,
 } from "./context-window-meter.utils";
+import { MetricsList } from "./metrics-list";
 
 interface ContextWindowDetailsProps {
   serverId: string;
@@ -18,8 +19,10 @@ interface ContextWindowDetailsProps {
     maxTokens: number;
   } | null;
   sessionCost: string | null;
+  /** What the provider reports about the session. A reported cost replaces `sessionCost`. */
+  sessionMetrics: AgentMetric[];
   /** Present only when the host advertises agentSessionMetrics. An empty object still shows the rows. */
-  sessionMetrics?: AgentSessionMetrics;
+  usageSessionMetrics?: AgentSessionMetrics;
   /** The hover card and tooltip title themselves; the sheet's header carries the title instead. */
   showTitle: boolean;
   /** Whether the usage cards have a Refresh button; without one they show their freshness. */
@@ -27,8 +30,9 @@ interface ContextWindowDetailsProps {
 }
 
 /**
- * What the context window meter opens: how full the window is, then the usage of the agent's
- * account. The desktop hover card, the native wide tooltip, and the compact sheet all render it.
+ * What the context window meter opens: how full the window is, what the provider reports about the
+ * session, the fork's measured session rate and cache hit, then the usage of the agent's account.
+ * The desktop hover card, the native wide tooltip, and the compact sheet all render it.
  */
 export function ContextWindowDetails({
   serverId,
@@ -36,6 +40,7 @@ export function ContextWindowDetails({
   context,
   sessionCost,
   sessionMetrics,
+  usageSessionMetrics,
   showTitle,
   refreshable,
 }: ContextWindowDetailsProps) {
@@ -43,12 +48,15 @@ export function ContextWindowDetails({
   const locale = i18n.resolvedLanguage;
   const unavailable = t("contextWindow.unavailable");
   const outputRate = formatSessionOutputTokensPerSecond(
-    sessionMetrics?.outputTokensPerSecond5m,
+    usageSessionMetrics?.outputTokensPerSecond5m,
     locale,
   );
   let outputRateValue = outputRate ?? unavailable;
-  if (outputRate !== null && sessionMetrics?.outputTokensPerSecond5mEstimated)
+  if (outputRate !== null && usageSessionMetrics?.outputTokensPerSecond5mEstimated)
     outputRateValue = `≈ ${outputRate}`;
+  const providerReportsCost = sessionMetrics.some(
+    (metric) => metric.label.toLowerCase() === "cost",
+  );
   return (
     <>
       <View style={styles.summary}>
@@ -68,10 +76,10 @@ export function ContextWindowDetails({
         ) : (
           <Text style={styles.detail}>{t("contextWindow.noData")}</Text>
         )}
-        {sessionCost ? (
+        {sessionCost && !providerReportsCost ? (
           <Text style={styles.detail}>{t("contextWindow.sessionCost", { cost: sessionCost })}</Text>
         ) : null}
-        {sessionMetrics ? (
+        {usageSessionMetrics ? (
           <>
             <Text style={styles.detail}>
               {t("contextWindow.outputTokensPerSecond5m", {
@@ -81,13 +89,14 @@ export function ContextWindowDetails({
             <Text style={styles.detail}>
               {t("contextWindow.cacheHitPercentage", {
                 value:
-                  formatSessionCacheHitPercentage(sessionMetrics.cacheHitPercentage, locale) ??
+                  formatSessionCacheHitPercentage(usageSessionMetrics.cacheHitPercentage, locale) ??
                   unavailable,
               })}
             </Text>
           </>
         ) : null}
       </View>
+      {sessionMetrics.length > 0 ? <MetricsList metrics={sessionMetrics} /> : null}
       <AgentUsage serverId={serverId} agentId={agentId} refreshable={refreshable} />
     </>
   );

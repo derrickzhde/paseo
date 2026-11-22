@@ -1,72 +1,100 @@
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { page } from "vitest/browser";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { AgentMetric, AgentSessionMetrics } from "@getpaseo/protocol/agent-types";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { AgentSessionMetrics } from "@getpaseo/protocol/agent-types";
+import { page } from "vitest/browser";
 import { i18n } from "@/i18n/i18next";
 import { ContextWindowDetails } from "./context-window-details";
 
-vi.mock("@/usage", () => ({ AgentUsage: () => null }));
-beforeEach(() => vi.stubGlobal("React", React));
-let root: Root | undefined;
-let container: HTMLDivElement;
-const context = { percentage: 40, usedTokens: 4_000, maxTokens: 10_000 };
-afterEach(async () => {
-  act(() => root?.unmount());
-  container?.remove();
+const CONTEXT = { percentage: 40, usedTokens: 80_000, maxTokens: 200_000 };
+
+let root: Root;
+let host: HTMLDivElement;
+
+beforeEach(async () => {
   await i18n.changeLanguage("en");
+  vi.stubGlobal("React", React);
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  host = document.createElement("div");
+  document.body.appendChild(host);
+  root = createRoot(host);
 });
 
-function renderDetails(metrics?: AgentSessionMetrics) {
+afterEach(() => {
+  act(() => root.unmount());
+  host.remove();
+  vi.unstubAllGlobals();
+});
+
+function renderDetails(
+  sessionMetrics: AgentMetric[],
+  usageSessionMetrics?: AgentSessionMetrics,
+): void {
   act(() =>
-    root!.render(
-      <ContextWindowDetails
-        serverId="host"
-        agentId="agent"
-        context={context}
-        sessionCost="$1.20"
-        sessionMetrics={metrics}
-        showTitle
-        refreshable={false}
-      />,
+    root.render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ContextWindowDetails
+          serverId="server"
+          agentId="agent"
+          context={CONTEXT}
+          sessionCost="$1.20"
+          sessionMetrics={sessionMetrics}
+          usageSessionMetrics={usageSessionMetrics}
+          showTitle
+          refreshable={false}
+        />
+      </QueryClientProvider>,
     ),
   );
 }
 
+it("shows what the provider reports about the session", async () => {
+  renderDetails([
+    { label: "Model", value: "opus" },
+    { label: "Requests", value: "12" },
+  ]);
+
+  await expect.element(page.getByText("Model")).toBeVisible();
+  await expect.element(page.getByText("opus")).toBeVisible();
+  await expect.element(page.getByText("Requests")).toBeVisible();
+  await expect.element(page.getByText("Session cost $1.20")).toBeVisible();
+});
+
+it("leaves the cost to the provider when it reports one", async () => {
+  renderDetails([{ label: "Cost", value: "$1.25" }]);
+
+  await expect.element(page.getByText("$1.25")).toBeVisible();
+  expect(page.getByText("Session cost $1.20").elements()).toHaveLength(0);
+});
+
 it("updates live values and missing samples in the same open details view", async () => {
-  container = document.createElement("div");
-  container.style.cssText = "width:320px;padding:20px;background:white;box-sizing:border-box";
-  document.body.appendChild(container);
-  root = createRoot(container);
-  renderDetails({ outputTokensPerSecond5m: 26.7, cacheHitPercentage: 80 });
-  expect(container.textContent).toContain("TPS (5m active) 26.7");
-  expect(container.textContent).toContain("Cache hit (session) 80%");
-  renderDetails({
+  renderDetails([], { outputTokensPerSecond5m: 26.7, cacheHitPercentage: 80 });
+  expect(host.textContent).toContain("TPS (5m active) 26.7");
+  expect(host.textContent).toContain("Cache hit (session) 80%");
+  renderDetails([], {
     outputTokensPerSecond5m: 50,
     outputTokensPerSecond5mEstimated: true,
     cacheHitPercentage: 80,
   });
-  expect(container.textContent).toContain("TPS (5m active) ≈ 50");
-  await page.screenshot({ element: container });
-  renderDetails({ cacheHitPercentage: 80 });
-  expect(container.textContent).toContain("TPS (5m active) Unavailable");
-  expect(container.textContent).toContain("Cache hit (session) 80%");
-  renderDetails(undefined);
-  expect(container.textContent).not.toContain("TPS");
-  expect(container.textContent).toContain("40% used");
+  expect(host.textContent).toContain("TPS (5m active) ≈ 50");
+  await page.screenshot({ element: host });
+  renderDetails([], { cacheHitPercentage: 80 });
+  expect(host.textContent).toContain("TPS (5m active) Unavailable");
+  expect(host.textContent).toContain("Cache hit (session) 80%");
+  renderDetails([]);
+  expect(host.textContent).not.toContain("TPS");
+  expect(host.textContent).toContain("40% used");
 });
 
 it.each(["en", "fr", "zh-CN", "ar"])(
   "keeps localized metrics inside a narrow summary (%s)",
   async (language) => {
     await i18n.changeLanguage(language);
-    container = document.createElement("div");
-    container.style.cssText = "width:280px;padding:12px;box-sizing:border-box";
-    document.body.appendChild(container);
-    root = createRoot(container);
-    renderDetails({ outputTokensPerSecond5m: 0, cacheHitPercentage: 0 });
-    const bounds = container.getBoundingClientRect();
-    for (const element of container.querySelectorAll("[dir]")) {
+    host.style.cssText = "width:280px;padding:12px;box-sizing:border-box";
+    renderDetails([], { outputTokensPerSecond5m: 0, cacheHitPercentage: 0 });
+    const bounds = host.getBoundingClientRect();
+    for (const element of host.querySelectorAll("[dir]")) {
       const range = document.createRange();
       range.selectNodeContents(element);
       for (const rect of Array.from(range.getClientRects())) {
