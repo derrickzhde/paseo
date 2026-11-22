@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.17.2 - 2026-11-22
+
+Fork release integrating upstream Paseo v0.17.1 while preserving fork customizations:
+
+- Integrated upstream v0.17.1 features and fixes (see upstream 0.17.1 section below)
+- Preserved selectable Claude context window variants: both 200K and 1M `[1m]` variants remain available for Opus, Fable, and Mythos models per fork customization policy
+- Preserved math formula rendering and copying with delimiter-inclusive TeX source (`\(...\)`, `\[...\]`, `$$...$$`)
+- All fork-maintained features from v0.16.4 carry forward: per-model thinking controls, phone 12/24-hour clock, Expo push recovery, Claude imported-session cache, session metrics, and Vitest browser CI stability
+
+For complete upstream v0.17.1 feature details, see the 0.17.1 section below.
+
 ## 0.17.1 - 2026-11-21
 
 - **Use existing worktrees:** Start a workspace in a worktree you already have, or create one from a branch or pull request. Plugins can manage worktree creation, removal, and restoration. When you branch off a fork PR or MR, choose Run setup to approve workspace automation. ([#10190](https://github.com/getpaseo/paseo/pull/10190), [#10278](https://github.com/getpaseo/paseo/pull/10278))
