@@ -198,7 +198,9 @@ export class UsageSourceRegistry {
 
   private rebindLogins(fresh: Map<string, KnownReport>, generation: number): void {
     // The newest-started discovery owns a shared login, even if an older one finishes later.
+    // However, only authoritative discoveries (with labels) can update the identity mapping.
     for (const [id, report] of fresh) {
+      if (report.label === undefined) continue;
       for (const login of report.logins) {
         const key = `${report.source.id}:${loginKey(login)}`;
         if ((this.identities.get(key)?.generation ?? 0) <= generation)
