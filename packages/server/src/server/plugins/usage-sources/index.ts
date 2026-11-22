@@ -31,8 +31,7 @@ interface KnownReport {
 }
 
 interface LoginIdentity {
-  id: string;
-  label?: string;
+  accounts: Array<{ id: string; label: string }>;
   generation: number;
 }
 
@@ -197,31 +196,54 @@ export class UsageSourceRegistry {
   }
 
   private rebindLogins(fresh: Map<string, KnownReport>, generation: number): void {
-    // The newest-started discovery owns a shared login, even if an older one finishes later.
-    // However, only authoritative discoveries (with labels) can update the identity mapping.
-    for (const [id, report] of fresh) {
-      if (report.label === undefined) continue;
-      for (const login of report.logins) {
-        const key = `${report.source.id}:${loginKey(login)}`;
-        if ((this.identities.get(key)?.generation ?? 0) <= generation)
-          this.identities.set(key, { id, label: report.label, generation });
+    // Update identities mapping: record all labeled accounts from authoritative (global) discoveries.
+    // Multiple accounts with the same login in one discovery coexist in the set.
+    if (fresh === this.defaults) {
+      // This is a global/host discovery - update identities with all labeled accounts
+      const loginAccounts = new Map<string, Array<{ id: string; label: string }>>();
+      for (const [id, report] of fresh) {
+        if (report.label === undefined) continue;
+        for (const login of report.logins) {
+          const key = `${report.source.id}:${loginKey(login)}`;
+          const accounts = loginAccounts.get(key) ?? [];
+          accounts.push({ id, label: report.label });
+          loginAccounts.set(key, accounts);
+        }
+      }
+      // Update identities if this discovery has current or newer generation
+      for (const [key, accounts] of loginAccounts) {
+        if ((this.identities.get(key)?.generation ?? 0) <= generation) {
+          this.identities.set(key, { accounts, generation });
+        }
       }
     }
+
+    // Rebind agent/session scope reports: translate fallback keys to real account keys
     for (const reports of [this.defaults, ...this.byAgent.values()]) {
       const rebound = new Map<string, KnownReport>();
+      const isAgentScope = reports !== this.defaults;
+
       for (const [id, report] of reports) {
         for (const login of report.logins) {
-          const owner = this.identities.get(`${report.source.id}:${loginKey(login)}`);
-          // Use identity mapping unless this is a fresh discovery with current generation
-          const identity =
-            reports === fresh && (owner?.generation ?? 0) <= generation ? undefined : owner;
-          const currentId = identity?.id ?? id;
+          let currentId = id;
+          let currentLabel = report.label;
+
+          // Translation only applies to agent/session scope fallback keys
+          if (isAgentScope && report.label === undefined) {
+            const identity = this.identities.get(`${report.source.id}:${loginKey(login)}`);
+            // Translate only if exactly one labeled account exists for this login
+            if (identity && identity.accounts.length === 1) {
+              currentId = identity.accounts[0].id;
+              currentLabel = identity.accounts[0].label;
+            }
+          }
+
           const current = rebound.get(currentId);
           if (current) current.logins.push(login);
           else
             rebound.set(currentId, {
               source: report.source,
-              label: identity ? identity.label : report.label,
+              label: currentLabel,
               logins: [login],
             });
         }
