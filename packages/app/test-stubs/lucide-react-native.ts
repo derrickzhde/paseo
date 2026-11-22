@@ -141,3 +141,4 @@ export const Ellipsis = StubIcon;
 export const Maximize = StubIcon;
 export const Minimize = StubIcon;
 export const Rows2 = StubIcon;
+export const GripVertical = StubIcon;

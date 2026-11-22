@@ -2201,6 +2201,8 @@ export class VoiceAssistantWebSocketServer {
         daemonDiagnostics: true,
         // COMPAT(daemonSelfUpdate): added in v0.1.93, remove gate after 2026-12-13.
         daemonSelfUpdate: this.daemonRuntimeConfig?.desktopManaged !== true,
+        // COMPAT(forkDaemonSelfUpdate): added after fork v0.13.2, remove gate after 2027-04-27.
+        forkDaemonSelfUpdate: this.daemonRuntimeConfig?.desktopManaged !== true,
         // COMPAT(terminalsSurviveRestart): added in v0.12.0, remove gate after 2027-04-21.
         terminalsSurviveRestart: true,
         // COMPAT(agentForkContext): added in v0.1.102, remove gate after 2026-12-28.

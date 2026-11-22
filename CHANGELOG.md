@@ -2,7 +2,9 @@
 
 ## 0.17.2 - 2026-11-22
 
-Fork release integrating upstream Paseo v0.17.1 while preserving fork customizations:
+Fork release integrating upstream Paseo v0.17.1 while preserving fork customizations.
+
+### Changed
 
 - Integrated upstream v0.17.1 features and fixes (see upstream 0.17.1 section below)
 - Preserved selectable Claude context window variants: both 200K and 1M `[1m]` variants remain available for Opus, Fable, and Mythos models per fork customization policy
