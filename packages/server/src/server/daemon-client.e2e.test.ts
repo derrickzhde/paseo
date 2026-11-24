@@ -346,6 +346,49 @@ class StubAgentSession implements AgentSession {
   }
 }
 
+class MetricsProbeSession extends StubAgentSession {
+  private listener: ((event: AgentStreamEvent) => void) | undefined;
+
+  override subscribe(callback: (event: AgentStreamEvent) => void): () => void {
+    this.listener = callback;
+    return () => {
+      if (this.listener === callback) this.listener = undefined;
+    };
+  }
+
+  push(event: AgentStreamEvent): void {
+    this.listener?.(event);
+  }
+}
+
+class MetricsProbeClient implements AgentClient {
+  readonly provider = "codex" as const;
+  readonly capabilities;
+
+  constructor(private readonly session: MetricsProbeSession) {
+    this.capabilities = session.capabilities;
+  }
+
+  async isAvailable(): Promise<boolean> {
+    return true;
+  }
+
+  async createSession(): Promise<AgentSession> {
+    return this.session;
+  }
+
+  async resumeSession(): Promise<AgentSession> {
+    return this.session;
+  }
+
+  async fetchCatalog() {
+    return {
+      models: [{ id: "gpt-5.4-mini", label: "GPT-5.4 mini", provider: this.provider }],
+      modes: [{ id: "full-access", label: "Full access", description: "No prompts" }],
+    };
+  }
+}
+
 class StubAgentClient implements AgentClient {
   readonly provider = "codex" as const;
   readonly capabilities;
@@ -455,6 +498,74 @@ class RejectingMcpResumeClient implements AgentClient {
     this.nativeArchiveCalls.push("unarchive");
   }
 }
+
+test("advertises agent session metrics and reports them on usage", async () => {
+  const session = new MetricsProbeSession({
+    sessionId: "session-metrics-probe",
+    supportsStreaming: true,
+  });
+  const daemon = await createTestPaseoDaemon({
+    agentClients: {
+      ...createTestAgentClients(),
+      codex: new MetricsProbeClient(session),
+    },
+  });
+  const client = new DaemonClient({
+    url: `ws://127.0.0.1:${daemon.port}/ws`,
+    appVersion: "0.1.82",
+  });
+  const cwd = tmpCwd();
+
+  try {
+    await client.connect();
+    expect(client.getLastServerInfoMessage()?.features?.agentSessionMetrics).toBe(true);
+    await client.fetchAgents({ subscribe: {} });
+    const agent = await client.createAgent({
+      provider: "codex",
+      cwd,
+      title: "Session metrics",
+      modeId: "full-access",
+      model: "gpt-5.4-mini",
+    });
+    const reported = waitForSignal(15000, (resolve) => {
+      const unsubscribe = client.on("agent_update", (message) => {
+        if (message.type !== "agent_update" || message.payload.kind !== "upsert") return;
+        if (message.payload.agent.id !== agent.id) return;
+        if (message.payload.agent.lastUsage?.sessionMetrics?.cacheHitPercentage !== 80) return;
+        resolve(message.payload.agent);
+      });
+      return unsubscribe;
+    });
+    const providerRows = [{ label: "Cost", value: "$0.011" }];
+    session.push({
+      type: "session_metrics_updated",
+      provider: "codex",
+      metrics: providerRows,
+    });
+    session.push({
+      type: "usage_updated",
+      provider: "codex",
+      usage: { outputTokens: 20 },
+      usageSample: {
+        scope: "session",
+        id: session.id,
+        inputTokens: 100,
+        cachedInputTokens: 80,
+        outputTokens: 20,
+      },
+    });
+    const live = await reported;
+    expect(live.sessionMetrics).toEqual(providerRows);
+    expect(live.lastUsage?.sessionMetrics).toEqual({ cacheHitPercentage: 80 });
+    const fetched = await client.fetchAgent({ agentId: agent.id });
+    expect(fetched?.agent.sessionMetrics).toEqual(providerRows);
+    expect(fetched?.agent.lastUsage?.sessionMetrics).toEqual({ cacheHitPercentage: 80 });
+  } finally {
+    await client.close();
+    await daemon.close();
+    rmSync(cwd, { recursive: true, force: true });
+  }
+}, 30000);
 
 test("createAgent preserves the error snapshot when the initial turn cannot start", async () => {
   const testAgent = new StubAgentClient({

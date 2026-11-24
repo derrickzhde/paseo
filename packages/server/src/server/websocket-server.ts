@@ -2076,6 +2076,8 @@ export class VoiceAssistantWebSocketServer {
         relayProtectedSecurity: true,
         usageSetting: true,
         usageSources: true,
+        // COMPAT(agentSessionMetrics): added in fork v0.13.2, remove gate after 2027-04-27.
+        agentSessionMetrics: true,
         providerInstallation: true,
         ownedSubscriptions: true,
         providerOptionControls: true,
