@@ -2,6 +2,7 @@ export type {
   MarkdownRenderers,
   CodeBlockRendererProps,
   LinkRendererProps,
+  MathRendererProps,
 } from './types/MarkdownRenderers';
 export { EnrichedMarkdownText, default } from './web/EnrichedMarkdownText';
 export type { EnrichedMarkdownTextProps } from './types/MarkdownTextProps.web';

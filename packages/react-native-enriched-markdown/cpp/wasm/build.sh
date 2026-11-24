@@ -40,8 +40,11 @@ emcc \
   -c "$CPP_ROOT/md4c/md4c.c" \
   -o "$OUT_DIR/md4c.o"
 
-# Compile C++ sources and link everything together
-emcc \
+# Compile C++ sources and link everything together.
+# em++ (or -sDEFAULT_TO_CXX) is required by Emscripten 4+; plain emcc drops libc++.
+# SINGLE_FILE_BINARY_ENCODE=0 keeps the committed glue as base64 text. The
+# default binary encoding embeds NUL bytes, which the web bundler cannot parse.
+em++ \
   "$SCRIPT_DIR/md4c_wasm.cpp" \
   "$SCRIPT_DIR/ASTSerializer.cpp" \
   "$CPP_ROOT/parser/MD4CParser.cpp" \
@@ -53,6 +56,7 @@ emcc \
   -Wswitch \
   -s WASM=1 \
   -s SINGLE_FILE=1 \
+  -s SINGLE_FILE_BINARY_ENCODE=0 \
   -s EXPORTED_FUNCTIONS='["_parseMarkdown"]' \
   -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","UTF8ToString"]' \
   -s ENVIRONMENT='web' \

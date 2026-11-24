@@ -116,6 +116,8 @@ function LatexMathInlineRenderer({
   capabilities,
 }: RendererProps) {
   const content = extractNodeText(node);
+  const MathRenderer = capabilities.renderers?.math;
+  if (MathRenderer) return <MathRenderer content={content} displayMode={false} />;
 
   return (
     <KaTeXRenderer

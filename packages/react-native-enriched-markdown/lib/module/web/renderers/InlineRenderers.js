@@ -157,6 +157,11 @@ function LatexMathInlineRenderer({
   capabilities
 }) {
   const content = extractNodeText(node);
+  const MathRenderer = capabilities.renderers?.math;
+  if (MathRenderer) return /*#__PURE__*/_jsx(MathRenderer, {
+    content,
+    displayMode: false
+  });
   return /*#__PURE__*/_jsx(KaTeXRenderer, {
     content: content,
     katex: capabilities.katex,
