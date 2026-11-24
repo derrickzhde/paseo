@@ -487,6 +487,8 @@ const AgentUsageSchema: z.ZodType<AgentUsage> = z.object({
       outputTokensPerSecond5m: z.number().nonnegative().optional(),
       outputTokensPerSecond5mEstimated: z.boolean().optional(),
       cacheHitPercentage: z.number().min(0).max(100).optional(),
+      // COMPAT(cacheHitReportedByProvider): added in fork v0.17.6, remove after 2027-04-27.
+      cacheHitReportedByProvider: z.boolean().optional(),
     })
     .optional(),
 });

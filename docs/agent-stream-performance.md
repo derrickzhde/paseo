@@ -20,7 +20,7 @@ Every provider delivers incremental text, so there is no provider that needs spe
 
 ## Session metrics in the context details
 
-The context meter shows **TPS (5m active)** and **Cache hit (session)** when the host advertises `agentSessionMetrics`. Keep these measurements per agent runtime session. Do not persist or backfill them, combine agents, or use account quota reports as token counters. A new runtime session starts a new ledger.
+The context meter shows **TPS (5m active)** when the host advertises `agentSessionMetrics`, and **Cache hit (session)** for providers that do not already publish an upstream cache row. The split is in [fork maintenance](fork-maintenance.md). Keep these measurements per agent runtime session. Do not persist or backfill them, combine agents, or use account quota reports as token counters. A new runtime session starts a new ledger.
 
 TPS follows OpenCode’s active-request calculation: sum output tokens and divide by the sum of model-response durations. Include each complete response that finished in the last five minutes. A response crossing the window boundary contributes its full count and duration; do not spread its tokens across time. Idle gaps and local tool settlement are excluded. Native request duration can include prompt processing, network delay, internal retries or provider-hosted tools, so this is an approximation of generation throughput. Do not infer duration from chunk arrival gaps, daemon coalescing, app reveal or a whole agent turn.
 

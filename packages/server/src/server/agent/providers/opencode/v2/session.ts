@@ -46,6 +46,7 @@ import { replayedTurnMetrics, sessionMetrics } from "./metrics.js";
 
 export class OpenCodeV2Session implements AgentSession {
   readonly provider = "opencode";
+  readonly reportsUpstreamCacheHit = true;
   readonly capabilities = V2_CAPABILITIES;
   private readonly listeners = new Set<(event: AgentStreamEvent) => void>();
   private readonly timeline = new V2Timeline();

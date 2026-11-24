@@ -2738,6 +2738,7 @@ class ClaudeContextUsageState {
 }
 class ClaudeAgentSession implements AgentSession {
   readonly provider = "claude" as const;
+  readonly reportsUpstreamCacheHit = true;
   readonly capabilities = CLAUDE_CAPABILITIES;
 
   private readonly config: ClaudeAgentConfig;

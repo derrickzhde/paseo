@@ -233,6 +233,8 @@ export interface AgentSessionMetrics {
   /** At least one response uses a timestamp-based duration estimate. */
   outputTokensPerSecond5mEstimated?: boolean;
   cacheHitPercentage?: number;
+  /** Upstream already publishes a cache-hit row, so the fork row keeps TPS only. */
+  cacheHitReportedByProvider?: boolean;
 }
 
 export interface AgentUsage {
@@ -765,6 +767,11 @@ export interface AgentUsageSession {
 export interface AgentSession {
   /** Persist the session's current handle immediately after an interactive resume. */
   readonly persistenceUpdatedOnResume?: boolean;
+  /**
+   * The provider publishes upstream cache hit on its own metric rows. Fork session
+   * metrics then keep TPS and omit the fork cache-hit percentage.
+   */
+  readonly reportsUpstreamCacheHit?: boolean;
   usageSession?(): AgentUsageSession | null;
   readonly provider: AgentProvider;
   readonly id: string | null;

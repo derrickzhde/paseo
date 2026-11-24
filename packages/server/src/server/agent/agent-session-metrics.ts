@@ -150,3 +150,18 @@ export class AgentSessionMetricsLedger {
     if (cachedInputTokens !== undefined) state.cachedInputTokens = cachedInputTokens;
   }
 }
+
+/** Drop the fork cache-hit percentage when the provider already publishes its own. */
+export function forkUsageSessionMetrics(
+  reportsUpstreamCacheHit: boolean,
+  metrics: AgentSessionMetrics,
+): AgentSessionMetrics {
+  if (!reportsUpstreamCacheHit) return metrics;
+  if (metrics.cacheHitPercentage === undefined && metrics.cacheHitReportedByProvider === true) {
+    return metrics;
+  }
+  const published = { ...metrics };
+  delete published.cacheHitPercentage;
+  published.cacheHitReportedByProvider = true;
+  return published;
+}

@@ -60,6 +60,7 @@ const RUNTIME_INFO: AgentRuntimeInfo = {
 
 class FakeSession implements AgentSession {
   readonly provider = "claude";
+  reportsUpstreamCacheHit?: boolean;
   id = "session-1";
   capabilities = CAPABILITIES;
   initialTimeline: ImportedTimelineEntry[] = [
@@ -224,6 +225,8 @@ describe("wrapSessionProvider", () => {
     expect(wrapped.id).toBe("session-2");
     expect(wrapped.capabilities).toEqual(session.capabilities);
     expect(wrapped.initialTimeline).toEqual(session.initialTimeline);
+    session.reportsUpstreamCacheHit = true;
+    expect(wrapped.reportsUpstreamCacheHit).toBe(true);
     session.steerActiveTurn = undefined;
     expect(wrapped.steerActiveTurn).toBeUndefined();
   });

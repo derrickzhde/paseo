@@ -128,6 +128,16 @@ it("preserves current-session metrics on the wire without persisting them", () =
   expect(toStoredAgentRecord(agent)).not.toHaveProperty("lastUsage");
 });
 
+it("keeps the upstream-cache marker on the wire and still drops persisted usage", () => {
+  const agent = createManagedAgent({
+    lastUsage: {
+      sessionMetrics: { outputTokensPerSecond5m: 20, cacheHitReportedByProvider: true },
+    },
+  });
+  expect(toAgentPayload(agent).lastUsage).toEqual(agent.lastUsage);
+  expect(toStoredAgentRecord(agent)).not.toHaveProperty("lastUsage");
+});
+
 function createPermission(overrides: Partial<AgentPermissionRequest> = {}): AgentPermissionRequest {
   const base: AgentPermissionRequest = {
     id: "perm-1",

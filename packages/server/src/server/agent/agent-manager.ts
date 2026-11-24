@@ -99,7 +99,7 @@ import {
   AgentStreamCoalescer,
 } from "./agent-stream-coalescer.js";
 import { limitAgentTimelineItemContent } from "./agent-timeline-content.js";
-import { AgentSessionMetricsLedger } from "./agent-session-metrics.js";
+import { AgentSessionMetricsLedger, forkUsageSessionMetrics } from "./agent-session-metrics.js";
 import {
   AgentRunState,
   type ForegroundPromptStart,
@@ -6295,7 +6295,10 @@ export class AgentManager {
       this.sessionMetrics.set(agent.id, entry);
     }
     entry.ledger.observe(event);
-    const metrics = entry.ledger.snapshot();
+    const metrics = forkUsageSessionMetrics(
+      agent.session.reportsUpstreamCacheHit === true,
+      entry.ledger.snapshot(),
+    );
     // Some providers report completion timing independently of their context
     // snapshot. A generation-only update must retain that last raw snapshot.
     if (event.generationSample && event.type === "usage_updated") {
@@ -6335,7 +6338,13 @@ export class AgentManager {
           agent.session !== entry.session
         )
           return;
-        agent.lastUsage = { ...agent.lastUsage, sessionMetrics: entry.ledger.snapshot() };
+        agent.lastUsage = {
+          ...agent.lastUsage,
+          sessionMetrics: forkUsageSessionMetrics(
+            agent.session.reportsUpstreamCacheHit === true,
+            entry.ledger.snapshot(),
+          ),
+        };
         this.emitState(agent);
         this.scheduleSessionMetricsExpiry(agent, entry);
       },

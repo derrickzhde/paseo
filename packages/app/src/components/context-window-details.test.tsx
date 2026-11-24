@@ -31,6 +31,7 @@ function renderDetails(
         outputTokensPerSecond5m?: number;
         outputTokensPerSecond5mEstimated?: boolean;
         cacheHitPercentage?: number;
+        cacheHitReportedByProvider?: boolean;
       }
     | "omit",
 ) {
@@ -88,6 +89,13 @@ describe("context window session metrics", () => {
 
     expect(screen.getByText("TPS (5m active) Unavailable")).toBeTruthy();
     expect(screen.getByText("Cache hit (session) Unavailable")).toBeTruthy();
+  });
+
+  it("hides the fork cache row when the provider already reports cache hit", () => {
+    renderDetails({ outputTokensPerSecond5m: 12.34, cacheHitReportedByProvider: true });
+
+    expect(screen.getByText("TPS (5m active) 12.3")).toBeTruthy();
+    expect(screen.queryByText(/Cache hit \(session\)/)).toBeNull();
   });
 
   it("hides both rows when the host does not provide session metrics", () => {

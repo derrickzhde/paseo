@@ -672,6 +672,7 @@ class OmpHistorySession implements AgentSession {
 
 export class OmpAgentSession implements AgentSession {
   readonly provider: AgentProvider = OMP_PROVIDER;
+  readonly reportsUpstreamCacheHit = true;
   readonly capabilities: AgentCapabilityFlags = withOmpCapabilities();
 
   private readonly subscribers = new Set<(event: AgentStreamEvent) => void>();

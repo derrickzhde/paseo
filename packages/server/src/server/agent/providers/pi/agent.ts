@@ -1182,6 +1182,7 @@ function createRuntime(
 }
 
 export class PiRpcAgentSession implements AgentSession {
+  readonly reportsUpstreamCacheHit = true;
   readonly provider: AgentProvider;
   readonly capabilities: AgentCapabilityFlags;
 

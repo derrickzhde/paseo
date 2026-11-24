@@ -642,6 +642,9 @@ function sanitizeUsage(value: unknown): AgentUsage | undefined {
     if (typeof cached === "number" && Number.isFinite(cached) && cached >= 0 && cached <= 100) {
       result.sessionMetrics.cacheHitPercentage = cached;
     }
+    if (metrics.cacheHitReportedByProvider === true) {
+      result.sessionMetrics.cacheHitReportedByProvider = true;
+    }
   }
   return Object.keys(result).length ? result : undefined;
 }

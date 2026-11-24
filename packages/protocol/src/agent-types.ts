@@ -217,6 +217,11 @@ export interface AgentSessionMetrics {
   /** At least one response uses a timestamp-based duration estimate. */
   outputTokensPerSecond5mEstimated?: boolean;
   cacheHitPercentage?: number;
+  /**
+   * The provider already publishes its own cache-hit row. The fork session row
+   * keeps TPS and leaves cache hit to that row.
+   */
+  cacheHitReportedByProvider?: boolean;
 }
 
 export interface AgentUsage {

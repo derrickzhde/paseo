@@ -588,6 +588,82 @@ test("foreground stream consumers do not receive internal usage samples", async 
   }
 });
 
+class UpstreamCacheHitClient extends SessionRecordingAgentClient {
+  constructor() {
+    super("claude");
+  }
+
+  override async createSession(config: AgentSessionConfig): Promise<AgentSession> {
+    const session = new (class extends TestAgentSession {
+      readonly reportsUpstreamCacheHit = true;
+    })(config);
+    this.sessions.push(session);
+    return session;
+  }
+}
+
+test("upstream cache rows replace the fork cache hit and leave TPS", async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(1_000_000);
+  const covered = new UpstreamCacheHitClient();
+  const uncovered = new SessionRecordingAgentClient();
+  const manager = new AgentManager({
+    clients: { claude: covered, codex: uncovered },
+    providerDefinitions: {
+      claude: { enabled: true, derivedFromProviderId: null },
+      codex: { enabled: true, derivedFromProviderId: null },
+    },
+    logger,
+    agentStreamCoalesceWindowMs: 0,
+  });
+  const claude = await manager.createAgent({ provider: "claude", cwd: process.cwd() }, undefined, {
+    workspaceId: undefined,
+  });
+  const codex = await manager.createAgent({ provider: "codex", cwd: process.cwd() }, undefined, {
+    workspaceId: undefined,
+  });
+  try {
+    const coveredSession = covered.sessions[0]!;
+    const upstreamCache = [{ label: "Cache (last turn)", value: "75%", tone: "ok" as const }];
+    coveredSession.pushEvent({
+      type: "session_metrics_updated",
+      provider: "claude",
+      metrics: upstreamCache,
+    });
+    coveredSession.pushEvent({
+      type: "usage_updated",
+      provider: "claude",
+      usage: {},
+      usageSample: { scope: "session", id: "cache", inputTokens: 100, cachedInputTokens: 80 },
+      generationSample: { id: "reply", outputTokens: 20, durationMs: 1000 },
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(manager.getAgent(claude.id)?.sessionMetrics).toEqual(upstreamCache);
+    expect(manager.getAgent(claude.id)?.lastUsage?.sessionMetrics).toEqual({
+      outputTokensPerSecond5m: 20,
+      cacheHitReportedByProvider: true,
+    });
+
+    const codexSession = uncovered.sessions[0]!;
+    codexSession.pushEvent({
+      type: "usage_updated",
+      provider: "codex",
+      usage: {},
+      usageSample: { scope: "session", id: "cache", inputTokens: 100, cachedInputTokens: 80 },
+      generationSample: { id: "reply", outputTokens: 20, durationMs: 1000 },
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(manager.getAgent(codex.id)?.lastUsage?.sessionMetrics).toEqual({
+      outputTokensPerSecond5m: 20,
+      cacheHitPercentage: 80,
+    });
+  } finally {
+    await manager.closeAgent(claude.id);
+    await manager.closeAgent(codex.id);
+    vi.useRealTimers();
+  }
+});
+
 class HeldAgentCreationClient extends TestAgentClient {
   private readonly creationStarted = deferred<void>();
   private readonly creationAllowed = deferred<void>();

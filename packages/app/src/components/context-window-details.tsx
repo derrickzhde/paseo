@@ -86,13 +86,17 @@ export function ContextWindowDetails({
                 value: outputRateValue,
               })}
             </Text>
-            <Text style={styles.detail}>
-              {t("contextWindow.cacheHitPercentage", {
-                value:
-                  formatSessionCacheHitPercentage(usageSessionMetrics.cacheHitPercentage, locale) ??
-                  unavailable,
-              })}
-            </Text>
+            {usageSessionMetrics.cacheHitReportedByProvider ? null : (
+              <Text style={styles.detail}>
+                {t("contextWindow.cacheHitPercentage", {
+                  value:
+                    formatSessionCacheHitPercentage(
+                      usageSessionMetrics.cacheHitPercentage,
+                      locale,
+                    ) ?? unavailable,
+                })}
+              </Text>
+            )}
           </>
         ) : null}
       </View>

@@ -4,7 +4,7 @@ import type {
   AgentStreamEvent,
   AgentUsageSample,
 } from "./agent-sdk-types.js";
-import { AgentSessionMetricsLedger } from "./agent-session-metrics.js";
+import { AgentSessionMetricsLedger, forkUsageSessionMetrics } from "./agent-session-metrics.js";
 
 function output(text: string): AgentStreamEvent {
   return { type: "timeline", provider: "codex", item: { type: "assistant_message", text } };
@@ -381,5 +381,30 @@ describe("current-session metrics", () => {
     ledger.observe(usage({ inputTokens: Number.MAX_VALUE, cachedInputTokens: 0 }));
     ledger.observe(usage({ id: "other", inputTokens: Number.MAX_VALUE, cachedInputTokens: 0 }));
     expect(ledger.snapshot()).toEqual({});
+  });
+});
+
+describe("fork session metrics beside upstream cache hit", () => {
+  it("keeps the measured cache hit when the provider does not publish one", () => {
+    expect(
+      forkUsageSessionMetrics(false, {
+        outputTokensPerSecond5m: 20,
+        cacheHitPercentage: 80,
+      }),
+    ).toEqual({ outputTokensPerSecond5m: 20, cacheHitPercentage: 80 });
+  });
+
+  it("keeps TPS and drops the fork cache hit when upstream already publishes it", () => {
+    expect(
+      forkUsageSessionMetrics(true, {
+        outputTokensPerSecond5m: 20,
+        outputTokensPerSecond5mEstimated: true,
+        cacheHitPercentage: 80,
+      }),
+    ).toEqual({
+      outputTokensPerSecond5m: 20,
+      outputTokensPerSecond5mEstimated: true,
+      cacheHitReportedByProvider: true,
+    });
   });
 });
