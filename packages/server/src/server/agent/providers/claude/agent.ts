@@ -44,9 +44,15 @@ import {
 } from "./task-notification-tool-call.js";
 import { isClaudeInterruptPlaceholderText } from "./interrupt-placeholder.js";
 import {
+  CLAUDE_API_ORIGIN,
+  fetchClaudeApiModels,
+  type ClaudeModelApiConfig,
+} from "./api-models.js";
+import {
   getClaudeContextWindowMaxTokens,
   getClaudeModelsWithSettings,
   normalizeClaudeRuntimeModelId,
+  readClaudeUserSettings,
   resolveConfiguredClaudeModel,
 } from "./models.js";
 import {
@@ -1070,6 +1076,39 @@ function claudeDefaultMode(env: NodeJS.ProcessEnv): PermissionMode {
     : "auto";
 }
 
+function resolveClaudeModelApiConfig(
+  env: NodeJS.ProcessEnv,
+  userSettingsEnv: unknown,
+): ClaudeModelApiConfig | undefined {
+  const settings = isTruthyEnvValue(env.CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST)
+    ? undefined
+    : toObjectRecord(userSettingsEnv);
+  const readEnv = (name: string) => {
+    const value = settings?.[name];
+    return (typeof value === "string" ? value : env[name])?.trim();
+  };
+  const apiKey = readEnv("ANTHROPIC_API_KEY");
+  const authToken = readEnv("ANTHROPIC_AUTH_TOKEN");
+  if (!apiKey && !authToken) return undefined;
+
+  const cloudProvider = [
+    "CLAUDE_CODE_USE_BEDROCK",
+    "CLAUDE_CODE_USE_VERTEX",
+    "CLAUDE_CODE_USE_FOUNDRY",
+    "CLAUDE_CODE_USE_ANTHROPIC_AWS",
+    "CLAUDE_CODE_USE_ANTHROPIC_GOOGLE_CLOUD",
+  ].some((name) => isTruthyEnvValue(readEnv(name)));
+  if (cloudProvider) return undefined;
+
+  const baseUrl = readEnv("ANTHROPIC_BASE_URL") || CLAUDE_API_ORIGIN;
+  if (authToken) {
+    // Gateway keys can be bearer tokens. Leave Anthropic login tokens to Claude Code.
+    if (URL.canParse(baseUrl) && new URL(baseUrl).origin === CLAUDE_API_ORIGIN) return undefined;
+    return { baseUrl, authHeaders: { authorization: `Bearer ${authToken}` } };
+  }
+  return apiKey ? { baseUrl, authHeaders: { "x-api-key": apiKey } } : undefined;
+}
+
 function coerceSessionMetadata(metadata: AgentMetadata | undefined): Partial<AgentSessionConfig> {
   if (!isMetadata(metadata)) {
     return {};
@@ -1762,6 +1801,28 @@ export class ClaudeAgentClient implements AgentClient {
     }
     this.version = Promise.resolve(claudeCodeVersion);
     const env = this.buildProviderEnv();
+    const settings = await runProviderRefreshActivity(context, "settings", () =>
+      readClaudeUserSettings(this.logger, claudeConfigDir(env)),
+    );
+    const baseCatalog = { modes: DEFAULT_MODES, defaultModeId: claudeDefaultMode(env) };
+    const apiConfig = resolveClaudeModelApiConfig(env, settings.env);
+    if (apiConfig) {
+      try {
+        const models = await runProviderRefreshActivity(context, "models", () =>
+          fetchClaudeApiModels(apiConfig, claudeCodeVersion, context?.signal),
+        );
+        return { ...baseCatalog, models };
+      } catch {
+        context?.signal.throwIfAborted();
+        this.logger.warn("Claude API model list unavailable; using built-in models");
+        const models = getClaudeModelsWithSettings(settings, claudeCodeVersion);
+        for (const model of models) {
+          model.description = `API model list unavailable. ${model.description ?? "Built-in fallback."}`;
+        }
+        return { ...baseCatalog, models, incomplete: true };
+      }
+    }
+
     let discoveredModelIds = new Set<string>();
     let incomplete = false;
     try {
@@ -1786,18 +1847,9 @@ export class ClaudeAgentClient implements AgentClient {
         "Claude model discovery failed; omitting discovery-required models",
       );
     }
-    const models = await runProviderRefreshActivity(context, "settings", () =>
-      getClaudeModelsWithSettings(
-        this.logger,
-        claudeConfigDir(env),
-        claudeCodeVersion,
-        discoveredModelIds,
-      ),
-    );
     return {
-      models,
-      modes: DEFAULT_MODES,
-      defaultModeId: claudeDefaultMode(env),
+      ...baseCatalog,
+      models: getClaudeModelsWithSettings(settings, claudeCodeVersion, discoveredModelIds),
       ...(incomplete ? { incomplete } : {}),
     };
   }

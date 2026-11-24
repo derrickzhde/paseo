@@ -4,7 +4,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { promisify } from "node:util";
 import pino from "pino";
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { PermissionResult, SDKMessage, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 
 import { createTestLogger } from "../../../../test-utils/test-logger.js";
@@ -55,6 +55,7 @@ function isPermissionResolvedEvent(
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
 });
 
 describe("convertClaudeHistoryEntry", () => {
@@ -428,8 +429,227 @@ describe("convertClaudeHistoryEntry", () => {
 // "interrupting message should produce coherent text without garbling from race condition"
 // in daemon.e2e.test.ts which exercises the full flow through the WebSocket API.
 
+describe("ClaudeAgentClient.fetchCatalog API model discovery", () => {
+  const logger = createTestLogger();
+  const catalogOptions = { cwd: "/tmp/claude-models" };
+
+  beforeEach(() => {
+    for (const name of [
+      "ANTHROPIC_API_KEY",
+      "ANTHROPIC_AUTH_TOKEN",
+      "ANTHROPIC_BASE_URL",
+      "CLAUDE_CODE_USE_BEDROCK",
+      "CLAUDE_CODE_USE_VERTEX",
+      "CLAUDE_CODE_USE_FOUNDRY",
+      "CLAUDE_CODE_USE_ANTHROPIC_AWS",
+      "CLAUDE_CODE_USE_ANTHROPIC_GOOGLE_CLOUD",
+      "CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST",
+    ]) {
+      vi.stubEnv(name, undefined);
+    }
+  });
+
+  let configDir: string;
+  const discoverModels = vi.fn(async () => []);
+  const createClient = (env: Record<string, string> = {}) =>
+    new ClaudeAgentClient({
+      logger,
+      discoverModels,
+      resolveVersion: async () => "2.1.293",
+      runtimeSettings: { env: { CLAUDE_CONFIG_DIR: configDir, ...env } },
+    });
+
+  beforeEach(async () => {
+    discoverModels.mockClear();
+    configDir = await fs.mkdtemp(path.join(os.tmpdir(), "paseo-claude-api-models-"));
+  });
+
+  afterEach(async () => {
+    await fs.rm(configDir, { recursive: true, force: true });
+  });
+
+  test.each(["provider environment", "user settings"])(
+    "lists all API model pages using the key from %s",
+    async (keySource) => {
+      const env = { ANTHROPIC_API_KEY: "fixture-key" };
+      if (keySource === "user settings") {
+        vi.stubEnv("ANTHROPIC_API_KEY", "inherited-fixture-key");
+        await fs.writeFile(
+          path.join(configDir, "settings.json"),
+          JSON.stringify({ env, model: "unlisted-settings-model" }),
+        );
+      }
+      const fetch = vi
+        .spyOn(globalThis, "fetch")
+        .mockRejectedValue(new Error("unexpected API page"))
+        .mockResolvedValueOnce(
+          Response.json({
+            data: [
+              {
+                id: "claude-opus-4-7-20260401",
+                display_name: "Claude Opus 4.7",
+                max_input_tokens: 1_000_000,
+              },
+            ],
+            has_more: true,
+            last_id: "claude-opus-4-7-20260401",
+          }),
+        )
+        .mockResolvedValueOnce(
+          Response.json({
+            data: [{ id: "claude-new-model", display_name: "Claude New" }],
+            has_more: false,
+            last_id: "claude-new-model",
+          }),
+        );
+      const client = createClient(keySource === "provider environment" ? env : undefined);
+
+      const { models, incomplete } = await client.fetchCatalog(catalogOptions);
+
+      expect(models.map(({ id, label }) => [id, label])).toEqual([
+        ["claude-opus-4-7-20260401", "Claude Opus 4.7"],
+        ["claude-new-model", "Claude New"],
+      ]);
+      expect(models[0]).toMatchObject({
+        provider: "claude",
+        isDefault: true,
+        contextWindowMaxTokens: 1_000_000,
+        thinkingOptions: expect.arrayContaining([expect.objectContaining({ id: "high" })]),
+      });
+      expect(incomplete).toBeUndefined();
+      expect(discoverModels).not.toHaveBeenCalled();
+      expect(fetch).toHaveBeenCalledTimes(2);
+      const requests = fetch.mock.calls.map(([input, init]) => new Request(input, init));
+      for (const request of requests) {
+        expect(new URL(request.url).origin + new URL(request.url).pathname).toBe(
+          "https://api.anthropic.com/v1/models",
+        );
+        expect(request.method).toBe("GET");
+        expect(request.headers.get("x-api-key")).toBe("fixture-key");
+        expect(request.headers.get("anthropic-version")).toBeTruthy();
+        expect(request.redirect).toBe("error");
+      }
+      expect(new URL(requests[0].url).searchParams.has("after_id")).toBe(false);
+      expect(new URL(requests[1].url).searchParams.get("after_id")).toBe(
+        "claude-opus-4-7-20260401",
+      );
+    },
+  );
+
+  test.each([
+    {
+      baseUrl: "https://gateway.example.test/proxy",
+      modelsUrl: "https://gateway.example.test/proxy/v1/models",
+      env: { ANTHROPIC_AUTH_TOKEN: "fixture-bearer", ANTHROPIC_API_KEY: "unused-fixture-key" },
+      bearer: "Bearer fixture-bearer",
+      apiKey: null,
+    },
+    {
+      baseUrl: "https://gateway.example.test/api/v1/",
+      modelsUrl: "https://gateway.example.test/api/v1/models",
+      env: { ANTHROPIC_AUTH_TOKEN: "", ANTHROPIC_API_KEY: "fixture-gateway-key" },
+      bearer: null,
+      apiKey: "fixture-gateway-key",
+    },
+  ])(
+    "uses the model list from gateway $baseUrl",
+    async ({ baseUrl, modelsUrl, env, bearer, apiKey }) => {
+      const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+        Response.json({
+          object: "list",
+          data: [{ id: "team/opus", name: "Team Opus" }, { id: "team/quick" }],
+        }),
+      );
+      const client = createClient({ ...env, ANTHROPIC_BASE_URL: baseUrl });
+
+      const { models, incomplete } = await client.fetchCatalog(catalogOptions);
+
+      expect(models.map(({ id, label }) => [id, label])).toEqual([
+        ["team/opus", "Team Opus"],
+        ["team/quick", "team/quick"],
+      ]);
+      expect(incomplete).toBeUndefined();
+      expect(discoverModels).not.toHaveBeenCalled();
+      expect(fetch).toHaveBeenCalledTimes(1);
+      const request = new Request(...fetch.mock.calls[0]);
+      expect(request.url).toBe(modelsUrl);
+      expect(request.headers.get("authorization")).toBe(bearer);
+      expect(request.headers.get("x-api-key")).toBe(apiKey);
+      expect(request.redirect).toBe("error");
+    },
+  );
+
+  test.each([
+    { name: "Anthropic rejects the key", baseUrl: "", status: 401 },
+    {
+      name: "gateway does not expose the endpoint",
+      baseUrl: "https://gateway.example.test",
+      status: 404,
+    },
+  ])("marks the fallback and retries when $name", async ({ baseUrl, status }) => {
+    const fetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockRejectedValue(new Error("unexpected API call"))
+      .mockResolvedValueOnce(new Response("Rejected fixture-key", { status }))
+      .mockResolvedValueOnce(
+        Response.json({
+          data: [{ id: "newly-available", display_name: "Newly available" }],
+          has_more: false,
+        }),
+      );
+    const client = createClient({ ANTHROPIC_API_KEY: "fixture-key", ANTHROPIC_BASE_URL: baseUrl });
+
+    const fallback = await client.fetchCatalog(catalogOptions);
+
+    expect(fallback.incomplete).toBe(true);
+    expect(fallback.models.find((model) => model.isDefault)).toMatchObject({
+      id: "claude-opus-5-5[1m]",
+      description: expect.stringContaining("API model list unavailable"),
+    });
+    expect(JSON.stringify(fallback)).not.toContain("fixture-key");
+
+    const refreshed = await client.fetchCatalog({ ...catalogOptions, force: true });
+
+    expect(refreshed.incomplete).toBeUndefined();
+    expect(refreshed.models.map(({ id }) => id)).toEqual(["newly-available"]);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(discoverModels).not.toHaveBeenCalled();
+  });
+
+  test.each<[string, Record<string, string>]>([
+    ["subscription login", { CLAUDE_CODE_OAUTH_TOKEN: "fixture-oauth-token" }],
+    [
+      "bearer authentication",
+      { ANTHROPIC_API_KEY: "fixture-key", ANTHROPIC_AUTH_TOKEN: "fixture-bearer" },
+    ],
+    ["Bedrock", { ANTHROPIC_API_KEY: "fixture-key", CLAUDE_CODE_USE_BEDROCK: "1" }],
+    [
+      "subscription login through a proxy",
+      {
+        CLAUDE_CODE_OAUTH_TOKEN: "fixture-oauth-token",
+        ANTHROPIC_BASE_URL: "https://proxy.example.com",
+      },
+    ],
+  ])("uses the existing discovery path for %s", async (_name, env) => {
+    const fetch = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("unexpected API call"));
+    const client = createClient(env);
+
+    const { models, incomplete } = await client.fetchCatalog(catalogOptions);
+
+    expect(models.some((model) => model.isDefault)).toBe(true);
+    expect(incomplete).toBeUndefined();
+    expect(discoverModels).toHaveBeenCalledTimes(1);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
 describe("ClaudeAgentClient.fetchCatalog", () => {
   const logger = createTestLogger();
+
+  beforeEach(() => {
+    vi.stubEnv("ANTHROPIC_API_KEY", undefined);
+    vi.stubEnv("ANTHROPIC_AUTH_TOKEN", undefined);
+  });
 
   test("returns hardcoded claude models", async () => {
     const emptyConfigDir = await fs.mkdtemp(path.join(os.tmpdir(), "paseo-claude-models-empty-"));

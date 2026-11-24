@@ -2,7 +2,7 @@ import { ChildProcess } from "node:child_process";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createTestLogger } from "../../../../test-utils/test-logger.js";
 import { ClaudeAgentClient } from "./agent.js";
@@ -38,6 +38,11 @@ describe("getClaudeContextWindowMaxTokens", () => {
 });
 
 const createdClaudeConfigDirs: string[] = [];
+
+beforeEach(() => {
+  vi.stubEnv("ANTHROPIC_API_KEY", undefined);
+  vi.stubEnv("ANTHROPIC_AUTH_TOKEN", undefined);
+});
 
 afterEach(async () => {
   vi.unstubAllEnvs();
