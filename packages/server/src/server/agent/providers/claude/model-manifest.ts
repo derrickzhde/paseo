@@ -37,9 +37,9 @@ export const CLAUDE_ULTRACODE_THINKING_OPTION_ID = "ultracode";
 
 export const CLAUDE_MODEL_MANIFEST = [
   {
-    id: "claude-opus-5-5[1m]",
-    label: "Opus 5.5 1M",
-    description: "Opus 5.5 with 1M context window",
+    id: "claude-opus-5-5",
+    label: "Opus 5.5",
+    description: "Opus 5.5 · Latest release",
     defaultPriority: 3,
     minimumClaudeCodeVersion: "2.1.280",
     defaultThinkingOptionId: "medium",
@@ -48,45 +48,14 @@ export const CLAUDE_MODEL_MANIFEST = [
     supportsFastMode: true,
   },
   {
-    id: "claude-opus-5-5",
-    label: "Opus 5.5",
-    description: "Opus 5.5 · Latest release",
-    minimumClaudeCodeVersion: "2.1.280",
-    defaultThinkingOptionId: "medium",
-    contextWindowMaxTokens: 200_000,
-    effortLevels: CLAUDE_EFFORT_LEVELS.xhigh,
-    supportsFastMode: true,
-  },
-  {
-    id: "claude-opus-5[1m]",
-    label: "Opus 5 1M",
-    description: "Opus 5 with 1M context window",
+    id: "claude-opus-5",
+    label: "Opus 5",
+    description: "Opus 5 · Previous release",
     defaultPriority: 2,
     minimumClaudeCodeVersion: "2.1.219",
     contextWindowMaxTokens: 1_000_000,
     effortLevels: CLAUDE_EFFORT_LEVELS.xhigh,
     supportsThinkingDisabled: true,
-    supportsFastMode: true,
-  },
-  {
-    id: "claude-opus-5",
-    label: "Opus 5",
-    description: "Opus 5 · Previous release",
-    minimumClaudeCodeVersion: "2.1.219",
-    contextWindowMaxTokens: 200_000,
-    effortLevels: CLAUDE_EFFORT_LEVELS.xhigh,
-    supportsThinkingDisabled: true,
-    supportsFastMode: true,
-  },
-  {
-    id: "claude-mythos-5-2[1m]",
-    label: "Mythos 5.2 1M",
-    requiresDiscovery: true,
-    description: "Mythos 5.2 with 1M context window",
-    minimumClaudeCodeVersion: "2.1.321",
-    defaultThinkingOptionId: "medium",
-    contextWindowMaxTokens: 1_000_000,
-    effortLevels: CLAUDE_EFFORT_LEVELS.xhigh,
     supportsFastMode: true,
   },
   {
@@ -96,7 +65,7 @@ export const CLAUDE_MODEL_MANIFEST = [
     description: "Mythos 5.2 · Requires verified access",
     minimumClaudeCodeVersion: "2.1.321",
     defaultThinkingOptionId: "medium",
-    contextWindowMaxTokens: 200_000,
+    contextWindowMaxTokens: 1_000_000,
     effortLevels: CLAUDE_EFFORT_LEVELS.xhigh,
     supportsFastMode: true,
   },
@@ -109,53 +78,30 @@ export const CLAUDE_MODEL_MANIFEST = [
     effortLevels: CLAUDE_EFFORT_LEVELS.xhigh,
   },
   {
-    id: "claude-fable-5-2[1m]",
-    label: "Fable 5.2 1M",
-    description: "Fable 5.2 with 1M context window",
-    minimumClaudeCodeVersion: "2.1.321",
-    defaultThinkingOptionId: "medium",
-    contextWindowMaxTokens: 1_000_000,
-    effortLevels: CLAUDE_EFFORT_LEVELS.xhigh,
-    supportsFastMode: true,
-  },
-  {
     id: "claude-fable-5-2",
     label: "Fable 5.2",
     description: "Fable 5.2 · Most powerful model",
     minimumClaudeCodeVersion: "2.1.321",
     defaultThinkingOptionId: "medium",
-    contextWindowMaxTokens: 200_000,
-    effortLevels: CLAUDE_EFFORT_LEVELS.xhigh,
-    supportsFastMode: true,
-  },
-  {
-    id: "claude-fable-5-1[1m]",
-    label: "Fable 5.1 1M",
-    description: "Fable 5.1 with 1M context window",
     contextWindowMaxTokens: 1_000_000,
     effortLevels: CLAUDE_EFFORT_LEVELS.xhigh,
+    supportsFastMode: true,
   },
   {
     id: "claude-fable-5-1",
     label: "Fable 5.1",
     description: "Fable 5.1 · Previous release",
-    contextWindowMaxTokens: 200_000,
-    effortLevels: CLAUDE_EFFORT_LEVELS.xhigh,
-  },
-  {
-    id: "claude-fable-5[1m]",
-    label: "Fable 5 1M",
-    description: "Fable 5 with 1M context window",
-    minimumClaudeCodeVersion: "2.1.169",
     contextWindowMaxTokens: 1_000_000,
     effortLevels: CLAUDE_EFFORT_LEVELS.xhigh,
   },
   {
     id: "claude-fable-5",
+    // COMPAT(claudeFable5OneMillionId): added in v0.3.0, remove after 2027-02-06 once pre-v0.3.0 app preferences are outside support.
+    aliases: ["claude-fable-5[1m]"],
     label: "Fable 5",
     description: "Fable 5 · Previous release",
     minimumClaudeCodeVersion: "2.1.169",
-    contextWindowMaxTokens: 200_000,
+    contextWindowMaxTokens: 1_000_000,
     effortLevels: CLAUDE_EFFORT_LEVELS.xhigh,
   },
   {
@@ -346,10 +292,6 @@ export function getClaudeManifestModels(
     if (thinkingOptions) {
       definition.thinkingOptions = thinkingOptions;
       definition.defaultThinkingOptionId = getDefaultThinkingOptionId(model);
-    }
-    // COMPAT(claudeFable5LegacyCatalogEntry): runtime resolution keeps this ID; CLI hides it.
-    if (model.id === "claude-fable-5[1m]") {
-      definition.isSelectable = false;
     }
     definitions.push(definition);
     if (!("aliases" in model) || !model.aliases) {

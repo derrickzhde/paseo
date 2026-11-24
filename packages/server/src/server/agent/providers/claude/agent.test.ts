@@ -557,7 +557,7 @@ describe("ClaudeAgentClient.fetchCatalog API model discovery", () => {
       const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
         Response.json({
           object: "list",
-          data: [{ id: "team/opus", name: "Team Opus" }, { id: "team/quick" }],
+          data: [{ id: "team/opus[1m]", name: "Team Opus" }, { id: "team/quick" }],
         }),
       );
       const client = createClient({ ...env, ANTHROPIC_BASE_URL: baseUrl });
@@ -565,7 +565,7 @@ describe("ClaudeAgentClient.fetchCatalog API model discovery", () => {
       const { models, incomplete } = await client.fetchCatalog(catalogOptions);
 
       expect(models.map(({ id, label }) => [id, label])).toEqual([
-        ["team/opus", "Team Opus"],
+        ["team/opus[1m]", "Team Opus"],
         ["team/quick", "team/quick"],
       ]);
       expect(incomplete).toBeUndefined();
@@ -603,7 +603,7 @@ describe("ClaudeAgentClient.fetchCatalog API model discovery", () => {
 
     expect(fallback.incomplete).toBe(true);
     expect(fallback.models.find((model) => model.isDefault)).toMatchObject({
-      id: "claude-opus-5-5[1m]",
+      id: "claude-opus-5-5",
       description: expect.stringContaining("API model list unavailable"),
     });
     expect(JSON.stringify(fallback)).not.toContain("fixture-key");
@@ -636,7 +636,11 @@ describe("ClaudeAgentClient.fetchCatalog API model discovery", () => {
 
     const { models, incomplete } = await client.fetchCatalog(catalogOptions);
 
-    expect(models.some((model) => model.isDefault)).toBe(true);
+    expect(models.find((model) => model.isDefault)).toMatchObject({
+      id: "claude-opus-5-5",
+      contextWindowMaxTokens: 1_000_000,
+    });
+    expect(models.some((model) => model.id === "claude-opus-5-5[1m]")).toBe(false);
     expect(incomplete).toBeUndefined();
     expect(discoverModels).toHaveBeenCalledTimes(1);
     expect(fetch).not.toHaveBeenCalled();
@@ -675,13 +679,11 @@ describe("ClaudeAgentClient.fetchCatalog", () => {
       });
 
       expect(models.map((m) => m.id)).toEqual([
-        "claude-opus-5[1m]",
         "claude-opus-5",
         "claude-mythos-5-1",
-        "claude-fable-5-1[1m]",
         "claude-fable-5-1",
-        "claude-fable-5[1m]",
         "claude-fable-5",
+        "claude-fable-5[1m]",
         "claude-opus-4-8[1m]",
         "claude-opus-4-8",
         "claude-sonnet-5",
@@ -702,7 +704,7 @@ describe("ClaudeAgentClient.fetchCatalog", () => {
       }
 
       const defaultModel = models.find((m) => m.isDefault);
-      expect(defaultModel?.id).toBe("claude-opus-5[1m]");
+      expect(defaultModel?.id).toBe("claude-opus-5");
     } finally {
       await fs.rm(emptyConfigDir, { recursive: true, force: true });
     }
@@ -732,7 +734,7 @@ describe("ClaudeAgentClient.fetchCatalog", () => {
         force: false,
       });
 
-      expect(models.find((model) => model.isDefault)?.id).toBe("claude-opus-5-5[1m]");
+      expect(models.find((model) => model.isDefault)?.id).toBe("claude-opus-5-5");
       expect(models.map((model) => model.id)).toContain("claude-fable-5");
     } finally {
       await fs.rm(emptyConfigDir, { recursive: true, force: true });
