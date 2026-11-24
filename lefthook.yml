@@ -6,6 +6,9 @@ pre-commit:
       exclude:
         - "package-lock.json"
         - "**/package-lock.json"
+        # oxfmt ignores this package. Passing only its generated files makes
+        # format:check exit because every target was excluded.
+        - "packages/react-native-enriched-markdown/**"
       run: npm run format:check:files -- {staged_files}
     - name: lint
       glob: "*.{js,jsx,ts,tsx}"
