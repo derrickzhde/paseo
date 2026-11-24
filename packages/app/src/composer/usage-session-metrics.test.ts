@@ -23,8 +23,21 @@ describe("selectUsageSessionMetrics", () => {
     );
   });
 
+  it.each(["Cache (last turn)", "Cache (last reply)"])(
+    "omits empty session metrics beside a saved %s row until live usage arrives",
+    (label) => {
+      const agent = { sessionMetrics: [{ label, value: "98%" }] };
+      expect(selectUsageSessionMetrics(advertising, agent)).toBeUndefined();
+
+      const sessionMetrics = { outputTokensPerSecond5m: 12, cacheHitReportedByProvider: true };
+      expect(
+        selectUsageSessionMetrics(advertising, { ...agent, lastUsage: { sessionMetrics } }),
+      ).toBe(sessionMetrics);
+    },
+  );
+
   it("reuses one empty snapshot so the composer subscription stays still", () => {
-    const agent = { lastUsage: {} };
+    const agent = { lastUsage: {}, sessionMetrics: [{ label: "Tokens", value: "20 ↑ · 40 ↓" }] };
     const first = selectUsageSessionMetrics(advertising, agent);
     const second = selectUsageSessionMetrics(advertising, agent);
     expect(first).toEqual({});
