@@ -1,5 +1,7 @@
-- Fork release integrating upstream v0.17.3: Includes upstream v0.17.3 and upstream v0.17.2. Download this fork from GitHub releases.
-- Turn and session stats: View per-turn and session timing, token, cache, and cost metrics for Claude, OpenCode v2, Pi, Oh My Pi, and plugin providers.
-- Sidebar usage by default: The sidebar usage summary is enabled by default, sources for inactive providers start hidden, and source toggles move to a Sources list.
+Fixed
+- Fixed numbered sublists overlapping their text and quotes inside lists overlapping later messages on Android
+- Fixed Android terminal input so it asks the keyboard to exclude typed text from personalized learning
+- Fixed conversations disappearing when directory capitalization differs on a case-insensitive file system
+- Fixed interrupt and steer messages to archived agents being queued without starting a turn
 
 Full notes: https://paseo.sh/changelog
