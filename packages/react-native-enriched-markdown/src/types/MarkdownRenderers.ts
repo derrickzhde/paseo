@@ -14,8 +14,16 @@ export interface LinkRendererProps {
   children: ReactNode;
 }
 
+export interface MathRendererProps {
+  /** LaTeX math content. */
+  content: string;
+  /** Whether this is display mode (block) or inline mode. */
+  displayMode: boolean;
+}
+
 /** Custom web components. Overrides own their styling and interactions. */
 export interface MarkdownRenderers {
   codeBlock?: ComponentType<CodeBlockRendererProps>;
   link?: ComponentType<LinkRendererProps>;
+  math?: ComponentType<MathRendererProps>;
 }

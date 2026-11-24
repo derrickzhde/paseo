@@ -2,6 +2,7 @@ export type {
   MarkdownRenderers,
   CodeBlockRendererProps,
   LinkRendererProps,
+  MathRendererProps,
 } from './types/MarkdownRenderers';
 export type { LinkVariantStyle, LinkPillStyle } from './types/MarkdownStyle';
 export type { LinkPillContent } from './types/MarkdownTextProps';
