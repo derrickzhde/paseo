@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.17.6 - 2026-11-24
+
+- **Fork release:** Session speed is shown again. Providers that already publish a cache row keep that row and the fork speed; the others keep the fork speed and the fork cache hit. Download this fork from [GitHub releases](https://github.com/derrickzhde/paseo/releases).
+
+### Fixed
+
+- Fixed session tokens per second disappearing after the v0.17.1 merge stopped advertising session metrics. Opening a chat no longer loops when a session has no metrics yet.
+- Claude, Pi, Oh My Pi, and OpenCode v2 keep their own cache row and no longer repeat it as the fork session cache hit. Codex, OpenCode v1, Copilot, ACP, and plugins still show the fork cache hit beside the speed.
+
 ## 0.17.5 - 2026-11-24
 
 - **Fork release integrating upstream v0.17.4:** Includes [upstream v0.17.4](https://github.com/getpaseo/paseo/releases/tag/v0.17.4) and [upstream v0.17.3](https://github.com/getpaseo/paseo/releases/tag/v0.17.3). Download this fork from [GitHub releases](https://github.com/derrickzhde/paseo/releases).

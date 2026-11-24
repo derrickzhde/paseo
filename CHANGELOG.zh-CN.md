@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.17.6 - 2026-11-24
+
+- **Fork 版本：** 会话速度重新显示。已经发布自己缓存行的 Provider 保留该行和 fork 的速度；其余 Provider 同时保留 fork 的速度和缓存命中率。请从本 fork 的 [GitHub releases](https://github.com/derrickzhde/paseo/releases) 下载。
+
+### 修复
+
+- 修复合并上游 v0.17.1 后不再广播会话指标、会话每秒 token 数消失的问题。会话还没有指标时，打开对话不再陷入更新循环。
+- Claude、Pi、Oh My Pi 和 OpenCode v2 保留自己的缓存行，不再把同一指标重复显示为 fork 的会话缓存命中率。Codex、OpenCode v1、Copilot、ACP 和插件仍在速度旁边显示 fork 的缓存命中率。
+
 ## 0.17.5 - 2026-11-24
 
 - **Fork 版本，集成上游 v0.17.4：** 包含 [上游 v0.17.4](https://github.com/getpaseo/paseo/releases/tag/v0.17.4) 和 [上游 v0.17.3](https://github.com/getpaseo/paseo/releases/tag/v0.17.3)。请从本 fork 的 [GitHub releases](https://github.com/derrickzhde/paseo/releases) 下载。

@@ -1,0 +1,6 @@
+- Fork release: Session speed is shown again. Providers that already publish a cache row keep that row and the fork speed; the others keep the fork speed and the fork cache hit. Download this fork from GitHub releases.
+
+Fixed
+- Fixed session tokens per second disappearing after the v0.17.1 merge stopped advertising session metrics. Opening a chat no longer loops when a session has no metrics yet.
+
+Full notes: https://paseo.sh/changelog
