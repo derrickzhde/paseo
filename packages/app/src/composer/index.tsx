@@ -72,8 +72,6 @@ import {
   selectAgentSentMessages,
   selectAgentTurnPresentation,
   useSessionStore,
-  type Agent,
-  type SessionState,
 } from "@/stores/session-store";
 import { useFilePicker } from "@/hooks/use-file-picker";
 import { useFileDrop } from "@/components/file-drop/use-file-drop";
@@ -149,7 +147,8 @@ import { RenderProfile } from "@/utils/render-profiler";
 import { AfterPaintPublication } from "@/composer/after-paint-publication";
 import { isWeb, isNative } from "@/constants/platform";
 import type { ForgeSearchItem } from "@getpaseo/protocol/messages";
-import type { AgentMetric, AgentSessionMetrics } from "@getpaseo/protocol/agent-types";
+import type { AgentMetric } from "@getpaseo/protocol/agent-types";
+import { selectUsageSessionMetrics } from "@/composer/usage-session-metrics";
 import type {
   AttachmentMetadata,
   ComposerAttachment,
@@ -299,14 +298,6 @@ function buildRealtimeVoiceButtonStyle(pressed: boolean, voiceButtonDisabled: bo
 }
 
 const EMPTY_METRICS: AgentMetric[] = [];
-
-function selectUsageSessionMetrics(
-  session: SessionState | undefined,
-  agent: Agent | null,
-): AgentSessionMetrics | undefined {
-  if (session?.serverInfo?.features?.agentSessionMetrics !== true) return undefined;
-  return agent?.lastUsage?.sessionMetrics ?? {};
-}
 
 function buildAgentStateSelector(serverId: string, agentId: string) {
   return (state: ReturnType<typeof useSessionStore.getState>) => {
