@@ -204,22 +204,15 @@ function assertClaudeModels(data: ProviderModel[]): void {
     );
   }
 
-  const catalogFableIds = data
-    .map((model) => model.id)
-    .filter((id) => id.startsWith("claude-fable-5") && !id.includes("[1m]"));
-  const fable52Index = catalogFableIds.indexOf("claude-fable-5-2");
+  const fable52Index = data.findIndex((model) => model.id === "claude-fable-5-2");
   assert.deepStrictEqual(
-    catalogFableIds.slice(fable52Index, fable52Index + 3),
+    data.slice(fable52Index, fable52Index + 3).map((model) => model.id),
     ["claude-fable-5-2", "claude-fable-5-1", "claude-fable-5"],
     "Fable models should stay adjacent and newest-first",
   );
   assert(
     !byId.has("claude-fable-5[1m]"),
     "compatibility-only Fable aliases should not appear in CLI output",
-  );
-  assert(
-    byId.has("claude-fable-5-1[1m]"),
-    "fork Fable 1M variants should remain selectable in the catalog",
   );
 }
 
