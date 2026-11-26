@@ -81,7 +81,7 @@ function createCheckoutFacts(
     branchRemoteName: null,
     branchMergeRef: null,
     upstreamStatus: { state: "none" },
-    firstPushRemote: null,
+    pushTarget: null,
     pullRequestLookupTarget: { headRef: "main" },
     ...overrides,
   };
@@ -429,7 +429,7 @@ describe("WorkspaceGitServiceImpl primitive refresh entrypoint", () => {
 
   test("getCheckout surfaces an unexpected Git read failure", async () => {
     const service = createService({
-      getCheckoutStatus: vi.fn(async () => {
+      getCheckoutIdentity: vi.fn(async () => {
         throw new Error("Git read failed");
       }),
     });

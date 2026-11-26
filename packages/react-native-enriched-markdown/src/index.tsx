@@ -1,6 +1,7 @@
 export type {
   MarkdownRenderers,
   CodeBlockRendererProps,
+  BlockquoteRendererProps,
   LinkRendererProps,
   MathRendererProps,
 } from './types/MarkdownRenderers';
