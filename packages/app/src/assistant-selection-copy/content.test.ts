@@ -3,7 +3,10 @@
  */
 import { afterEach, describe, expect, it } from "vitest";
 import { MARKDOWN_COPY_MATH_SOURCE_ATTRIBUTE } from "./markup";
-import { createAssistantSelectionClipboardContent } from "./content.web";
+import {
+  createAssistantSelectionClipboardContent,
+  createElementClipboardContent,
+} from "./content.web";
 
 function mountMessage(build: (message: HTMLElement) => void): HTMLElement {
   const host = document.createElement("div");
@@ -68,5 +71,18 @@ describe("math formula copy", () => {
     selection.removeAllRanges();
     selection.addRange(range);
     expect(copiedMarkdown(selection)).toBe(blockSource);
+  });
+
+  it("copies a formula's source from a quote's copy control", () => {
+    const quote = document.createElement("blockquote");
+    const paragraph = document.createElement("p");
+    const formula = document.createElement("span");
+    formula.setAttribute(MARKDOWN_COPY_MATH_SOURCE_ATTRIBUTE, String.raw`\(e^{i\pi}\)`);
+    formula.append(document.createElementNS("http://www.w3.org/2000/svg", "svg"));
+    paragraph.append("Euler: ", formula);
+    quote.append(paragraph);
+    document.body.append(quote);
+
+    expect(createElementClipboardContent(quote)?.plainText).toBe(String.raw`Euler: \(e^{i\pi}\)`);
   });
 });
