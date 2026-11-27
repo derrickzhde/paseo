@@ -662,6 +662,24 @@ export const ja: TranslationResources = {
         invalidUrl: "無効なブラウザURL",
         unsupportedProtocol: "サポートされていないブラウザURLをブロック: {{protocol}}",
       },
+      routing: {
+        tooltipHost: "{{hostName}} 経由で閲覧中。クリックしてローカルで閲覧。",
+        tooltipLocal: "ローカルで閲覧中。クリックして {{hostName}} 経由で閲覧。",
+        switchToLocal: "ブラウザルーティングを {{hostName}} からローカルに切り替え",
+        switchToHost: "ブラウザルーティングをローカルから {{hostName}} に切り替え",
+      },
+      proxy: {
+        connecting: "{{hostName}} に接続中...",
+        reconnecting: "{{hostName}} に再接続中...",
+        updateTitle: "このホスト経由で閲覧するには {{hostName}} を更新してください",
+        updateDescription: "このホストはまだブラウザプロキシに対応していません。",
+        routedTitle: "ルーティングされたホストではブラウザプロキシを利用できません",
+        routedDescription: "このホストに直接接続するか、ローカルで閲覧してください。",
+        offlineTitle: "{{hostName}} はオフラインです",
+        offlineDescription: "ホストの再接続を待つか、ローカルで閲覧してください。",
+        errorTitle: "ブラウザプロキシに接続できませんでした",
+        browseLocally: "ローカルで閲覧",
+      },
     },
     terminal: {
       hostDisconnected: "ホストが接続されていません",
@@ -2468,6 +2486,48 @@ export const ja: TranslationResources = {
     },
     notifications: {
       title: "通知",
+      enabled: {
+        label: "通知を有効にする",
+        description: "このデバイスでエージェント、ターミナル、プラグインからの通知を受け取ります",
+        pausedDescription: "プラグインを含むすべての通知がこのデバイスで一時停止されています",
+      },
+      events: {
+        title: "イベント",
+        agentPermission: {
+          label: "エージェントが権限を要求",
+          description: "承認、プラン、質問",
+        },
+        agentError: {
+          label: "エージェントのエラー",
+          description: "エージェントがエラーで停止したとき",
+        },
+        agentFinished: {
+          label: "エージェントが完了",
+          description: "エージェントがターンを完了したとき",
+        },
+        terminalNeedsInput: {
+          label: "ターミナルが入力を待機",
+          description: "ターミナルコマンドが入力を待っているとき",
+        },
+        terminalFinished: {
+          label: "ターミナルが完了",
+          description: "ターミナルコマンドが完了したとき",
+        },
+      },
+      plugins: {
+        title: "プラグイン",
+        enabled: {
+          label: "プラグイン通知",
+          description: "インストール済みプラグインによる通知の送信を許可します",
+        },
+        empty: "インストールされたプラグインがここに表示され、個別にミュートできます",
+      },
+      legacyHostTitle: "プッシュ通知設定にはホストの更新が必要です",
+      legacyHostHint:
+        "このデバイスのカスタムプッシュ通知設定を同期するには、接続中のホストを更新してください",
+      desktop: {
+        title: "システム",
+      },
       permission: "通知の権限",
       refreshAccessibility: "通知の権限を更新",
       playSound: "サウンドを再生",
@@ -3109,6 +3169,8 @@ export const ja: TranslationResources = {
       },
       agentProfiles: {
         sectionTitle: "エージェントプロファイル",
+        sectionDescription:
+          "素早く選べるエージェント設定を保存します。エージェントが作業を委任するときにも使えます",
         unavailable: "エージェントプロファイルを管理するにはこのホストに接続してください",
         unsupported: "このホストで動作するデーモンはまだエージェントプロファイルに対応していません",
         emptyState:
@@ -3133,6 +3195,10 @@ export const ja: TranslationResources = {
         featuresLabel: "機能",
         featureCount: "{{count}}個の機能",
         featureCountOne: "{{count}}個の機能",
+        systemPromptLabel: "システムプロンプト",
+        systemPromptPlaceholder:
+          "レイアウト、アクセシビリティ、デザイントークンに集中してください。",
+        systemPromptHint: "新しいエージェントにのみ適用されます",
         notesLabel: "使用する場面",
         notesPlaceholder: "UI作業に使用 — コンポーネント、レイアウト、デザイントークンなど。",
         notesHint: "別のエージェントを起動するとき、このプロファイルを選ぶために使用されます。",

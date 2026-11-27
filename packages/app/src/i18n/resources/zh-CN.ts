@@ -656,6 +656,24 @@ export const zhCN: TranslationResources = {
         invalidUrl: "浏览器 URL 无效",
         unsupportedProtocol: "已阻止不支持的浏览器 URL：{{protocol}}",
       },
+      routing: {
+        tooltipHost: "正在通过 {{hostName}} 浏览。点击切换为本地浏览。",
+        tooltipLocal: "正在本地浏览。点击切换为通过 {{hostName}} 浏览。",
+        switchToLocal: "将浏览器路由从 {{hostName}} 切换为本地",
+        switchToHost: "将浏览器路由从本地切换为 {{hostName}}",
+      },
+      proxy: {
+        connecting: "正在连接到 {{hostName}}...",
+        reconnecting: "正在重新连接到 {{hostName}}...",
+        updateTitle: "请更新 {{hostName}} 以通过此主机浏览",
+        updateDescription: "此主机尚不支持浏览器代理。",
+        routedTitle: "路由主机不支持浏览器代理",
+        routedDescription: "请直接连接到此主机，或改为本地浏览。",
+        offlineTitle: "{{hostName}} 已离线",
+        offlineDescription: "请等待主机重新连接，或改为本地浏览。",
+        errorTitle: "无法连接浏览器代理",
+        browseLocally: "本地浏览",
+      },
     },
     terminal: {
       hostDisconnected: "Host 未连接",
@@ -2419,6 +2437,47 @@ export const zhCN: TranslationResources = {
     },
     notifications: {
       title: "通知",
+      enabled: {
+        label: "启用通知",
+        description: "在此设备上接收来自智能体、终端和插件的通知",
+        pausedDescription: "此设备上的所有通知（包括插件通知）均已暂停",
+      },
+      events: {
+        title: "事件",
+        agentPermission: {
+          label: "智能体需要权限",
+          description: "审批、计划与提问",
+        },
+        agentError: {
+          label: "智能体出错",
+          description: "当智能体因错误停止时",
+        },
+        agentFinished: {
+          label: "智能体已完成",
+          description: "当智能体完成一轮回复时",
+        },
+        terminalNeedsInput: {
+          label: "终端等待输入",
+          description: "当终端命令正在等待输入时",
+        },
+        terminalFinished: {
+          label: "终端命令完成",
+          description: "当终端命令执行结束时",
+        },
+      },
+      plugins: {
+        title: "插件",
+        enabled: {
+          label: "插件通知",
+          description: "允许已安装的插件发送通知",
+        },
+        empty: "已安装的插件会显示在这里，方便你单独静音",
+      },
+      legacyHostTitle: "更新主机以同步推送偏好",
+      legacyHostHint: "更新已连接的主机，以同步此设备上的自定义推送通知偏好设置",
+      desktop: {
+        title: "系统",
+      },
       permission: "通知权限",
       refreshAccessibility: "刷新通知权限",
       playSound: "播放声音",
@@ -3047,6 +3106,7 @@ export const zhCN: TranslationResources = {
       },
       agentProfiles: {
         sectionTitle: "Agent 配置",
+        sectionDescription: "保存可快速选用的 Agent 设置，Agent 委派工作时也可以使用这些配置",
         unavailable: "连接到这个 Host 以管理 Agent 配置",
         unsupported: "此 Host 运行的 Daemon 尚不支持 Agent 配置",
         emptyState: "还没有配置。添加一个以便使用保存的 Provider 和 Model 启动 Agent。",
@@ -3070,6 +3130,9 @@ export const zhCN: TranslationResources = {
         featuresLabel: "Features",
         featureCount: "{{count}} 个 Feature",
         featureCountOne: "{{count}} 个 Feature",
+        systemPromptLabel: "System prompt",
+        systemPromptPlaceholder: "专注于布局、无障碍和设计 token。",
+        systemPromptHint: "仅适用于新 Agent",
         notesLabel: "适用场景",
         notesPlaceholder: "用于 UI 工作 — 组件、布局和设计 token。",
         notesHint: "帮助 Agent 在启动另一个 Agent 时选择此配置。",

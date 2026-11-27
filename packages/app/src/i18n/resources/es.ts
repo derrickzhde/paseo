@@ -662,6 +662,24 @@ export const es: TranslationResources = {
         invalidUrl: "Navegador no válidoURL",
         unsupportedProtocol: "Navegador bloqueado no compatibleURL:{{protocol}}",
       },
+      routing: {
+        tooltipHost: "Navegando a través de {{hostName}}. Haz clic para navegar localmente.",
+        tooltipLocal: "Navegando localmente. Haz clic para navegar a través de {{hostName}}.",
+        switchToLocal: "Cambiar el enrutamiento del navegador de {{hostName}} a Local",
+        switchToHost: "Cambiar el enrutamiento del navegador de Local a {{hostName}}",
+      },
+      proxy: {
+        connecting: "Conectando con {{hostName}}...",
+        reconnecting: "Reconectando con {{hostName}}...",
+        updateTitle: "Actualiza {{hostName}} para navegar a través de este host",
+        updateDescription: "Este host todavía no admite el proxy del navegador.",
+        routedTitle: "El proxy del navegador no está disponible para hosts enrutados",
+        routedDescription: "Conéctate directamente a este host o navega localmente.",
+        offlineTitle: "{{hostName}} está desconectado",
+        offlineDescription: "Espera a que el host se reconecte o navega localmente.",
+        errorTitle: "No se pudo conectar el proxy del navegador",
+        browseLocally: "Navegar localmente",
+      },
     },
     terminal: {
       hostDisconnected: "Hostno está conectado",
@@ -2499,6 +2517,49 @@ export const es: TranslationResources = {
     },
     notifications: {
       title: "Notificaciones",
+      enabled: {
+        label: "Activar notificaciones",
+        description: "Recibe notificaciones de agentes, terminales y plugins en este dispositivo",
+        pausedDescription:
+          "Todas las notificaciones, incluidas las de plugins, están en pausa en este dispositivo",
+      },
+      events: {
+        title: "Eventos",
+        agentPermission: {
+          label: "El agente necesita permiso",
+          description: "Aprobaciones, planes y preguntas",
+        },
+        agentError: {
+          label: "Error del agente",
+          description: "Cuando un agente se detiene con un error",
+        },
+        agentFinished: {
+          label: "El agente terminó",
+          description: "Cuando un agente completa un turno",
+        },
+        terminalNeedsInput: {
+          label: "La terminal necesita entrada",
+          description: "Cuando un comando de terminal espera entrada",
+        },
+        terminalFinished: {
+          label: "La terminal terminó",
+          description: "Cuando finaliza un comando de terminal",
+        },
+      },
+      plugins: {
+        title: "Plugins",
+        enabled: {
+          label: "Notificaciones de plugins",
+          description: "Permitir que los plugins instalados envíen notificaciones",
+        },
+        empty: "Los plugins instalados aparecen aquí para que puedas silenciarlos individualmente",
+      },
+      legacyHostTitle: "Actualiza el host para preferencias push",
+      legacyHostHint:
+        "Actualiza los hosts conectados para sincronizar preferencias de notificaciones push desde este dispositivo",
+      desktop: {
+        title: "Sistema",
+      },
       permission: "Permiso de notificaciones",
       refreshAccessibility: "Actualizar permiso de notificaciones",
       playSound: "Reproducir sonido",
@@ -3145,6 +3206,8 @@ export const es: TranslationResources = {
       },
       agentProfiles: {
         sectionTitle: "Perfiles de agente",
+        sectionDescription:
+          "Guarda configuraciones de agente que puedes elegir rápido y que los agentes pueden usar para delegar trabajo",
         unavailable: "Conéctese a este host para administrar perfiles de agente",
         unsupported: "Este host ejecuta un daemon que aún no admite perfiles de agente",
         emptyState:
@@ -3169,6 +3232,9 @@ export const es: TranslationResources = {
         featuresLabel: "Características",
         featureCount: "{{count}} características",
         featureCountOne: "{{count}} característica",
+        systemPromptLabel: "Aviso del sistema",
+        systemPromptPlaceholder: "Enfócate en el diseño, la accesibilidad y los tokens de diseño.",
+        systemPromptHint: "Solo se aplica a agentes nuevos",
         notesLabel: "Cuándo usarlo",
         notesPlaceholder: "Úselo para trabajo de UI: componentes, diseño y tokens de diseño.",
         notesHint: "Ayuda a los agentes a elegir este perfil al iniciar otro agente.",

@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.18.0 - 2026-11-27
+
+- **Fork release:** Download this fork from [GitHub releases](https://github.com/derrickzhde/paseo/releases).
+- **Preserved fork behavior:** Math rendering and copying, including formulas in copied quotes, per-model thinking controls, the phone 12/24-hour clock, Codex `/goal` follow-up steering, Expo push recovery, the Claude imported-session cache, Claude API and gateway model discovery, measured session speed and cache-hit metrics, Vitest browser CI, and the Enriched Markdown patch.
+- **Remote workspace browser proxy:** Desktop browser tabs in remote workspaces now route through the workspace daemon, so remote `localhost` servers open directly in Paseo. ([#10944](https://github.com/getpaseo/paseo/pull/10944) by [@airon-assustadus](https://github.com/airon-assustadus))
+- **Per-device notification preferences:** Each device can choose which agent, terminal, and plugin events send notifications, and plugins can send notifications and handle taps. ([#10888](https://github.com/getpaseo/paseo/pull/10888))
+- **Agent profile system prompts:** Save an optional system prompt on an agent profile to apply it to new agents started from that profile. ([#10996](https://github.com/getpaseo/paseo/pull/10996))
+- **More syntax highlighting:** Syntax highlighting now covers diff and patch files along with Ruby, Kotlin, TOML, SQL, Lua, Protobuf, PowerShell, Groovy, Gradle, Scala, CMake, Properties, INI, R, Perl, and LaTeX. ([#11026](https://github.com/getpaseo/paseo/pull/11026) by [@hmalaspina](https://github.com/hmalaspina), [@kukicola](https://github.com/kukicola), [@MaximeConan](https://github.com/MaximeConan), [@singleton11](https://github.com/singleton11), [@chandlerok](https://github.com/chandlerok))
+
+### Changed
+
+- Changed ACP providers to cache model catalogs across daemon restarts instead of probing in the background, and cleaned up Antigravity ACP flags and metadata. Requires [Antigravity CLI 1.5.1 or later](https://paseo.sh/docs/supported-providers/antigravity) ([#10992](https://github.com/getpaseo/paseo/pull/10992))
+
+### Fixed
+
+- Fixed Paseo iOS crashing shortly after connecting when an enabled client plugin imports `react-native` ([#11011](https://github.com/getpaseo/paseo/pull/11011))
+- Fixed OpenCode v2 agents staying stuck in running after Stop when stream events were missed or chat history was large ([#10955](https://github.com/getpaseo/paseo/pull/10955))
+- Fixed steering a Pi agent during a run it started on its own aborting the run instead of steering it ([#10977](https://github.com/getpaseo/paseo/pull/10977) by [@viiqswim](https://github.com/viiqswim))
+- Fixed creating a workspace from a pull request in a fork clone checking out the fork's pull request with the same number ([#10987](https://github.com/getpaseo/paseo/pull/10987))
+- Fixed dropping images or files onto the composer leaving the input unfocused ([#11022](https://github.com/getpaseo/paseo/pull/11022))
+
 ## 0.17.8 - 2026-11-27
 
 - **Fork release integrating upstream v0.17.6:** Includes [upstream v0.17.6](https://github.com/getpaseo/paseo/releases/tag/v0.17.6). The fork 0.17.6 notes move into this entry because upstream now uses that version number. Download this fork from [GitHub releases](https://github.com/derrickzhde/paseo/releases).

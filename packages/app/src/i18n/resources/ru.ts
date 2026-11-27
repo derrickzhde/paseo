@@ -664,6 +664,24 @@ export const ru: TranslationResources = {
         unsupportedProtocol:
           "URL браузера с неподдерживаемым протоколом заблокирован: {{protocol}}",
       },
+      routing: {
+        tooltipHost: "Просмотр через {{hostName}}. Нажмите, чтобы перейти в локальный режим.",
+        tooltipLocal: "Локальный просмотр. Нажмите, чтобы просматривать через {{hostName}}.",
+        switchToLocal: "Переключить маршрутизацию браузера с {{hostName}} на локальную",
+        switchToHost: "Переключить маршрутизацию браузера с локальной на {{hostName}}",
+      },
+      proxy: {
+        connecting: "Подключение к {{hostName}}...",
+        reconnecting: "Повторное подключение к {{hostName}}...",
+        updateTitle: "Обновите {{hostName}}, чтобы просматривать через этот хост",
+        updateDescription: "Этот хост пока не поддерживает проксирование браузера.",
+        routedTitle: "Прокси браузера недоступен для маршрутизируемых хостов",
+        routedDescription: "Подключитесь к хосту напрямую или просматривайте локально.",
+        offlineTitle: "{{hostName}} не в сети",
+        offlineDescription: "Дождитесь повторного подключения хоста или просматривайте локально.",
+        errorTitle: "Не удалось подключить прокси браузера",
+        browseLocally: "Просматривать локально",
+      },
     },
     terminal: {
       hostDisconnected: "Хост не подключён",
@@ -2484,6 +2502,49 @@ export const ru: TranslationResources = {
     },
     notifications: {
       title: "Уведомления",
+      enabled: {
+        label: "Включить уведомления",
+        description: "Получать уведомления от агентов, терминалов и плагинов на этом устройстве",
+        pausedDescription:
+          "Все уведомления, включая уведомления от плагинов, приостановлены на этом устройстве",
+      },
+      events: {
+        title: "События",
+        agentPermission: {
+          label: "Агенту требуется разрешение",
+          description: "Подтверждения, планы и вопросы",
+        },
+        agentError: {
+          label: "Ошибка агента",
+          description: "Когда агент останавливается из-за ошибки",
+        },
+        agentFinished: {
+          label: "Агент завершил работу",
+          description: "Когда агент завершает ход",
+        },
+        terminalNeedsInput: {
+          label: "Терминал ожидает ввода",
+          description: "Когда команда в терминале ждёт ввода",
+        },
+        terminalFinished: {
+          label: "Терминал завершил команду",
+          description: "Когда команда в терминале завершается",
+        },
+      },
+      plugins: {
+        title: "Плагины",
+        enabled: {
+          label: "Уведомления плагинов",
+          description: "Разрешить установленным плагинам отправлять уведомления",
+        },
+        empty: "Установленные плагины появятся здесь, чтобы вы могли отключать их по отдельности",
+      },
+      legacyHostTitle: "Обновите хост для настроек push-уведомлений",
+      legacyHostHint:
+        "Обновите подключённые хосты для синхронизации настроек push-уведомлений с этого устройства",
+      desktop: {
+        title: "Система",
+      },
       permission: "Разрешение на уведомления",
       refreshAccessibility: "Обновить разрешение на уведомления",
       playSound: "Воспроизводить звук",
@@ -3135,6 +3196,8 @@ export const ru: TranslationResources = {
       },
       agentProfiles: {
         sectionTitle: "Профили агентов",
+        sectionDescription:
+          "Сохраняйте настройки агентов, чтобы быстро выбирать их и позволять агентам использовать их при делегировании задач",
         unavailable: "Подключитесь к этому хосту, чтобы управлять профилями агентов",
         unsupported: "На этом хосте запущен демон, который пока не поддерживает профили агентов",
         emptyState:
@@ -3159,6 +3222,9 @@ export const ru: TranslationResources = {
         featuresLabel: "Функции",
         featureCount: "Функции: {{count}}",
         featureCountOne: "{{count}} функция",
+        systemPromptLabel: "Системный промпт",
+        systemPromptPlaceholder: "Сосредоточься на вёрстке, доступности и дизайн-токенах.",
+        systemPromptHint: "Применяется только к новым агентам",
         notesLabel: "Когда использовать",
         notesPlaceholder: "Используйте для работы над UI — компоненты, макет и токены дизайна.",
         notesHint: "Помогает агентам выбрать этот профиль при запуске другого агента.",
