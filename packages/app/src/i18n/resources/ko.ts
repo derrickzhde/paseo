@@ -295,6 +295,7 @@ export const ko: TranslationResources = {
     archived: {
       callout: "이 에이전트는 보관되었습니다",
       unarchive: "보관 해제",
+      unarchiving: "보관 해제 중...",
     },
   },
   sessions: {
@@ -1903,12 +1904,13 @@ export const ko: TranslationResources = {
     waysToConnect: "연결 방법",
     docs: "문서",
     docsAccessibility: "연결 문서 열기",
-    recommended: "권장",
-    relay: { title: "릴레이", hint: "엔드투엔드 암호화, QR 코드를 스캔하세요" },
+    relay: { title: "릴레이", hint: "설정 불필요, 엔드투엔드 암호화, QR 코드를 스캔하세요" },
     tailscale: {
       hint: "tailnet으로 직접 연결, 주소 입력",
       unavailable: "이 호스트에서 Tailscale이 실행 중이 아닙니다",
       install: "Tailscale 받기",
+      refresh: "새로 고침",
+      refreshing: "새로 고치는 중...",
       waiting: "이 호스트에서 Tailscale이 시작되기를 기다리는 중",
       alwaysOn: "항상 켜짐. 이 호스트가 이미 Tailscale 연결을 받고 있습니다",
       socket: "꺼짐. 이 호스트가 로컬 소켓에서 수신 대기 중입니다",
@@ -2393,7 +2395,7 @@ export const ko: TranslationResources = {
     title: "설정",
     loading: "설정 불러오는 중...",
     groups: {
-      app: "앱",
+      app: "이 기기",
       host: "호스트",
     },
     hostPicker: {
@@ -2411,7 +2413,9 @@ export const ko: TranslationResources = {
     groupInfo: "{{title}} 정보",
     sections: {
       general: "일반",
+      hosts: "호스트",
       chat: "채팅",
+      chatAndPanes: "채팅 및 패널",
       appearance: "모양",
       sidebar: "사이드바",
       terminal: "터미널",
@@ -2424,6 +2428,16 @@ export const ko: TranslationResources = {
       permissions: "권한",
       diagnostics: "진단",
       about: "정보",
+    },
+    clientHosts: {
+      title: "저장된 호스트",
+      info: "이 기기가 연결하는 호스트입니다. 이름, 아이콘, 배지 및 경로는 이 기기에만 적용됩니다.",
+      backToHosts: "호스트로 돌아가기",
+      routesTitle: "이 기기의 연결 방식",
+      routesInfo:
+        "이 기기가 이 호스트에 연결할 때 사용하는 저장된 경로입니다. Paseo가 가장 빠른 경로를 선택합니다.",
+      addRoute: "경로 추가",
+      activeRoute: "활성",
     },
     layout: en.settings.layout,
     editor: {
@@ -2458,6 +2472,7 @@ export const ko: TranslationResources = {
       projects: "프로젝트",
       connections: "연결",
       agents: "에이전트",
+      tools: "도구 및 프롬프트",
       agentProfiles: "에이전트 프로필",
       metadata: "메타데이터",
       voice: "음성",
@@ -2467,6 +2482,7 @@ export const ko: TranslationResources = {
       terminals: "터미널",
       plugins: "플러그인",
       host: "개요",
+      daemon: "데몬",
     },
     plugins: pluginSettings.ko,
     metadataGeneration: {
@@ -3007,6 +3023,10 @@ export const ko: TranslationResources = {
           delete: "스킬 삭제",
         },
       },
+      tools: {
+        instructionsTitle: "지침",
+        toolsTitle: "에이전트 도구",
+      },
       orchestration: {
         title: "오케스트레이션",
         unavailable: "오케스트레이션을 관리하려면 이 호스트에 연결하세요",
@@ -3134,6 +3154,7 @@ export const ko: TranslationResources = {
         },
       },
       daemon: {
+        runtimeTitle: "에이전트 런타임",
         rename: {
           editLabel: "레이블 편집",
           title: "호스트 이름 변경",

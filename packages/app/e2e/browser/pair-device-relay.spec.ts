@@ -15,8 +15,12 @@ import {
   disableTailscale,
   enableTailscale,
   expectTailscaleAddress,
+  expectTailscaleAvailable,
   expectTailscaleRowLoadsOn,
+  expectTailscaleUnavailable,
+  observeDaemonStatusPolling,
   openSetupMobileStep,
+  refreshTailscaleAvailability,
   slowConnectionToHost,
   expectTailscaleUpdateRequired,
   expectCompletePairingQr,
@@ -93,6 +97,11 @@ test("turns Tailscale on and off from Devices, asking first over Tailscale", asy
       const restoreSpeed = await slowConnectionToHost(page, daemon.port, 300);
       await expectTailscaleRowLoadsOn(page, address, () => openSetupMobileStep(page, daemon));
       await expectTailscaleRowLoadsOn(page, address, () => preparePairingHost(page, daemon));
+      await test.step("Turning Tailscale off and back on settles over a slow connection", async () => {
+        await disableTailscale(page, address);
+        await enableTailscale(page);
+        await expectTailscaleAddress(page, address);
+      });
       restoreSpeed();
     });
 
@@ -105,6 +114,57 @@ test("turns Tailscale on and off from Devices, asking first over Tailscale", asy
     });
     await test.step("Confirming turns it off and cuts this connection", async () => {
       await confirmTailscaleTurnOff(page, daemon.tailscaleAddress);
+    });
+  } finally {
+    await daemon.close();
+  }
+});
+
+test("refreshes Tailscale availability in place after Tailscale starts", async ({
+  page,
+  baseURL,
+}) => {
+  test.skip(process.platform !== "linux", "Uses a second IPv4 loopback address");
+  test.setTimeout(120_000);
+  if (!baseURL) throw new Error("Expected the app base URL");
+  const daemon = await startTailscaleTestDaemon(baseURL, { initialAvailable: false });
+  const statusPolling = observeDaemonStatusPolling(page, daemon.port);
+  try {
+    await preparePairingHost(page, daemon);
+    await expectTailscaleUnavailable(page);
+
+    await test.step("Refreshing while still unavailable shows progress and stays unavailable", async () => {
+      const restoreSpeed = await slowConnectionToHost(page, daemon.port, 250);
+      await preparePairingHost(page, daemon);
+      await expectTailscaleUnavailable(page);
+      await refreshTailscaleAvailability(page);
+      await page.getByRole("button", { name: "Refreshing...", exact: true }).waitFor();
+      await expectTailscaleUnavailable(page);
+      restoreSpeed();
+    });
+
+    await test.step("Refreshing after Tailscale starts enables the switch in place", async () => {
+      await statusPolling.waitForFreshPollWindow();
+      await daemon.setTailscaleAvailable(true);
+      const refreshRequest = statusPolling.waitForStatusRequest(1_000);
+      await refreshTailscaleAvailability(page);
+      await refreshRequest;
+      await expectTailscaleAvailable(page, { timeout: 1_000 });
+      await enableTailscale(page);
+      await expectTailscaleAddress(page, daemon.tailscaleAddress);
+      await disableTailscale(page, daemon.tailscaleAddress);
+    });
+
+    await test.step("Setup mobile step also refreshes Tailscale availability in place", async () => {
+      await daemon.setTailscaleAvailable(false);
+      await openSetupMobileStep(page, daemon);
+      await expectTailscaleUnavailable(page);
+      await statusPolling.waitForFreshPollWindow();
+      await daemon.setTailscaleAvailable(true);
+      const refreshRequest = statusPolling.waitForStatusRequest(1_000);
+      await refreshTailscaleAvailability(page);
+      await refreshRequest;
+      await expectTailscaleAvailable(page, { timeout: 1_000 });
     });
   } finally {
     await daemon.close();

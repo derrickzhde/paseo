@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.17.8 - 2026-11-27
+
+- **Fork 版本，集成上游 v0.17.6：** 包含 [上游 v0.17.6](https://github.com/getpaseo/paseo/releases/tag/v0.17.6)。上游现在使用 0.17.6 这个版本号，因此 fork 0.17.6 的说明移入本条目。请从本 fork 的 [GitHub releases](https://github.com/derrickzhde/paseo/releases) 下载。
+- **Fork 版本：** 会话速度重新显示。已经发布自己缓存行的 Provider 保留该行和 fork 的速度；其余 Provider 同时保留 fork 的速度和缓存命中率。请从本 fork 的 [GitHub releases](https://github.com/derrickzhde/paseo/releases) 下载。
+
+### 修复
+
+- 修复合并上游 v0.17.1 后不再广播会话指标、会话每秒 token 数消失的问题。会话还没有指标时，打开对话不再陷入更新循环。
+- Claude、Pi、Oh My Pi 和 OpenCode v2 保留自己的缓存行，不再把同一指标重复显示为 fork 的会话缓存命中率。Codex、OpenCode v1、Copilot、ACP 和插件仍在速度旁边显示 fork 的缓存命中率。
+
 ## 0.17.7 - 2026-11-26
 
 - **Fork 版本，集成上游 v0.17.5：** 包含 [上游 v0.17.5](https://github.com/getpaseo/paseo/releases/tag/v0.17.5)。上游现在使用 0.17.5 这个版本号，因此 fork 0.17.5 的说明移入本条目。请从本 fork 的 [GitHub releases](https://github.com/derrickzhde/paseo/releases) 下载。
@@ -28,14 +38,29 @@
 - 修复 Antigravity 创建循环定时任务后轮次一直停留在运行状态的问题 ([#10469](https://github.com/getpaseo/paseo/pull/10469))
 - 修复启动 daemon 和重载本地目录插件后遗留僵尸子进程的问题 ([#10470](https://github.com/getpaseo/paseo/pull/10470))
 
-## 0.17.6 - 2026-11-24
+## 0.17.6 - 2026-11-27
 
-- **Fork 版本：** 会话速度重新显示。已经发布自己缓存行的 Provider 保留该行和 fork 的速度；其余 Provider 同时保留 fork 的速度和缓存命中率。请从本 fork 的 [GitHub releases](https://github.com/derrickzhde/paseo/releases) 下载。
+### 改进
+
+- 将设置重组为设备和主机两个范围，并合并了内容较少的页面 ([#10933](https://github.com/getpaseo/paseo/pull/10933))
+- 为模型选择器中的模型、Provider 和配置文件新增方向键导航 ([#10929](https://github.com/getpaseo/paseo/pull/10929), [#10962](https://github.com/getpaseo/paseo/pull/10962))
+- 在主机设置和初始设置中新增就地刷新 Tailscale 可用性的按钮 ([#10903](https://github.com/getpaseo/paseo/pull/10903))
+
+### 变更
+
+- 移除了在后台运行 `agy -p /usage` 的 Antigravity 用量数据源 ([#10953](https://github.com/getpaseo/paseo/pull/10953)，贡献者：[@luoph](https://github.com/luoph))
 
 ### 修复
 
-- 修复合并上游 v0.17.1 后不再广播会话指标、会话每秒 token 数消失的问题。会话还没有指标时，打开对话不再陷入更新循环。
-- Claude、Pi、Oh My Pi 和 OpenCode v2 保留自己的缓存行，不再把同一指标重复显示为 fork 的会话缓存命中率。Codex、OpenCode v1、Copilot、ACP 和插件仍在速度旁边显示 fork 的缓存命中率。
+- 修复对话中出现代码块或引用时 Paseo Android 在三星设备上崩溃的问题 ([#10964](https://github.com/getpaseo/paseo/pull/10964))
+- 修复在 Android 上使用鼠标点击无法选择模型选择器行的问题 ([#10972](https://github.com/getpaseo/paseo/pull/10972))
+- 修复 macOS 桌面端因 Dock 进度条更新在启动时卡死的问题 ([#10939](https://github.com/getpaseo/paseo/pull/10939))
+- 修复 Linux AppImage 将其运行时环境变量泄漏到 Shell 和子进程的问题 ([#10920](https://github.com/getpaseo/paseo/pull/10920))
+- 修复 Linux 上后台 Git fetch 启动孤立 D-Bus 进程并在认证失败后循环重试的问题 ([#10921](https://github.com/getpaseo/paseo/pull/10921))
+- 修复恢复已归档工作区和 Agent 时的界面闪烁问题，并新增恢复中状态提示 ([#10928](https://github.com/getpaseo/paseo/pull/10928))
+- 修复 worktree 所有权超出已配置 worktrees 根目录的问题 ([#10878](https://github.com/getpaseo/paseo/pull/10878))
+- 修复另一个标签页淘汰目录缓存后，新打开的网页标签页丢失 project 的问题 ([#10942](https://github.com/getpaseo/paseo/pull/10942))
+- 修复 rewind epoch 变更时时间线丢失行的问题 ([#8794](https://github.com/getpaseo/paseo/pull/8794)，贡献者：[@LiebeLee](https://github.com/LiebeLee))
 
 ## 0.17.5 - 2026-11-26
 

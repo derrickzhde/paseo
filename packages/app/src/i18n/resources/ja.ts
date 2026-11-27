@@ -299,6 +299,7 @@ export const ja: TranslationResources = {
     archived: {
       callout: "このエージェントはアーカイブされています",
       unarchive: "アーカイブ解除",
+      unarchiving: "アーカイブ解除中...",
     },
   },
   sessions: {
@@ -1912,12 +1913,13 @@ export const ja: TranslationResources = {
     waysToConnect: "接続方法",
     docs: "ドキュメント",
     docsAccessibility: "接続のドキュメントを開く",
-    recommended: "おすすめ",
-    relay: { title: "リレー", hint: "エンドツーエンド暗号化、QR コードをスキャン" },
+    relay: { title: "リレー", hint: "設定不要、エンドツーエンド暗号化、QR コードをスキャン" },
     tailscale: {
       hint: "tailnet 経由で直接接続、アドレスを入力",
       unavailable: "このホストで Tailscale が動作していません",
       install: "Tailscale を入手",
+      refresh: "更新",
+      refreshing: "更新中...",
       waiting: "このホストで Tailscale が起動するのを待っています",
       alwaysOn: "常にオン。このホストはすでに Tailscale からの接続を受け付けています",
       socket: "オフ。このホストはローカルソケットで待ち受けています",
@@ -2406,7 +2408,7 @@ export const ja: TranslationResources = {
     title: "設定",
     loading: "設定を読み込み中...",
     groups: {
-      app: "アプリ",
+      app: "このデバイス",
       host: "ホスト",
     },
     hostPicker: {
@@ -2424,7 +2426,9 @@ export const ja: TranslationResources = {
     groupInfo: "{{title}}について",
     sections: {
       general: "一般",
+      hosts: "ホスト",
       chat: "チャット",
+      chatAndPanes: "チャットとペイン",
       appearance: "外観",
       sidebar: "サイドバー",
       terminal: "ターミナル",
@@ -2437,6 +2441,16 @@ export const ja: TranslationResources = {
       permissions: "権限",
       diagnostics: "診断",
       about: "アプリ情報",
+    },
+    clientHosts: {
+      title: "保存済みホスト",
+      info: "このデバイスが接続するホストです。ここでの名前、アイコン、バッジ、経路はこのデバイスにのみ反映されます。",
+      backToHosts: "ホスト一覧に戻る",
+      routesTitle: "このデバイスの接続経路",
+      routesInfo:
+        "このデバイスがこのホストに到達するために保存された経路です。Paseoは利用可能な最速の経路を選びます。",
+      addRoute: "経路を追加",
+      activeRoute: "接続中",
     },
     layout: en.settings.layout,
     editor: {
@@ -2471,6 +2485,7 @@ export const ja: TranslationResources = {
       projects: "プロジェクト",
       connections: "接続",
       agents: "エージェント",
+      tools: "ツールとプロンプト",
       agentProfiles: "エージェントプロファイル",
       metadata: "メタデータ",
       voice: "音声",
@@ -2480,6 +2495,7 @@ export const ja: TranslationResources = {
       terminals: "ターミナル",
       plugins: "プラグイン",
       host: "概要",
+      daemon: "デーモン",
     },
     plugins: pluginSettings.ja,
     metadataGeneration: {
@@ -3022,6 +3038,10 @@ export const ja: TranslationResources = {
           delete: "スキルを削除",
         },
       },
+      tools: {
+        instructionsTitle: "指示",
+        toolsTitle: "エージェントツール",
+      },
       orchestration: {
         title: "オーケストレーション",
         unavailable: "オーケストレーションを管理するにはこのホストに接続してください",
@@ -3150,6 +3170,7 @@ export const ja: TranslationResources = {
         },
       },
       daemon: {
+        runtimeTitle: "エージェントランタイム",
         rename: {
           editLabel: "ラベルを編集",
           title: "ホストの名前を変更",

@@ -299,6 +299,7 @@ export const fr: TranslationResources = {
     archived: {
       callout: "Cet agent est archivé",
       unarchive: "Désarchiver",
+      unarchiving: "Désarchivage...",
     },
   },
   sessions: {
@@ -1939,12 +1940,16 @@ export const fr: TranslationResources = {
     waysToConnect: "Moyens de connexion",
     docs: "Docs",
     docsAccessibility: "Ouvrir la documentation sur la connectivité",
-    recommended: "Recommandé",
-    relay: { title: "Relais", hint: "Chiffré de bout en bout, scannez un QR code" },
+    relay: {
+      title: "Relais",
+      hint: "Aucune configuration, chiffré de bout en bout, scannez un QR code",
+    },
     tailscale: {
       hint: "Connexion directe via votre tailnet, saisissez une adresse",
       unavailable: "Tailscale ne fonctionne pas sur cet hôte",
       install: "Obtenir Tailscale",
+      refresh: "Actualiser",
+      refreshing: "Actualisation...",
       waiting: "En attente du démarrage de Tailscale sur cet hôte",
       alwaysOn: "Toujours activé, car cet hôte accepte déjà les connexions Tailscale",
       socket: "Désactivé, car cet hôte écoute sur un socket local",
@@ -2433,7 +2438,7 @@ export const fr: TranslationResources = {
     title: "Paramètres",
     loading: "Chargement des paramètres…",
     groups: {
-      app: "Application",
+      app: "Cet appareil",
       host: "Hôte",
     },
     hostPicker: {
@@ -2451,7 +2456,9 @@ export const fr: TranslationResources = {
     groupInfo: "À propos de {{title}}",
     sections: {
       general: "Général",
+      hosts: "Hôtes",
       chat: "Discussion",
+      chatAndPanes: "Chat et panneaux",
       appearance: "Apparence",
       sidebar: "Barre latérale",
       terminal: "Terminal",
@@ -2464,6 +2471,16 @@ export const fr: TranslationResources = {
       permissions: "Autorisations",
       diagnostics: "Diagnostic",
       about: "À propos",
+    },
+    clientHosts: {
+      title: "Hôtes enregistrés",
+      info: "Hôtes auxquels cet appareil se connecte. Les noms, icônes, badges et routes ici ne concernent que cet appareil.",
+      backToHosts: "Retour aux hôtes",
+      routesTitle: "Comment cet appareil se connecte",
+      routesInfo:
+        "Routes enregistrées utilisées par cet appareil pour joindre cet hôte. Paseo choisit la plus rapide disponible.",
+      addRoute: "Ajouter une route",
+      activeRoute: "Active",
     },
     layout: en.settings.layout,
     editor: {
@@ -2498,6 +2515,7 @@ export const fr: TranslationResources = {
       projects: "Projets",
       connections: "Connexions",
       agents: "Agents",
+      tools: "Outils et instructions",
       agentProfiles: "Profils d’agent",
       metadata: "Métadonnées",
       voice: "Voix",
@@ -2507,6 +2525,7 @@ export const fr: TranslationResources = {
       terminals: "Terminaux",
       plugins: "Plugins",
       host: "Aperçu",
+      daemon: "Daemon",
     },
     plugins: pluginSettings.fr,
     metadataGeneration: {
@@ -3057,6 +3076,10 @@ export const fr: TranslationResources = {
           delete: "Supprimer le skill",
         },
       },
+      tools: {
+        instructionsTitle: "Instructions",
+        toolsTitle: "Outils des agents",
+      },
       orchestration: {
         title: "Orchestration",
         unavailable: "Connectez-vous à cet hôte pour gérer l’orchestration",
@@ -3186,6 +3209,7 @@ export const fr: TranslationResources = {
         },
       },
       daemon: {
+        runtimeTitle: "Exécution des agents",
         rename: {
           editLabel: "Modifier le libellé",
           title: "Renommer l’hôte",

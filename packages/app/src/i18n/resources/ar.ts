@@ -294,6 +294,7 @@ export const ar: TranslationResources = {
     archived: {
       callout: "تمت أرشفة هذا الوكيل",
       unarchive: "إلغاء الأرشفة",
+      unarchiving: "جارٍ إلغاء الأرشفة...",
     },
   },
   sessions: {
@@ -1891,12 +1892,13 @@ export const ar: TranslationResources = {
     waysToConnect: "طرق الاتصال",
     docs: "الوثائق",
     docsAccessibility: "افتح وثائق الاتصال",
-    recommended: "موصى به",
-    relay: { title: "التتابع", hint: "مشفّر من طرف إلى طرف، امسح رمز QR" },
+    relay: { title: "التتابع", hint: "دون إعداد، مشفّر من طرف إلى طرف، امسح رمز QR" },
     tailscale: {
       hint: "اتصال مباشر عبر شبكة tailnet الخاصة بك، أدخل عنوانًا",
       unavailable: "Tailscale لا يعمل على هذا المضيف",
       install: "احصل على Tailscale",
+      refresh: "تحديث",
+      refreshing: "جارٍ التحديث...",
       waiting: "في انتظار بدء Tailscale على هذا المضيف",
       alwaysOn: "مفعّل دائمًا، لأن هذا المضيف يقبل اتصالات Tailscale بالفعل",
       socket: "متوقف، لأن هذا المضيف يستمع على مقبس محلي",
@@ -2417,7 +2419,7 @@ export const ar: TranslationResources = {
     title: "إعدادات",
     loading: "جارٍ تحميل الإعدادات...",
     groups: {
-      app: "برنامج",
+      app: "هذا الجهاز",
       host: "Host",
     },
     hostPicker: {
@@ -2435,7 +2437,9 @@ export const ar: TranslationResources = {
     groupInfo: "حول{{title}}",
     sections: {
       general: "عام",
+      hosts: "المضيفون",
       chat: "الدردشة",
+      chatAndPanes: "الدردشة والأجزاء",
       appearance: "مظهر",
       sidebar: "الشريط الجانبي",
       terminal: "الطرفية",
@@ -2448,6 +2452,16 @@ export const ar: TranslationResources = {
       permissions: "الأذونات",
       diagnostics: "التشخيص",
       about: "عن",
+    },
+    clientHosts: {
+      title: "المضيفون المحفوظون",
+      info: "المضيفون الذين يتصل بهم هذا الجهاز. الأسماء والأيقونات والشارات والمسارات هنا تؤثر على هذا الجهاز فقط.",
+      backToHosts: "العودة إلى المضيفين",
+      routesTitle: "كيف يتصل هذا الجهاز",
+      routesInfo:
+        "المسارات المحفوظة التي يستخدمها هذا الجهاز للوصول إلى هذا المضيف. يختار Paseo أسرع مسار متاح.",
+      addRoute: "إضافة مسار",
+      activeRoute: "نشط",
     },
     layout: en.settings.layout,
     editor: {
@@ -2482,6 +2496,7 @@ export const ar: TranslationResources = {
       projects: "المشاريع",
       connections: "اتصالات",
       agents: "Agents",
+      tools: "الأدوات والتعليمات",
       agentProfiles: "ملفات الوكيل",
       metadata: "البيانات الوصفية",
       voice: "الصوت",
@@ -2491,6 +2506,7 @@ export const ar: TranslationResources = {
       terminals: "Terminals",
       plugins: "Plugins",
       host: "نظرة عامة",
+      daemon: "الخدمة",
     },
     plugins: pluginSettings.ar,
     metadataGeneration: {
@@ -3028,6 +3044,10 @@ export const ar: TranslationResources = {
           delete: "حذف المهارة",
         },
       },
+      tools: {
+        instructionsTitle: "التعليمات",
+        toolsTitle: "أدوات الوكلاء",
+      },
       orchestration: {
         title: "التنسيق",
         unavailable: "اتصل بهذا المضيف لإدارة التنسيق",
@@ -3154,6 +3174,7 @@ export const ar: TranslationResources = {
         },
       },
       daemon: {
+        runtimeTitle: "بيئة تشغيل الوكلاء",
         rename: {
           editLabel: "تحرير التسمية",
           title: "إعادة تسمية المضيف",

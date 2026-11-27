@@ -1,0 +1,4 @@
+- Fork release integrating upstream v0.17.6: Includes upstream v0.17.6. The fork 0.17.6 notes move into this entry because upstream now uses that version number. Download this fork from GitHub releases.
+- Fork release: Session speed is shown again. Providers that already publish a cache row keep that row and the fork speed; the others keep the fork speed and the fork cache hit. Download this fork from GitHub releases.
+
+Full notes: https://paseo.sh/changelog

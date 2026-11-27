@@ -294,6 +294,7 @@ export const zhCN: TranslationResources = {
     archived: {
       callout: "此 Agent 已归档",
       unarchive: "取消归档",
+      unarchiving: "正在取消归档...",
     },
   },
   sessions: {
@@ -1873,12 +1874,13 @@ export const zhCN: TranslationResources = {
     waysToConnect: "连接方式",
     docs: "文档",
     docsAccessibility: "打开连接文档",
-    recommended: "推荐",
-    relay: { title: "中继", hint: "端到端加密，扫描二维码" },
+    relay: { title: "中继", hint: "无需配置，端到端加密，扫描二维码" },
     tailscale: {
       hint: "通过你的 tailnet 直连，输入地址即可",
       unavailable: "此主机未运行 Tailscale",
       install: "获取 Tailscale",
+      refresh: "刷新",
+      refreshing: "刷新中...",
       waiting: "正在等待此主机上的 Tailscale 启动",
       alwaysOn: "始终开启，因为此主机已接受 Tailscale 连接",
       socket: "已关闭，因为此主机监听的是本地套接字",
@@ -2358,7 +2360,7 @@ export const zhCN: TranslationResources = {
     title: "设置",
     loading: "正在加载设置...",
     groups: {
-      app: "应用",
+      app: "此设备",
       host: "主机",
     },
     hostPicker: {
@@ -2376,7 +2378,9 @@ export const zhCN: TranslationResources = {
     groupInfo: "关于 {{title}}",
     sections: {
       general: "通用",
+      hosts: "主机",
       chat: "聊天",
+      chatAndPanes: "聊天与面板",
       appearance: "外观",
       sidebar: "侧边栏",
       terminal: "终端",
@@ -2389,6 +2393,15 @@ export const zhCN: TranslationResources = {
       permissions: "权限",
       diagnostics: "诊断",
       about: "关于",
+    },
+    clientHosts: {
+      title: "已保存的主机",
+      info: "此设备连接的主机。这里的名称、图标、徽章和连接路径仅影响此设备。",
+      backToHosts: "返回主机",
+      routesTitle: "此设备的连接方式",
+      routesInfo: "此设备连接到该主机的已保存路径。Paseo 会自动选择最快的可用路径。",
+      addRoute: "添加路径",
+      activeRoute: "当前使用",
     },
     layout: en.settings.layout,
     editor: {
@@ -2423,6 +2436,7 @@ export const zhCN: TranslationResources = {
       projects: "项目",
       connections: "连接",
       agents: "Agents",
+      tools: "工具与提示词",
       agentProfiles: "智能体配置文件",
       metadata: "元数据",
       voice: "语音",
@@ -2432,6 +2446,7 @@ export const zhCN: TranslationResources = {
       terminals: "Terminals",
       plugins: "插件",
       host: "概览",
+      daemon: "守护进程",
     },
     plugins: pluginSettings["zh-CN"],
     metadataGeneration: {
@@ -2962,6 +2977,10 @@ export const zhCN: TranslationResources = {
           delete: "删除 skill",
         },
       },
+      tools: {
+        instructionsTitle: "指令",
+        toolsTitle: "代理工具",
+      },
       orchestration: {
         title: "编排",
         unavailable: "连接到这个 Host 以管理编排",
@@ -3088,6 +3107,7 @@ export const zhCN: TranslationResources = {
         },
       },
       daemon: {
+        runtimeTitle: "代理运行时",
         rename: {
           editLabel: "编辑标签",
           title: "重命名 Host",

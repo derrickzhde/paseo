@@ -298,6 +298,7 @@ export const ru: TranslationResources = {
     archived: {
       callout: "Этот агент находится в архиве",
       unarchive: "Разархивировать",
+      unarchiving: "Разархивация...",
     },
   },
   sessions: {
@@ -1925,12 +1926,16 @@ export const ru: TranslationResources = {
     waysToConnect: "Способы подключения",
     docs: "Документация",
     docsAccessibility: "Открыть документацию по подключению",
-    recommended: "Рекомендуется",
-    relay: { title: "Ретранслятор", hint: "Сквозное шифрование, отсканируйте QR-код" },
+    relay: {
+      title: "Ретранслятор",
+      hint: "Без настройки, сквозное шифрование, отсканируйте QR-код",
+    },
     tailscale: {
       hint: "Прямое подключение через ваш tailnet, по адресу",
       unavailable: "Tailscale не запущен на этом хосте",
       install: "Скачать Tailscale",
+      refresh: "Обновить",
+      refreshing: "Обновление...",
       waiting: "Ожидаем запуска Tailscale на этом хосте",
       alwaysOn: "Всегда включено, так как хост уже принимает подключения Tailscale",
       socket: "Выключено, так как хост слушает локальный сокет",
@@ -2419,7 +2424,7 @@ export const ru: TranslationResources = {
     title: "Настройки",
     loading: "Загрузка настроек...",
     groups: {
-      app: "Приложение",
+      app: "Это устройство",
       host: "Хост",
     },
     hostPicker: {
@@ -2437,7 +2442,9 @@ export const ru: TranslationResources = {
     groupInfo: "О разделе «{{title}}»",
     sections: {
       general: "Основные",
+      hosts: "Хосты",
       chat: "Чат",
+      chatAndPanes: "Чат и панели",
       appearance: "Оформление",
       sidebar: "Боковая панель",
       terminal: "Терминал",
@@ -2450,6 +2457,16 @@ export const ru: TranslationResources = {
       permissions: "Разрешения",
       diagnostics: "Диагностика",
       about: "О приложении",
+    },
+    clientHosts: {
+      title: "Сохранённые хосты",
+      info: "Хосты, к которым подключается это устройство. Имена, значки, бейджи и маршруты здесь влияют только на это устройство.",
+      backToHosts: "Назад к хостам",
+      routesTitle: "Как подключается это устройство",
+      routesInfo:
+        "Сохранённые маршруты, по которым это устройство подключается к хосту. Paseo выбирает самый быстрый.",
+      addRoute: "Добавить маршрут",
+      activeRoute: "Активный",
     },
     layout: en.settings.layout,
     editor: {
@@ -2484,6 +2501,7 @@ export const ru: TranslationResources = {
       projects: "Проекты",
       connections: "Подключения",
       agents: "Агенты",
+      tools: "Инструменты и промпты",
       agentProfiles: "Профили агентов",
       metadata: "Метаданные",
       voice: "Голос",
@@ -2493,6 +2511,7 @@ export const ru: TranslationResources = {
       terminals: "Терминалы",
       plugins: "Плагины",
       host: "Обзор",
+      daemon: "Демон",
     },
     plugins: pluginSettings.ru,
     metadataGeneration: {
@@ -3005,9 +3024,9 @@ export const ru: TranslationResources = {
         rowTitle: "Подключить устройство",
       },
       skills: {
-        sectionTitle: "Навыки оркестрации",
-        title: "Навыки оркестрации",
-        description: "Научите агентов пользоваться инструментами Paseo",
+        sectionTitle: "Навыки",
+        title: "Навыки Paseo",
+        description: "Установить встроенные навыки справки, плагинов и оркестрации",
         docs: "Навыки",
         openDocs: "Открыть документацию по навыкам",
         unavailable: "Подключитесь к этому хосту, чтобы управлять навыками оркестрации",
@@ -3044,6 +3063,10 @@ export const ru: TranslationResources = {
           update: "Обновить навык",
           delete: "Удалить навык",
         },
+      },
+      tools: {
+        instructionsTitle: "Инструкции",
+        toolsTitle: "Инструменты агентов",
       },
       orchestration: {
         title: "Оркестрация",
@@ -3173,6 +3196,7 @@ export const ru: TranslationResources = {
         },
       },
       daemon: {
+        runtimeTitle: "Среда выполнения агентов",
         rename: {
           editLabel: "Изменить название",
           title: "Переименовать хост",

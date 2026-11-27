@@ -293,6 +293,7 @@ export const en = {
     archived: {
       callout: "This agent is archived",
       unarchive: "Unarchive",
+      unarchiving: "Unarchiving...",
     },
   },
   sessions: {
@@ -1920,12 +1921,13 @@ export const en = {
     waysToConnect: "Ways to connect",
     docs: "Docs",
     docsAccessibility: "Open connectivity documentation",
-    recommended: "Recommended",
-    relay: { title: "Relay", hint: "End-to-end encrypted, scan a QR code" },
+    relay: { title: "Relay", hint: "No setup, end-to-end encrypted, scan a QR code" },
     tailscale: {
       hint: "Direct over your tailnet, enter an address",
       unavailable: "Tailscale is not running on this host",
       install: "Get Tailscale",
+      refresh: "Refresh",
+      refreshing: "Refreshing...",
       waiting: "Waiting for Tailscale to start on this host",
       alwaysOn: "Always on, because this host already accepts Tailscale connections",
       socket: "Off, because this host listens on a local socket",
@@ -2411,7 +2413,7 @@ export const en = {
     title: "Settings",
     loading: "Loading settings...",
     groups: {
-      app: "App",
+      app: "This device",
       host: "Host",
     },
     hostPicker: {
@@ -2429,7 +2431,9 @@ export const en = {
     groupInfo: "About {{title}}",
     sections: {
       general: "General",
+      hosts: "Hosts",
       chat: "Chat",
+      chatAndPanes: "Chat & panes",
       appearance: "Appearance",
       sidebar: "Sidebar",
       editor: "Editor",
@@ -2442,6 +2446,16 @@ export const en = {
       permissions: "Permissions",
       diagnostics: "Diagnostics",
       about: "About",
+    },
+    clientHosts: {
+      title: "Saved hosts",
+      info: "Hosts this device connects to. Names, icons, badges, and routes here only affect this device.",
+      backToHosts: "Back to hosts",
+      routesTitle: "How this device connects",
+      routesInfo:
+        "Saved routes this device uses to reach this host. Paseo picks the fastest available route.",
+      addRoute: "Add route",
+      activeRoute: "Active",
     },
     layout: {
       openInSidePane: {
@@ -2514,6 +2528,7 @@ export const en = {
       projects: "Projects",
       connections: "Connections",
       agents: "Agents",
+      tools: "Tools & prompts",
       agentProfiles: "Agent profiles",
       metadata: "Metadata",
       voice: "Voice",
@@ -2523,6 +2538,7 @@ export const en = {
       terminals: "Terminals",
       plugins: "Plugins",
       host: "Overview",
+      daemon: "Daemon",
     },
     plugins: {
       gallery: pluginGallery.en,
@@ -3087,9 +3103,9 @@ export const en = {
         rowTitle: "Pair a device",
       },
       skills: {
-        sectionTitle: "Orchestration skills",
-        title: "Orchestration skills",
-        description: "Teach your agents how to use Paseo tools",
+        sectionTitle: "Skills",
+        title: "Paseo skills",
+        description: "Install bundled help, plugin, and orchestration skills",
         docs: "Skills",
         openDocs: "Open skills documentation",
         unavailable: "Connect to this host to manage orchestration skills",
@@ -3126,6 +3142,10 @@ export const en = {
           update: "Update skill",
           delete: "Delete skill",
         },
+      },
+      tools: {
+        instructionsTitle: "Instructions",
+        toolsTitle: "Agent tools",
       },
       orchestration: {
         title: "Orchestration",
@@ -3253,6 +3273,7 @@ export const en = {
         },
       },
       daemon: {
+        runtimeTitle: "Agent runtime",
         rename: {
           editLabel: "Edit label",
           title: "Rename host",
