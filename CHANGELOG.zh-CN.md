@@ -1,9 +1,12 @@
 # Changelog
 
+## 0.18.1 - 2026-11-27
+
+- **Fork 版本，集成上游 v0.18.0：** 包含 [上游 v0.18.0](https://github.com/getpaseo/paseo/releases/tag/v0.18.0)。上游已经使用 0.18.0 这个版本号，因此 fork 0.18.0 的说明移入本条目。请从本 fork 的 [GitHub releases](https://github.com/derrickzhde/paseo/releases) 下载。
+- **保留的 fork 行为：** 数学公式渲染和复制（包括复制引用块中的公式）、按模型的思考控制、手机 12/24 小时制、Codex `/goal` 后续引导、Expo 推送恢复、Claude 导入会话缓存、Claude API 和网关模型发现、实测会话速度和缓存命中率、Vitest 浏览器 CI，以及 Enriched Markdown 补丁。
+
 ## 0.18.0 - 2026-11-27
 
-- **Fork 版本：** 请从本 fork 的 [GitHub releases](https://github.com/derrickzhde/paseo/releases) 下载。
-- **保留的 fork 行为：** 数学公式渲染和复制（包括复制引用块中的公式）、按模型的思考控制、手机 12/24 小时制、Codex `/goal` 后续引导、Expo 推送恢复、Claude 导入会话缓存、Claude API 和网关模型发现、实测会话速度和缓存命中率、Vitest 浏览器 CI，以及 Enriched Markdown 补丁。
 - **远程工作区浏览器代理**：远程工作区中的桌面端浏览器标签页现在会通过该工作区的 daemon 转发流量，远程 `localhost` 服务可以直接在 Paseo 中打开。([#10944](https://github.com/getpaseo/paseo/pull/10944)，贡献者：[@airon-assustadus](https://github.com/airon-assustadus))
 - **按设备配置通知偏好**：每台设备都可以分别选择哪些 Agent、终端和插件事件发送通知，插件现在也可以发送通知并处理点击。([#10888](https://github.com/getpaseo/paseo/pull/10888))
 - **智能体配置文件系统提示词**：在智能体配置文件中保存可选的系统提示词，以便在通过该配置启动新 Agent 时应用。([#10996](https://github.com/getpaseo/paseo/pull/10996))

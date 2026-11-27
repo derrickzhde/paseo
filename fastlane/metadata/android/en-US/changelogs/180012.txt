@@ -1,0 +1,3 @@
+- Fork release integrating upstream v0.18.0: Includes upstream v0.18.0. The fork 0.18.0 notes move into this entry because upstream already uses that version number. Download this fork from GitHub releases.
+
+Full notes: https://paseo.sh/changelog

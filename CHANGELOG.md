@@ -1,9 +1,12 @@
 # Changelog
 
+## 0.18.1 - 2026-11-27
+
+- **Fork release integrating upstream v0.18.0:** Includes [upstream v0.18.0](https://github.com/getpaseo/paseo/releases/tag/v0.18.0). The fork 0.18.0 notes move into this entry because upstream already uses that version number. Download this fork from [GitHub releases](https://github.com/derrickzhde/paseo/releases).
+- **Preserved fork behavior:** Math rendering and copying, including formulas in copied quotes, per-model thinking controls, the phone 12/24-hour clock, Codex `/goal` follow-up steering, Expo push recovery, the Claude imported-session cache, Claude API and gateway model discovery, measured session speed and cache-hit metrics, Vitest browser CI, and the Enriched Markdown patch.
+
 ## 0.18.0 - 2026-11-27
 
-- **Fork release:** Download this fork from [GitHub releases](https://github.com/derrickzhde/paseo/releases).
-- **Preserved fork behavior:** Math rendering and copying, including formulas in copied quotes, per-model thinking controls, the phone 12/24-hour clock, Codex `/goal` follow-up steering, Expo push recovery, the Claude imported-session cache, Claude API and gateway model discovery, measured session speed and cache-hit metrics, Vitest browser CI, and the Enriched Markdown patch.
 - **Remote workspace browser proxy:** Desktop browser tabs in remote workspaces now route through the workspace daemon, so remote `localhost` servers open directly in Paseo. ([#10944](https://github.com/getpaseo/paseo/pull/10944) by [@airon-assustadus](https://github.com/airon-assustadus))
 - **Per-device notification preferences:** Each device can choose which agent, terminal, and plugin events send notifications, and plugins can send notifications and handle taps. ([#10888](https://github.com/getpaseo/paseo/pull/10888))
 - **Agent profile system prompts:** Save an optional system prompt on an agent profile to apply it to new agents started from that profile. ([#10996](https://github.com/getpaseo/paseo/pull/10996))
