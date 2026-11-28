@@ -1,4 +1,4 @@
-- Fork release: Download this fork from GitHub releases.
-- Preserved fork behavior: Math rendering and copying, including formulas in copied quotes, per-model thinking controls, the phone 12/24-hour clock, Codex /goal follow-up steering, Expo push recovery, the Claude imported-session cache, Claude API and gateway model discovery, measured session speed and cache-hit metrics, Vitest browser CI, and the Enriched Markdown patch.
+- Remote workspace browser proxy: Desktop browser tabs in remote workspaces now route through the workspace daemon, so remote localhost servers open directly in Paseo.
+- Per-device notification preferences: Each device can choose which agent, terminal, and plugin events send notifications, and plugins can send notifications and handle taps.
 
 Full notes: https://paseo.sh/changelog

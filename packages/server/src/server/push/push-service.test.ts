@@ -182,7 +182,7 @@ describe("PushService request timeouts", () => {
         return new Response(okTickets(1), { status: 200 });
       }),
     );
-    const service = new PushService(createLogger(), () => undefined);
+    const service = new PushService({ logger: createLogger(), revokeToken: () => undefined });
 
     await service.sendPush(["ExponentPushToken[a]"], { title: "t", body: "b" });
 
@@ -205,7 +205,7 @@ describe("PushService cross-project batches", () => {
         ? new Response(CROSS_PROJECT_BODY, { status: 400 })
         : new Response(okTickets(1), { status: 200 }),
     );
-    const service = new PushService(createLogger(), () => undefined);
+    const service = new PushService({ logger: createLogger(), revokeToken: () => undefined });
 
     await service.sendPush(["ExponentPushToken[upstream]", "ExponentPushToken[fork]"], {
       title: "t",
@@ -235,7 +235,10 @@ describe("PushService cross-project batches", () => {
       return new Response(okTickets(1), { status: 200 });
     });
     const revoked: string[] = [];
-    const service = new PushService(createLogger(), (token) => revoked.push(token));
+    const service = new PushService({
+      logger: createLogger(),
+      revokeToken: (token) => revoked.push(token),
+    });
 
     await service.sendPush(["ExponentPushToken[dead]", "ExponentPushToken[fork]"], {
       title: "t",
@@ -248,7 +251,7 @@ describe("PushService cross-project batches", () => {
   // Splitting on every failure would multiply requests against an outage.
   test("does not split when the rejection is unrelated to project mixing", async () => {
     const sent = stubFetch(() => new Response("upstream is down", { status: 503 }));
-    const service = new PushService(createLogger(), () => undefined);
+    const service = new PushService({ logger: createLogger(), revokeToken: () => undefined });
 
     await service.sendPush(["ExponentPushToken[a]", "ExponentPushToken[b]"], {
       title: "t",
@@ -260,7 +263,7 @@ describe("PushService cross-project batches", () => {
 
   test("sends a single request when every token shares a project", async () => {
     const sent = stubFetch(() => new Response(okTickets(2), { status: 200 }));
-    const service = new PushService(createLogger(), () => undefined);
+    const service = new PushService({ logger: createLogger(), revokeToken: () => undefined });
 
     await service.sendPush(["ExponentPushToken[a]", "ExponentPushToken[b]"], {
       title: "t",
@@ -275,7 +278,7 @@ describe("PushService cross-project batches", () => {
     const logger = createLogger();
 
     const tokens = Array.from({ length: 100 }, (_, index) => `ExponentPushToken[token-${index}]`);
-    const service = new PushService(logger, () => undefined);
+    const service = new PushService({ logger, revokeToken: () => undefined });
     const sendPromise = service.sendPush(tokens, { title: "t", body: "b" });
 
     await flushUntil(() => harness.pendingIndividuals.length === 5);
@@ -305,7 +308,7 @@ describe("PushService cross-project batches", () => {
     // 250 tokens split into three batches. Each batch fails cross-project on its own, so a
     // per-batch bound would allow three concurrent waves of five.
     const tokens = Array.from({ length: 250 }, (_, index) => `ExponentPushToken[token-${index}]`);
-    const service = new PushService(logger, () => undefined);
+    const service = new PushService({ logger, revokeToken: () => undefined });
     const sendPromise = service.sendPush(tokens, { title: "t", body: "b" });
 
     await flushUntil(() => harness.pendingIndividuals.length === 5);
@@ -334,7 +337,7 @@ describe("PushService cross-project batches", () => {
 
     // The daemon fires pushes without awaiting them, so two sends can overlap. A per-send
     // bound would allow each of them five concurrent retries.
-    const service = new PushService(logger, () => undefined);
+    const service = new PushService({ logger, revokeToken: () => undefined });
     const batchOf = (prefix: string) =>
       Array.from({ length: 100 }, (_, index) => `ExponentPushToken[${prefix}-${index}]`);
     const sendPromises = Promise.all([
@@ -379,7 +382,7 @@ describe("PushService API error logs", () => {
     });
     stubFetch(() => new Response(errorBody, { status: 400 }));
     const logger = createLogger();
-    const service = new PushService(logger, () => undefined);
+    const service = new PushService({ logger, revokeToken: () => undefined });
 
     await service.sendPush([token], { title: "t", body: "b" });
 
@@ -403,7 +406,7 @@ describe("PushService API error logs", () => {
     });
     stubFetch(() => new Response(errorBody, { status: 503, statusText: "Service Unavailable" }));
     const logger = createLogger();
-    const service = new PushService(logger, () => undefined);
+    const service = new PushService({ logger, revokeToken: () => undefined });
 
     await service.sendPush(["ExponentPushToken[a]"], { title: "t", body: "b" });
 
@@ -444,7 +447,7 @@ describe("PushService ticket failure logs", () => {
         ),
     );
     const logger = createLogger();
-    const service = new PushService(logger, () => undefined);
+    const service = new PushService({ logger, revokeToken: () => undefined });
 
     await service.sendPush([token], { title: "t", body: "b" });
 
@@ -452,5 +455,40 @@ describe("PushService ticket failure logs", () => {
     expect(ticketFailure).toBeDefined();
     expect(JSON.stringify(ticketFailure)).not.toContain(token);
     expect(ticketFailure?.[0]).toMatchObject({ tokenSuffix: token.slice(-6) });
+  });
+
+  test("requests high priority for every notification across batches", async () => {
+    const requests: Record<string, unknown>[][] = [];
+    const sendRequest: typeof fetch = async (_url, init) => {
+      const messages = JSON.parse(String(init?.body)) as Record<string, unknown>[];
+      requests.push(messages);
+      return new Response(
+        JSON.stringify({ data: messages.map(() => ({ status: "ok", id: "ticket" })) }),
+      );
+    };
+    const service = new PushService({
+      logger: createLogger(),
+      revokeToken: () => undefined,
+      sendRequest,
+    });
+    const tokens = Array.from({ length: 101 }, (_, index) => `ExponentPushToken[device-${index}]`);
+
+    await service.sendPush(tokens, {
+      title: "Agent finished",
+      body: "Done",
+      data: { agentId: "agent" },
+    });
+
+    expect(requests.map((batch) => batch.length)).toEqual([100, 1]);
+    expect(requests.flat()).toEqual(
+      tokens.map((token) => ({
+        to: token,
+        priority: "high",
+        title: "Agent finished",
+        body: "Done",
+        data: { agentId: "agent" },
+        sound: "default",
+      })),
+    );
   });
 });

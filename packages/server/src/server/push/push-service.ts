@@ -12,6 +12,7 @@ interface ExpoPushMessage {
   body: string;
   data?: Record<string, unknown>;
   sound?: "default";
+  priority?: "default" | "normal" | "high";
 }
 
 interface ExpoPushTicket {
@@ -89,11 +90,17 @@ function parseExpoPushApiErrorCodes(body: string): string[] | null {
 export class PushService {
   private readonly logger: pino.Logger;
   private readonly revokeToken: (token: string) => void;
+  private readonly sendRequest: typeof fetch;
   private readonly retryGate = createConcurrencyGate(MAX_INDIVIDUAL_RETRY_CONCURRENCY);
 
-  constructor(logger: pino.Logger, revokeToken: (token: string) => void) {
-    this.logger = logger.child({ component: "push-service" });
-    this.revokeToken = revokeToken;
+  constructor(options: {
+    logger: pino.Logger;
+    revokeToken: (token: string) => void;
+    sendRequest?: typeof fetch;
+  }) {
+    this.logger = options.logger.child({ component: "push-service" });
+    this.revokeToken = options.revokeToken;
+    this.sendRequest = options.sendRequest ?? fetch;
   }
 
   async sendPush(tokens: string[], payload: PushPayload): Promise<void> {
@@ -101,12 +108,16 @@ export class PushService {
       return;
     }
 
+    // Expo defaults to "normal" priority on Android, which FCM holds back while
+    // the device dozes, so notifications arrive minutes late. iOS already
+    // defaults to "high".
     const messages: ExpoPushMessage[] = tokens.map((token) => ({
       to: token,
       title: payload.title,
       body: payload.body,
       data: payload.data,
       sound: "default",
+      priority: "high",
     }));
 
     // Batch tokens (max 100 per request per Expo limits)
@@ -120,7 +131,7 @@ export class PushService {
 
   private async sendBatch(messages: ExpoPushMessage[]): Promise<void> {
     try {
-      const response = await fetch(EXPO_PUSH_URL, {
+      const response = await this.sendRequest(EXPO_PUSH_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
