@@ -1,5 +1,5 @@
 import { motion, useInView, useReducedMotion } from "framer-motion";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   createMockupPlayer,
@@ -37,6 +37,23 @@ export function HeroMockup() {
   useEffect(() => {
     if (ready) player.start();
   }, [ready, player]);
+  // The observer above notifies on a later task. A scroll or resize that brings the line on screen
+  // starts the scene itself, so the opening plays at that moment instead of waiting out the task.
+  useLayoutEffect(() => {
+    const line = startLine.current;
+    if (!line) return;
+    const startIfLineIsOnScreen = () => {
+      const { top, bottom, width } = line.getBoundingClientRect();
+      if (width > 0 && top < window.innerHeight && bottom > 0) player.start();
+    };
+    startIfLineIsOnScreen();
+    document.addEventListener("scroll", startIfLineIsOnScreen, true);
+    window.addEventListener("resize", startIfLineIsOnScreen);
+    return () => {
+      document.removeEventListener("scroll", startIfLineIsOnScreen, true);
+      window.removeEventListener("resize", startIfLineIsOnScreen);
+    };
+  }, [player]);
   useEffect(() => player.stop, [player]);
 
   // The pills can sit above a mockup that is partly below the fold, most of all on a phone.
