@@ -3,6 +3,9 @@
 ## 0.18.2 - 2026-11-27
 
 - **Fork release integrating upstream v0.18.1:** Includes [upstream v0.18.1](https://github.com/getpaseo/paseo/releases/tag/v0.18.1). Download this fork from [GitHub releases](https://github.com/derrickzhde/paseo/releases).
+
+### Changed
+
 - **Preserved fork behavior:** Math rendering and copying, including formulas in copied quotes, per-model thinking controls, the phone 12/24-hour clock, Codex `/goal` follow-up steering, Expo push recovery, the Claude imported-session cache, Claude API and gateway model discovery, measured session speed and cache-hit metrics, Vitest browser CI, and the Enriched Markdown patch.
 
 ## 0.18.1 - 2026-11-27

@@ -3,6 +3,9 @@
 ## 0.18.2 - 2026-11-27
 
 - **集成上游 v0.18.1 的 Fork 版本：** 包含 [上游 v0.18.1](https://github.com/getpaseo/paseo/releases/tag/v0.18.1)。请从本 fork 的 [GitHub releases](https://github.com/derrickzhde/paseo/releases) 下载。
+
+### 变更
+
 - **保留的 fork 行为：** 数学公式渲染和复制（包括复制引用块中的公式）、按模型的思考控制、手机 12/24 小时制、Codex `/goal` 后续引导、Expo 推送恢复、Claude 导入会话缓存、Claude API 和网关模型发现、实测会话速度和缓存命中率、Vitest 浏览器 CI，以及 Enriched Markdown 补丁。
 
 ## 0.18.1 - 2026-11-27
